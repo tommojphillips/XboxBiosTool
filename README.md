@@ -23,7 +23,7 @@
   - The "Split bios" command requires the `-bios` and `-romsize` switches, which specify the BIOS file to split and the size of the ROM, respectively.
   - The "list bios" command requires the `-bios` switch and has a few switches to hone-down what you are actually looking for. ( `-2bl`, `-nv2a`, `-datatbl` )
 
-- If an argument is provided without a switch, it is inferred to be associated with the `-bios` switch. This means that you don't necessarily have to explicitly use the `-bios` switch when providing your BIOS file. You can simply provide the argument (the BIOS file in this case) and the program will understand that it is meant to be used with the `-bios` switch.
+- If an argument is provided without a switch, it is inferred to be associated with the `-bios` switch. This means that you don't necessarily have to explicitly use the `-bios` switch when providing your BIOS file. You can simply provide the argument and the program will understand that it is meant to be used with the `-bios` switch.
 
 - In order to decrypt parts of the BIOS, ( preldr, 2bl, krnl ) you will need to provide a 16-byte RC4 key file `key.bin` or the correct MCPX version specific to your BIOS. Without these, the decryption process cannot proceed.
   - Please note that this repository does not contain any crypto keys. **You will need to provide your own key file or a MCPX rom**.
