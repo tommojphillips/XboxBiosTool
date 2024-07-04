@@ -10,9 +10,15 @@
 - **Decode xcodes** (`xcode-decode`): Decodes the xcodes from a BIOS file or an initialization table.
 - **Decompress krnl** (`decomp-krnl`): Decompresses the kernel from a BIOS file.
 
+# Notes / Comments
 Each command has a set of required and optional switches that modify that specific command's behavior. For example:
 - The "Split bios" command requires the `-bios` and `-romsize` switches, which specify the BIOS file to split and the size of the ROM, respectively.
 - The "list bios" command requires the `-bios` switch. but has a few optional switches to hone-down what you are actually interested in. (-xcodes, -2bl, -datatbl -inittbl)
+
+If an argument is provided without a switch, it is inferred to be associated with the `-bios` switch. This means that you don't necessarily have to explicitly use the `-bios` switch when providing your BIOS file. You can simply provide the argument (the BIOS file in this case) and the program will understand that it is meant to be used with the `-bios` switch.
+
+In order to decrypt parts of the BIOS, ( 2bl, preldr, krnl ) you will need to provide a 16-byte RC4 key file `key.bin` or the correct MCPX version specific to your BIOS. Without these, the decryption process cannot proceed. Please ensure you have the correct key file or MCPX version before attempting to decrypt the BIOS.
+- Please note that this repository does not contain any crypto keys. **You will need to provide your own key file or a MCPX rom**.
 
 # Terminology
 **BIN SIZE**: This refers to the actual size of the BIOS binary file (with the `.bin` extension) on your disk. This size is determined by the total number of bytes that make up the file. You can think of it as the physical space that the file takes up on your hard drive.
