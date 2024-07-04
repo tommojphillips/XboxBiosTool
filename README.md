@@ -41,3 +41,12 @@ Example: you can have a 1MB bios.bin file and that file could contain `4x 256KB 
 ```xbios.exe -xcode-decode bios.bin``` - would interp/decode xcodes 
 
 ```xbios.exe -decomp-krnl bios.bin -mcpx mcpx.bin``` - Load the bios, decrypt it, and decompress the kernel to 'krnl.img'.
+
+# Example output:
+Xcode simulator (visor hack sim)
+
+![xcode_sim__eg](https://github.com/tommojphillips/XboxBiosTool/assets/39871058/1cfcfafa-9574-498d-86df-d2c3002266ed)
+
+Xcode decode:
+![Screenshot 2024-07-04 161539](https://github.com/tommojphillips/XboxBiosTool/assets/39871058/cc215e40-0c8a-4a99-b889-11cac7e649f0)
+
