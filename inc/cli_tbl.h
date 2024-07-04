@@ -14,27 +14,47 @@ enum COMMAND {
 };
 
 enum SWITCH : UINT {
-	SW_NONE = 1 << 0, SW_HELP = 1 << 1,
-	SW_BIOS_FILE = 1 << 2, SW_ROMSIZE = 1 << 3,
-	SW_KEY_KRNL = 1 << 4, SW_KEY_BLDR = 1 << 5,
+	SW_NONE =			1 << 0, 
+	SW_HELP =			1 << 1,
+	
+	SW_BIOS_FILE =		1 << 2,
+	
+	SW_ROMSIZE =		1 << 3,
 
-	SW_OUT = 1 << 6,
+	SW_KEY_KRNL_FILE =	1 << 4,
+	SW_KEY_BLDR_FILE =	1 << 5,
+	SW_OUT_FILE =		1 << 6,
 
-	SW_BANK1 = 1 << 7, SW_BANK2 = 1 << 8, SW_BANK3 = 1 << 9, SW_BANK4 = 1 << 10,
+	SW_BANK1_FILE =		1 << 7, 
+	SW_BANK2_FILE =		1 << 8,
+	SW_BANK3_FILE =		1 << 9,
+	SW_BANK4_FILE =		1 << 10,
 
-	SW_BLDR = 1 << 11, SW_KRNL = 1 << 12, SW_INITTBL = 1 << 13,
-	SW_ENC_BLDR = 1 << 14, SW_ENC_KRNL = 1 << 15,
+	SW_BLDR_FILE =		1 << 11,
+	SW_KRNL_FILE =		1 << 12,
+	SW_INITTBL_FILE =	1 << 13,
 
-	SW_LS_XCODES = 1 << 17, SW_LS_NV2A_TBL = 1 << 18, SW_LS_BIOS = 1 << 19, SW_LS_KRNL = 1 << 20,
-	SW_LS_BLDR = 1 << 21, SW_LS_INITTBL = 1 << 22, SW_LS_DATA_TBL = 1 << 23,
+	SW_ENC_BLDR =		1 << 14,
+	SW_ENC_KRNL =		1 << 15,
 
-	SW_MCPX = 1 << 24,
+	// ?? =				1 << 16,
+	// ?? =				1 << 17,
 
-	SW_PUB_KEY_FILE = 1 << 25,
-	SW_PATCH_PUB_KEY = 1 << 26,
+	SW_LS_NV2A_TBL =	1 << 18, 
+	SW_LS_BIOS =		1 << 19, 
+	SW_LS_KRNL =		1 << 20,
+	SW_LS_BLDR =		1 << 21, 
+	SW_LS_INITTBL =		1 << 22, 
+	SW_LS_DATA_TBL =	1 << 23,
+	
+	SW_MCPX =			1 << 24,
 
-	SW_BLD_BIOS = SW_BLDR | SW_KRNL | SW_INITTBL | SW_ROMSIZE,
-	SW_BANKS = SW_BANK1 | SW_BANK2 | SW_BANK3 | SW_BANK4,
+	SW_PUB_KEY_FILE =	1 << 25,
+	SW_PATCH_PUB_KEY =	1 << 26,
+
+	SW_BLD_BIOS = SW_BLDR_FILE | SW_KRNL_FILE | SW_INITTBL_FILE | SW_ROMSIZE,
+	SW_BANKS_FILE = SW_BANK1_FILE | SW_BANK2_FILE | SW_BANK3_FILE | SW_BANK4_FILE,
+	
 	SW_LS_OPT = SW_LS_BIOS | SW_LS_NV2A_TBL | SW_LS_KRNL | SW_LS_BLDR | SW_LS_INITTBL /*| SW_LS_XCODES | SW_LS_DATA_TBL*/
 };
 

@@ -119,38 +119,41 @@ class XbTool
 
 		void deconstruct();
 
+		// print the bios info. (boot params, sizes, xcodes, nv2a tbl, etc.)
 		int listBios();
 
-		// extract the bios. (bldr, krnl, inittbl) to their respective files.
+		// extract the bios. (bldr, krnl, krnl data, inittbl) to their respective files.
 		int extractBios();
-		
+
 		// build the bios. (bldr, krnl, inittbl) from the files provided.
 		int buildBios();
 
 		// split the bios into separate banks. based on the rom size provided.
-		int splitBios();
+		int splitBios();		
 		
 		// combine the bios files provided into a single bios file. (bank1, bank2, bank3, bank4)
 		int combineBios();
 
-		// simulate the xcodes from the inittbl file provided.
+		// simulate the xcodes.
 		int simulateXcodes() const;
+		
+		// decode the xcodes. 
+		int decodeXcodes() const;
 
-		//
+		// decompress the kernel from the bios file provided.
 		int decompressKrnl();
 
 		// read in the keys from the key files provided. (key-bldr, key-krnl)
-		int readKeys();
+		int readKeys();		
 		
 		// read in the mcpx file provided. 
 		int readMCPX();
 		
-		//
-		int decodeXcodes(UCHAR* data, UINT size);
-
+		// attempt to find the public key in the ptr.
+		int extractPubKey(UCHAR* data, UINT size);
 };
 
-int extractPubKey(UCHAR* data, UINT size, bool dumpToConsole = true);
+
 int verifyPubKey(UCHAR* data, PUBLIC_KEY*& pubkey);
 int printPubKey(PUBLIC_KEY* pubkey);
 

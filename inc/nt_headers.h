@@ -177,7 +177,6 @@ static void print_nt_header(IMAGE_NT_HEADER* nt_header)
     print_image_file_header(&nt_header->file_header);
     print_optional_header(&nt_header->optional_header);
 }
-
 static void print_nt_header_basic(IMAGE_NT_HEADER* nt_header)
 {
     print("Signature:\t%s\n", &nt_header->signature);

@@ -21,8 +21,8 @@
 #include "help_strings.h"
 #include "version.h"
 
-XbTool xbtool;						// global instance of xbtool
-Parameters&  params = xbtool.params; // global instance of parameters (pointing to xbtool's params)
+XbTool xbtool;							// global instance of xbtool
+Parameters&  params = xbtool.params;	// global instance of parameters.
 
 // Command table. name, switch, type, required switches, optional switches, help string
 const CMD_TBL cmd_tbl[] = {
@@ -30,50 +30,54 @@ const CMD_TBL cmd_tbl[] = {
 	{ "List bios",			"ls",			CMD_LIST,				(SW_BIOS_FILE),				 (SW_ROMSIZE | SW_LS_OPT),				HELP_STR_LIST },
 	
 	{ "Split bios",			"split",		CMD_SPLIT,				(SW_BIOS_FILE | SW_ROMSIZE), (SW_NONE),								HELP_STR_SPLIT },
-	{ "Combine banks",		"combine",		CMD_COMBINE,			(SW_NONE),					 (SW_OUT | SW_BANKS),					HELP_STR_COMBINE },
-	
+	{ "Combine banks",		"combine",		CMD_COMBINE,			(SW_NONE),					 (SW_OUT_FILE | SW_BANKS_FILE),			HELP_STR_COMBINE },
+
 	{ "Extract bios",		"extr",			CMD_EXTR,				(SW_BIOS_FILE),				 (SW_BLD_BIOS),							HELP_STR_EXTR_ALL },
-	{ "Build bios",			"bld",			CMD_BLD_BIOS,			(SW_BLD_BIOS),				 (SW_OUT),								HELP_STR_BUILD },
-	
-	{ "Simulate xcodes",	"xcode-sim",	CMD_XCODE_SIM,			(SW_NONE),					 (SW_INITTBL | SW_BIOS_FILE),			HELP_STR_BUILD_INITTBL },
-	{ "Decode xcodes",		"xcode-decode",	CMD_XCODE_DECODE,		(SW_NONE),					(SW_INITTBL | SW_BIOS_FILE),			NULL },
+	{ "Build bios",			"bld",			CMD_BLD_BIOS,			(SW_BLD_BIOS),				 (SW_OUT_FILE),							HELP_STR_BUILD },
 
-	{ "Decompress krnl",	"decomp-krnl",	CMD_KRNL_DECOMPRESS,	(SW_BIOS_FILE),	(SW_OUT | SW_PATCH_PUB_KEY | SW_PUB_KEY_FILE),		NULL }
+	{ "Simulate xcodes",	"xcode-sim",	CMD_XCODE_SIM,			(SW_NONE),					 (SW_INITTBL_FILE | SW_BIOS_FILE),		HELP_STR_BUILD_INITTBL },
+	{ "Decode xcodes",		"xcode-decode",	CMD_XCODE_DECODE,		(SW_NONE),					(SW_INITTBL_FILE | SW_BIOS_FILE),		NULL },
 
+	{ "Decompress krnl",	"decomp-krnl",	CMD_KRNL_DECOMPRESS,	(SW_BIOS_FILE),	(SW_OUT_FILE | SW_PATCH_PUB_KEY | SW_PUB_KEY_FILE),	NULL }
 };
 
-PARAM_TBL PARAM_BLDR_KEY = { "key-bldr",	SW_KEY_BLDR,	&params.keyBldrFile,	PARAM_TBL::STR,		NULL };
-PARAM_TBL PARAM_BLDR_ENC = { "enc-bldr",	SW_ENC_BLDR,	&params.encBldr,		PARAM_TBL::BOOL,	NULL };
-PARAM_TBL PARAM_KRNL_KEY = { "key-krnl",	SW_KEY_KRNL,	&params.keyKrnlFile,	PARAM_TBL::STR,		NULL };
-PARAM_TBL PARAM_KRNL_ENC = { "enc-krnl",	SW_ENC_KRNL,	&params.encKrnl,		PARAM_TBL::BOOL,	NULL };
+PARAM_TBL PARAM_BLDR_KEY = { "key-bldr",	SW_KEY_BLDR_FILE,	&params.keyBldrFile,	PARAM_TBL::STR,		NULL };
+PARAM_TBL PARAM_BLDR_ENC = { "enc-bldr",	SW_ENC_BLDR,		&params.encBldr,		PARAM_TBL::BOOL,	NULL };
+
+PARAM_TBL PARAM_KRNL_KEY = { "key-krnl",	SW_KEY_KRNL_FILE,	&params.keyKrnlFile,	PARAM_TBL::STR,		NULL };
+PARAM_TBL PARAM_KRNL_ENC = { "enc-krnl",	SW_ENC_KRNL,		&params.encKrnl,		PARAM_TBL::BOOL,	NULL };
 
 // Parameter table. switch, type, variable, variable type, help string
 PARAM_TBL param_tbl[] = {
 	{ "bios",		SW_BIOS_FILE,	&params.biosFile,		PARAM_TBL::STR,		HELP_STR_PARAM_BIOS_FILE },
-	{ "out",		SW_OUT,			&params.outFile,		PARAM_TBL::STR,		HELP_STR_PARAM_OUT_FILE },
+	{ "out",		SW_OUT_FILE,	&params.outFile,		PARAM_TBL::STR,		HELP_STR_PARAM_OUT_FILE },
 	{ "romsize",	SW_ROMSIZE,		&params.romsize,		PARAM_TBL::INT,		HELP_STR_PARAM_ROMSIZE },
 
-	PARAM_BLDR_KEY, PARAM_BLDR_ENC, PARAM_KRNL_KEY, PARAM_KRNL_ENC, // key switches
+	// crypto switches
+	PARAM_BLDR_KEY, PARAM_BLDR_ENC, PARAM_KRNL_KEY, PARAM_KRNL_ENC,
 
-	{ "bank1",		SW_BANK1,		&params.bankFiles[0],	PARAM_TBL::STR,		HELP_STR_PARAM_BANK1 },
-	{ "bank2",		SW_BANK2,		&params.bankFiles[1],	PARAM_TBL::STR,		HELP_STR_PARAM_BANK2 },
-	{ "bank3",		SW_BANK3,		&params.bankFiles[2],	PARAM_TBL::STR,		HELP_STR_PARAM_BANK3 },
-	{ "bank4",		SW_BANK4,		&params.bankFiles[3],	PARAM_TBL::STR,		HELP_STR_PARAM_BANK4 },
+	// bank switches (used for split, combine commands)
+	{ "bank1",		SW_BANK1_FILE,	&params.bankFiles[0],	PARAM_TBL::STR,	HELP_STR_PARAM_BANK1 },
+	{ "bank2",		SW_BANK2_FILE,	&params.bankFiles[1],	PARAM_TBL::STR,	HELP_STR_PARAM_BANK2 },
+	{ "bank3",		SW_BANK3_FILE,	&params.bankFiles[2],	PARAM_TBL::STR,	HELP_STR_PARAM_BANK3 },
+	{ "bank4",		SW_BANK4_FILE,	&params.bankFiles[3],	PARAM_TBL::STR,	HELP_STR_PARAM_BANK4 },
 
-	{ "bldr",		SW_BLDR,		&params.bldrFile,		PARAM_TBL::STR,		HELP_STR_PARAM_BLDR },
-	{ "krnl",		SW_KRNL,		&params.krnlFile,		PARAM_TBL::STR,		HELP_STR_PARAM_KRNL },
-	{ "inittbl",	SW_INITTBL,		&params.inittblFile,		PARAM_TBL::STR,		HELP_STR_PARAM_INITTBL },
+	// bios switches
+	{ "bldr",		SW_BLDR_FILE,	&params.bldrFile,		PARAM_TBL::STR,	HELP_STR_PARAM_BLDR },
+	{ "krnl",		SW_KRNL_FILE,	&params.krnlFile,		PARAM_TBL::STR,	HELP_STR_PARAM_KRNL },
+	{ "inittbl",	SW_INITTBL_FILE,&params.inittblFile,	PARAM_TBL::STR,	HELP_STR_PARAM_INITTBL },
 		
-	// Flags for list bios command.
-	{ "xcodes",		SW_LS_XCODES,	&params.ls_flag,		PARAM_TBL::FLAG,	HELP_STR_PARAM_LS_XCODES },
-	{ "nv2a",		SW_LS_NV2A_TBL,	&params.ls_flag,		PARAM_TBL::FLAG,	HELP_STR_PARAM_LS_NV2A_TBL },
-	{ "2bl",		SW_LS_BLDR,		&params.ls_flag,		PARAM_TBL::FLAG,	HELP_STR_PARAM_LS_BIOS },
-	{ "datatbl",	SW_LS_DATA_TBL,	&params.ls_flag,		PARAM_TBL::FLAG,	HELP_STR_PARAM_LS_DATA_TBL },
+	// Flags for list bios command. ( -ls )
+	{ "nv2a",		SW_LS_NV2A_TBL,	&params.ls_flag,	PARAM_TBL::FLAG,	HELP_STR_PARAM_LS_NV2A_TBL },
+	{ "2bl",		SW_LS_BLDR,		&params.ls_flag,	PARAM_TBL::FLAG,	HELP_STR_PARAM_LS_BIOS },
+	{ "datatbl",	SW_LS_DATA_TBL,	&params.ls_flag,	PARAM_TBL::FLAG,	HELP_STR_PARAM_LS_DATA_TBL },
 
-	{ "mcpx",		SW_MCPX,		&params.mcpxFile,		PARAM_TBL::STR,		NULL },
+	// MCPX switches (used for en/decrypting preldr, 2bl and compresed kernel img)
+	{ "mcpx",		SW_MCPX,		&params.mcpxFile,	PARAM_TBL::STR,		NULL },
 
-	{ "pubkey",		SW_PUB_KEY_FILE,  &params.pubKeyFile,	PARAM_TBL::STR,		NULL },
-	{ "patchpubkey",SW_PATCH_PUB_KEY, &params.patchPubKey,	PARAM_TBL::BOOL,	NULL }
+	// public key switches (used for decompresed krnl extraction)
+	{ "pubkey",		SW_PUB_KEY_FILE,  &params.pubKeyFile,	PARAM_TBL::STR,	NULL },
+	{ "patchpubkey",SW_PATCH_PUB_KEY, &params.patchPubKey,	PARAM_TBL::BOOL,NULL }
 };
 
 void printHelp()
@@ -381,18 +385,16 @@ int main(int argc, char* argv[])
 	}
 
 	print("%s\n\n", xbtool.cmd->name);
-
-	result = xbtool.readKeys(); // read in keys if provided.
+	
+	// read in keys if provided.
+	result = xbtool.readKeys(); 
 	if (!SUCCESS(result))
 		goto Exit;
 
-	// read in mcpx data if provided
-	if (params.mcpxFile != NULL)
-	{
-		result = xbtool.readMCPX();
-		if (!SUCCESS(result))
-			goto Exit;
-	}
+	// read in mcpx rom if provided
+	result = xbtool.readMCPX();
+	if (!SUCCESS(result))
+		goto Exit;
 
 	// run command
 
@@ -424,7 +426,7 @@ int main(int argc, char* argv[])
 			break;
 
 		case CMD_XCODE_DECODE:
-			result = xbtool.decodeXcodes(NULL, 0);
+			result = xbtool.decodeXcodes();
 			break;
 
 		default:

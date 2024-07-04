@@ -1,4 +1,4 @@
-// XbTool.cpp : Defines functions for the XbTool class
+// XbTool.cpp : Implements command functions for the Xbox Bios Tool.
 
 // Author: tommojphillips
 // GitHub: https:\\github.com\tommojphillips
@@ -303,10 +303,10 @@ int XbTool::combineBios()
 
 	UCHAR* data = NULL;
 
-	Bios banks[MAX_BANKS] = { };
+	UCHAR* banks[MAX_BANKS] = { NULL };
+	UINT bankSizes[MAX_BANKS] = { 0 };
 
 	const char* filename = params.outFile;
-
 	if (filename == NULL)
 	{
 		filename = "bios.bin";
@@ -331,13 +331,9 @@ int XbTool::combineBios()
 				isLoaded = true;
 				print("Reading %s from bank %d\n", params.bankFiles[i], j + 1);
 
-				//banks[i].loadFromData(banks[j].getBiosData(), banks[j].getBiosSize());
-				//if (!SUCCESS(result))
-				//{
-				//	goto Cleanup;
-				//}
-				
-				banks[i] = banks[j];
+				banks[i] = (UCHAR*)xb_alloc(bankSizes[j]);
+				xb_cpy(banks[i], banks[j], bankSizes[i]);
+				bankSizes[i] = bankSizes[j];
 
 				break;
 			}
@@ -346,20 +342,21 @@ int XbTool::combineBios()
 		if (!isLoaded)
 		{
 			print("Reading %s from file\n", params.bankFiles[i]);
-			result = banks[i].loadFromFile(params.bankFiles[i]);
-			if (result == BIOS_LOAD_STATUS_FAILED) // bios doesn't need to be valid to combine
+
+			banks[i] = readFile(params.bankFiles[i], &bankSizes[i]);
+			if (banks[i] == NULL) // failed to load bank
 			{
 				goto Cleanup;
 			}
 
-			if (!SUCCESS(checkSize(banks[i].getBiosSize())))
+			if (!SUCCESS(checkSize(bankSizes[i])))
 			{
-				error("Error: %s has invalid file size: %d\n", params.bankFiles[i], banks[i].getBiosSize());
+				error("Error: %s has invalid file size: %d\n", params.bankFiles[i], bankSizes[i]);
 				result = 1;
 				goto Cleanup;
 			}
 		}
-		totalSize += banks[i].getBiosSize();
+		totalSize += bankSizes[i];
 	}
 
 	if (numBanks < 2)
@@ -385,11 +382,11 @@ int XbTool::combineBios()
 
 	for (i = 0; i < MAX_BANKS; i++)
 	{
-		if (banks[i].isLoaded())
+		if (banks[i] != NULL)
 		{
-			print("Reading %s %dKB into offset 0x%x (bank %d)\n", params.bankFiles[i], banks[i].getBiosSize() / 1024, offset, i + 1);
-			xb_cpy(data + offset, banks[i].getBiosData(), banks[i].getBiosSize());
-			offset += banks[i].getBiosSize();
+			print("Copying %s %dKB into offset 0x%x (bank %d)\n", params.bankFiles[i], bankSizes[i] / 1024, offset, i + 1);
+			xb_cpy(data + offset, banks[i], bankSizes[i]);
+			offset += bankSizes[i];
 		}
 	}
 
@@ -411,6 +408,15 @@ Cleanup:
 	if (data != NULL)
 	{
 		xb_free(data);
+	}
+
+	for (i = 0; i < MAX_BANKS; i++)
+	{
+		if (banks[i] != NULL)
+		{
+			xb_free(banks[i]);
+			banks[i] = NULL;
+		}
 	}
 
 	return result;
@@ -484,11 +490,6 @@ int XbTool::listBios()
 		bios.printNv2aInfo();
 	}
 
-	if (flag & SW_LS_XCODES)
-	{
-		decodeXcodes(bios.getBiosData(), params.romsize);
-	}
-
 	if (flag & SW_LS_DATA_TBL)
 	{
 		bios.printDataTbl();
@@ -497,7 +498,7 @@ int XbTool::listBios()
 	return 0;
 }
 
-int XbTool::decodeXcodes(UCHAR* data, UINT dataSize)
+int XbTool::decodeXcodes() const
 {
 	const UINT BASE_OFFSET = sizeof(INIT_TBL);
 
@@ -506,53 +507,43 @@ int XbTool::decodeXcodes(UCHAR* data, UINT dataSize)
 	UINT size = 0;
 	int result = 0;
 
-	// check if data was passed in
-	if (data == NULL)
-	{
-		// data was not passed in. load the inittbl file (inittblFile or biosFile)
+	// load the inittbl file (inittblFile or biosFile)
  
-		const char* filename = params.inittblFile;
+	const char* filename = params.inittblFile;
+	if (filename == NULL)
+	{
+		filename = params.biosFile;
 		if (filename == NULL)
 		{
-			filename = params.biosFile;
-			if (filename == NULL)
-			{
-				error("Error: No inittbl file provided\n");
-				return 1;
-			}
-		}
-
-		print("inittbl file: %s\n", filename);
-		inittbl = readFile(filename, &size);
-		if (inittbl == NULL)
-		{
-			result = 1;
-			goto Cleanup;
-		}
-
-		// validate the inittbl file
-		if (size < BASE_OFFSET)
-		{
-			error("Error: Invalid inittbl size: %d. Expected atleast %d bytes\n", size, BASE_OFFSET);
-			result = 1;
-			goto Cleanup;
-		}
-
-		// note: im only interested in the xcodes. so the inittbl size should be less than 0x100000 (way less)
-		// i could force check to 256, 512, 1024, but that prevents the user from using an extracted inittbl file. 
-		// (3-4KB or even more if there were a considerble amount of xcodes added)
-		if (size > 0x100000)
-		{
-			error("Error: Invalid inittbl size: %d. Expected less than %d bytes\n", size, 0x100000);
-			result = 1;
-			goto Cleanup;
+			error("Error: No inittbl file provided\n");
+			return 1;
 		}
 	}
-	else
+
+	print("inittbl file: %s\n", filename);
+	inittbl = readFile(filename, &size);
+	if (inittbl == NULL)
 	{
-		// data has been passed in. use it.
-		inittbl = data;
-		size = dataSize;
+		result = 1;
+		goto Cleanup;
+	}
+
+	// validate the inittbl file
+	if (size < BASE_OFFSET)
+	{
+		error("Error: Invalid inittbl size: %d. Expected atleast %d bytes\n", size, BASE_OFFSET);
+		result = 1;
+		goto Cleanup;
+	}
+
+	// note: im only interested in the xcodes. so the inittbl size should be less than 0x100000 (way less)
+	// i could force check to 256, 512, 1024, but that prevents the user from using an extracted inittbl file. 
+	// (3-4KB or even more if there were a considerble amount of xcodes added)
+	if (size > 0x100000)
+	{
+		error("Error: Invalid inittbl size: %d. Expected less than %d bytes\n", size, 0x100000);
+		result = 1;
+		goto Cleanup;
 	}
 	
 	print("\nDecode xcodes:\n");
@@ -567,14 +558,10 @@ int XbTool::decodeXcodes(UCHAR* data, UINT dataSize)
 
 Cleanup:
 
-	// if data was not passed in, free it. otherwise, the caller is responsible for freeing it.
-	if (data == NULL) 
+	if (inittbl != NULL)
 	{
-		if (inittbl != NULL)
-		{
-			xb_free(inittbl);
-		}
-	}
+		xb_free(inittbl);
+	}	
 
 	return result;
 }
@@ -677,6 +664,7 @@ int XbTool::simulateXcodes() const
 		// sanity check of addr.
 		if (xcode->addr < 0 || xcode->addr >= SIM_SIZE)
 		{
+			error("XCODE wrote to an address outside of the simulated memory space. addr: 0x%X\n", xcode->addr);
 			continue;
 		}
 		hasMemChanges_total = true;
@@ -827,7 +815,7 @@ int XbTool::decompressKrnl()
 	print("\nNT Header:\n");
 	print_nt_header_basic(header);
 
-	result = extractPubKey(decompressedKrnl, decompressedSize, true);
+	result = extractPubKey(decompressedKrnl, decompressedSize);
 
 	// get the filename
 	const char* filename = params.outFile;
@@ -858,133 +846,6 @@ Cleanup:
 	// bios frees it's allocated memory. no need to free decompressedKrnl
 
 	return result;
-}
-
-int verifyPubKey(UCHAR* data, PUBLIC_KEY*& pubkey)
-{
-	// verify the public key by checking the modulus size and the exponent.
-	// the modulus size should be 2048 bits and the exponent should be 65537.
-
-	if (data == NULL)
-	{
-		error("Error: Public key is NULL\n");
-		return 1;
-	}
-
-	const RSA_HEADER RSA1_HEADER = { { 'R', 'S', 'A', '1' }, 264, 2048, 255, 65537 };
-
-	if (xb_cmp(data, &RSA1_HEADER, sizeof(RSA_HEADER)) != 0)
-	{
-		return 1;
-	}
-
-	// update the public key struct
-	pubkey = (PUBLIC_KEY*)data;
-
-	return 0;
-}
-
-int printPubKey(PUBLIC_KEY* pubkey)
-{
-	const int bytesPerLine = 16;
-	char line[bytesPerLine * 3 + 1] = { 0 };
-
-	// print the public key to the console	
-	for (int i = 0; i < 264; i += bytesPerLine)
-	{
-		for (UINT j = 0; j < bytesPerLine; j++)
-		{
-			if (i + j >= 264)
-				break;
-			format(line + (j * 3), "%02X ", pubkey->modulus[i + j]);
-		}
-		print("%s\n", line);
-	}
-
-	return 0;
-}
-
-int extractPubKey(UCHAR* data, UINT size, bool dumpToConsole)
-{
-	// after successful decompression, lets see if we can find the public key.
-	// public key should start with the RSA1 magic number.
-	// if we find it, we can extract the public key and save it to a file.
-
-	if (data == NULL || size == 0)
-	{
-		error("Error: Invalid data\n");
-		return 1;
-	}
-
-	PUBLIC_KEY* pubkey = NULL;
-	UINT i;
-	
-	// search for the RSA1 header
-	for (i = 0; i < size - sizeof(PUBLIC_KEY); i++)
-	{
-		if (verifyPubKey(data + i, pubkey) == 0)
-		{
-			break;
-		}
-	}
-
-	if (pubkey == NULL)
-	{
-		print("Public key not found\n");
-		return 1;
-	}
-
-	print("Public key found at offset 0x%x\n", i);
-
-	if (dumpToConsole)
-	{
-		printPubKey(pubkey);
-	}
-
-	extern XbTool xbtool;
-
-	// check if user is patching the public key, 
-	// the user might be using the 'pubkeyfile' switch to tell us where to save it.
-	// otherwise, patch the public key with the provided key. (pubkeyfile is providing us with the key)
-	if (!xbtool.params.patchPubKey)
-	{
-		if (xbtool.params.pubKeyFile != NULL)
-		{
-			print("Writing public key to %s (%d bytes)\n", xbtool.params.pubKeyFile, sizeof(PUBLIC_KEY));
-			if (!SUCCESS(writeFile(xbtool.params.pubKeyFile, pubkey, sizeof(PUBLIC_KEY))))
-			{
-				error("Error: Failed to write public key to file\n");
-				return 1;
-			}
-		}
-	}
-	else
-	{
-		if (xbtool.params.pubKeyFile != NULL)
-		{
-			// patch the public key
-			print("\nPatching public key..\n");
-
-			PUBLIC_KEY* patch_pubkey = (PUBLIC_KEY*)readFile(xbtool.params.pubKeyFile, NULL, sizeof(PUBLIC_KEY));
-			if (patch_pubkey == NULL)
-			{
-				error("Error: Failed to patch public key\n");
-				return 1;
-			}
-
-			xb_cpy(pubkey->modulus, patch_pubkey->modulus, sizeof(pubkey->modulus));
-
-			xb_free(patch_pubkey);
-
-			if (dumpToConsole)
-			{
-				printPubKey(pubkey);
-			}
-			print("Public key patched.\n");
-		}
-	}
-
-	return 0;
 }
 
 int XbTool::readKeys()
@@ -1023,51 +884,169 @@ int XbTool::readMCPX()
 {
 	// read in the mcpx file that has been provided on the command line
 
-	if (params.mcpxFile != NULL)
+	if (params.mcpxFile == NULL)
+		return 0;
+
+	params.mcpx.data = readFile(params.mcpxFile, NULL, MCPX_BLOCK_SIZE);
+	if (params.mcpx.data == NULL)
+		return 1;
+
+	// verify we got a valid mcpx rom. readFile() has already checked the size.
+	// create some constants to check against.
+
+	const UINT MCPX_CONST_ONE = 280018995;
+	const UINT MCPX_CONST_TWO = 3230587022;
+	const UINT MCPX_CONST_THREE = 3993153540;
+	const UINT MCPX_CONST_FOUR = 2160066559;
+
+	if (xb_cmp(params.mcpx.data, &MCPX_CONST_ONE, 4) != 0 ||
+		xb_cmp(params.mcpx.data + 4, &MCPX_CONST_TWO, 4) != 0 ||
+		xb_cmp(params.mcpx.data + MCPX_BLOCK_SIZE - 4, &MCPX_CONST_THREE, 4) != 0)
 	{
-		params.mcpx.data = readFile(params.mcpxFile, NULL, MCPX_BLOCK_SIZE);
-		if (params.mcpx.data == NULL)
-			return 1;
+		error("Error: Invalid MCPX ROM\n");
+		return 1;
+	}
 
-		// verify we got a valid mcpx rom. readFile() has already checked the size.
-		// create some constants to check against.
+	// valid mcpx rom
 
-		const UINT MCPX_CONST_ONE = 280018995;
-		const UINT MCPX_CONST_TWO = 3230587022;
-		const UINT MCPX_CONST_THREE = 3993153540;
-		const UINT MCPX_CONST_FOUR = 2160066559;
+	print("mcpx file: %s ", params.mcpxFile);
 
-		if (xb_cmp(params.mcpx.data, &MCPX_CONST_ONE, 4) != 0 ||
-			xb_cmp(params.mcpx.data+4, &MCPX_CONST_TWO, 4) != 0 ||
-			xb_cmp(params.mcpx.data+MCPX_BLOCK_SIZE-4, &MCPX_CONST_THREE, 4) != 0)
+	// mcpx v1.0 has a hardcoded signature at offset 0x187.
+	if (xb_cmp(params.mcpx.data + 0x187, BOOT_PARAMS_SIGNATURE, 4) == 0)
+	{
+		print("( v1.0 )\n");
+		params.mcpx.version = MCPX_ROM::MCPX_V1_0;
+		return 0;
+	}
+
+	// verify the mcpx rom is v1.1
+
+	if (xb_cmp(params.mcpx.data + 0xe0, &MCPX_CONST_FOUR, 4) != 0)
+	{
+		error("Error: Invalid MCPX v1.1 ROM\n");
+		return 1;
+	}
+
+	print("( v1.1 )\n");
+	params.mcpx.version = MCPX_ROM::MCPX_V1_1;
+
+	return 0;
+}
+
+int XbTool::extractPubKey(UCHAR* data, UINT size)
+{
+	// after successful decompression, lets see if we can find the public key.
+	// public key should start with the RSA1 magic number.
+	// if we find it, we can extract the public key and save it to a file.
+
+	if (data == NULL || size == 0)
+	{
+		error("Error: Invalid data\n");
+		return 1;
+	}
+
+	PUBLIC_KEY* pubkey = NULL;
+	UINT i;
+
+	// search for the RSA1 header
+	for (i = 0; i < size - sizeof(PUBLIC_KEY); i++)
+	{
+		if (verifyPubKey(data + i, pubkey) == 0)
 		{
-			error("Error: Invalid MCPX ROM\n");
-			return 1;
+			break;
 		}
+	}
 
-		// they seem to be valid mcpx roms
+	if (pubkey == NULL)
+	{
+		print("Public key not found\n");
+		return 1;
+	}
 
-		print("mcpx file: %s ", params.mcpxFile);
+	print("Public key found at offset 0x%x\n", i);
 
-		// mcpx v1.0 has a hardcoded signature at offset 0x187.
-		if (xb_cmp(params.mcpx.data+0x187, BOOT_PARAMS_SIGNATURE, 4) == 0)
+	printPubKey(pubkey);
+
+	// check if user is patching the public key, 
+	// the user might be using the 'pubkeyfile' switch to tell us where to save it.
+	// otherwise, patch the public key with the provided key. (pubkeyfile is providing us with the key)
+	if (!params.patchPubKey)
+	{
+		if (params.pubKeyFile != NULL)
 		{
-			print("( v1.0 )\n");
-			params.mcpx.version = MCPX_ROM::MCPX_V1_0;
-			return 0;
+			print("Writing public key to %s (%d bytes)\n", params.pubKeyFile, sizeof(PUBLIC_KEY));
+			if (!SUCCESS(writeFile(params.pubKeyFile, pubkey, sizeof(PUBLIC_KEY))))
+			{
+				error("Error: Failed to write public key to file\n");
+				return 1;
+			}
 		}
-
-		// verify the mcpx rom is v1.1
-						
-		if (xb_cmp(params.mcpx.data+0xe0, &MCPX_CONST_FOUR, 4) != 0)
+	}
+	else
+	{
+		if (params.pubKeyFile != NULL)
 		{
-			error("Error: Invalid MCPX v1.1 ROM\n");
-			return 1;
+			// patch the public key
+			print("\nPatching public key..\n");
+
+			PUBLIC_KEY* patch_pubkey = (PUBLIC_KEY*)readFile(params.pubKeyFile, NULL, sizeof(PUBLIC_KEY));
+			if (patch_pubkey == NULL)
+			{
+				error("Error: Failed to patch public key\n");
+				return 1;
+			}
+
+			xb_cpy(pubkey->modulus, patch_pubkey->modulus, sizeof(pubkey->modulus));
+
+			xb_free(patch_pubkey);
+
+			printPubKey(pubkey);
+
+			print("Public key patched.\n");
 		}
+	}
 
+	return 0;
+}
 
-		print("( v1.1 )\n");
-		params.mcpx.version = MCPX_ROM::MCPX_V1_1;
+int verifyPubKey(UCHAR* data, PUBLIC_KEY*& pubkey)
+{
+	// verify the public key header.
+
+	if (data == NULL)
+	{
+		error("Error: Public key is NULL\n");
+		return 1;
+	}
+
+	const RSA_HEADER RSA1_HEADER = { { 'R', 'S', 'A', '1' }, 264, 2048, 255, 65537 };
+
+	if (xb_cmp(data, &RSA1_HEADER, sizeof(RSA_HEADER)) != 0)
+	{
+		return 1;
+	}
+
+	// update the public key struct
+	pubkey = (PUBLIC_KEY*)data;
+
+	return 0;
+}
+
+int printPubKey(PUBLIC_KEY* pubkey)
+{
+	const int bytesPerLine = 16;
+	char line[bytesPerLine * 3 + 1] = { 0 };
+
+	// print the public key to the console	
+	for (int i = 0; i < 264; i += bytesPerLine)
+	{
+		for (UINT j = 0; j < bytesPerLine; j++)
+		{
+			if (i + j >= 264)
+				break;
+			format(line + (j * 3), "%02X ", pubkey->modulus[i + j]);
+		}
+		print("%s\n", line);
 	}
 
 	return 0;
