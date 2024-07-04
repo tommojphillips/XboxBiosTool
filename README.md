@@ -1,23 +1,31 @@
 # Command Table
 
-- **Help**^(`?`): Displays help information about how to use the program and its commands.
-- **List bios**       (`ls`): Lists information about the BIOS file, such as its size and the contents of its banks.
-- **Split bios**      (`split`): Splits a BIOS file into its constituent banks.
-- **Combine banks**   (`combine`): Combines multiple bank files into a single BIOS file.
-- **Extract bios**    (`extr`): Extracts information from a BIOS file, such as its public key or xcodes.
-- **Build bios**      (`bld`): Builds a BIOS file from a set of input files.
-- **Simulate xcodes** (`xcode-sim`): Simulates the execution of xcodes, which are instructions for initializing the BIOS.
-- **Decode xcodes**   (`xcode-decode`): Decodes the xcodes from a BIOS file or an initialization table.
-- **Decompress krnl** (`decomp-krnl`): Decompresses the kernel from a BIOS file.
+- `?` - Displays help information about how to use the program and its commands.
+- `ls` - Lists information about the BIOS file, boot params, sizes, rc4 keys.
+- `split` - Splits a BIOS file into banks based on romsize. Eg bios.bin 1Mb -> bios.bin 4x 256Kb
+- `combine` - Combine multiple bank files into a single bios file. Eg bios.bin x4 256Kb -> bios.bin 1Mb
+- `extr` - Extract the bootloader, compressed kernel, uncompressed kernel data and init table from a bios.
+- `bld` - Builds a BIOS file from a set of input files.
+- `xcode-sim` - Simulates mem-write xcodes and parse x86 opcodes. (visor sim)
+- `xcode-decode` - Decodes the xcodes from a BIOS file or an extracted init table
+- `decomp-krnl` - Decompresses the kernel from a BIOS file.
+
+# Switches
+
+- `enc-bldr` if flag is supplied the 2BL is assumed to be *unencrypted* within the bios file.
+- `enc-krnl` if flag is supplied the kernel is assumed to be *unencrypted* within the bios file.
+- `key-bldr` The path to the 16-byte .bin rc4 key file.
+- `key-krnl` The path to the 16-byte .bin rc4 key file.
+- `mcpx`     The path to the MCPX rom, used for en/decryption
 
 # Notes / Comments
 - Each command has a set of required and optional switches that modify that specific command's behavior. For example:
   - The "Split bios" command requires the `-bios` and `-romsize` switches, which specify the BIOS file to split and the size of the ROM, respectively.
-  - The "list bios" command requires the `-bios` switch. but has a few optional switches to hone-down what you are actually interested in. (-xcodes, -2bl, -datatbl -inittbl)
+  - The "list bios" command requires the `-bios` switch and has a few switches to hone-down what you are actually looking for. ( `-2bl`, `-nv2a`, `-datatbl` )
 
 - If an argument is provided without a switch, it is inferred to be associated with the `-bios` switch. This means that you don't necessarily have to explicitly use the `-bios` switch when providing your BIOS file. You can simply provide the argument (the BIOS file in this case) and the program will understand that it is meant to be used with the `-bios` switch.
 
-- In order to decrypt parts of the BIOS, ( 2bl, preldr, krnl ) you will need to provide a 16-byte RC4 key file `key.bin` or the correct MCPX version specific to your BIOS. Without these, the decryption process cannot proceed.
+- In order to decrypt parts of the BIOS, ( preldr, 2bl, krnl ) you will need to provide a 16-byte RC4 key file `key.bin` or the correct MCPX version specific to your BIOS. Without these, the decryption process cannot proceed.
   - Please note that this repository does not contain any crypto keys. **You will need to provide your own key file or a MCPX rom**.
 
 - Supports all versions of the BIOS, However, to ensure correct decryption, you will need to supply the appropriate MCPX version for your specific BIOS.
