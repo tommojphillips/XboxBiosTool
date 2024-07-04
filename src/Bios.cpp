@@ -763,6 +763,9 @@ int Bios::create(UCHAR* in_bl, UINT in_blSize, UCHAR* in_tbl, UINT in_tblSize, U
 	// copy in the compressed kernel image
 	xb_cpy(krnl, in_k, in_kSize);
 
+	// copy in the uncompressed kernel data
+	xb_cpy(krnlData, in_kData, in_kDataSize);
+
 	// fixup the boot params.
 	bootParams->krnlSize = in_kSize;
 	bootParams->krnlDataSize = in_kDataSize;

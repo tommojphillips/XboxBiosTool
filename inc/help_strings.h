@@ -36,6 +36,7 @@ const char HELP_STR_PARAM_BANK4[] = " <path>\t - Bank 4 file";
 
 const char HELP_STR_PARAM_BLDR[] = " <path>\t - bldr file";
 const char HELP_STR_PARAM_KRNL[] = " <path>\t - Kernel file";
+const char HELP_STR_PARAM_KRNL_DATA[] = " <path>\t - Uncompressed kernel data file";
 const char HELP_STR_PARAM_INITTBL[] = " <path> - Init table file";
 
 const char HELP_STR_PARAM_BLDR_BLOCK[] = "\t- bldr block size";

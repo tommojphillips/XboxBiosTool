@@ -54,6 +54,7 @@ struct Parameters
 	const char* inittblFile;
 	const char* bldrFile;
 	const char* krnlFile;
+	const char* krnlDataFile;
 
 	const char* mcpxFile;
 
@@ -70,7 +71,7 @@ struct Parameters
 
 	Parameters() : sw_flag(0), ls_flag(0), romsize(0), encBldr(true), encKrnl(true),
 		biosFile(NULL), outFile(NULL), inittblFile(NULL), bldrFile(NULL), 
-		krnlFile(NULL), keyBldrFile(NULL), keyKrnlFile(NULL), 
+		krnlFile(NULL), krnlDataFile(NULL), keyBldrFile(NULL), keyKrnlFile(NULL),
 		keyBldr(NULL), keyKrnl(NULL), mcpxFile(NULL), mcpx(), 
 		pubKeyFile(NULL), patchPubKey(false)
 	{

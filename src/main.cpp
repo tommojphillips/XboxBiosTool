@@ -65,6 +65,7 @@ PARAM_TBL param_tbl[] = {
 	// bios switches
 	{ "bldr",		SW_BLDR_FILE,	&params.bldrFile,		PARAM_TBL::STR,	HELP_STR_PARAM_BLDR },
 	{ "krnl",		SW_KRNL_FILE,	&params.krnlFile,		PARAM_TBL::STR,	HELP_STR_PARAM_KRNL },
+	{ "krnldata",	SW_KRNL_DATA_FILE,&params.krnlDataFile,	PARAM_TBL::STR,	HELP_STR_PARAM_KRNL_DATA },
 	{ "inittbl",	SW_INITTBL_FILE,&params.inittblFile,	PARAM_TBL::STR,	HELP_STR_PARAM_INITTBL },
 		
 	// Flags for list bios command. ( -ls )

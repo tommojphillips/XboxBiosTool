@@ -29,9 +29,11 @@ int XbTool::buildBios()
 	UCHAR* inittbl = NULL;
 	UCHAR* bldr = NULL;
 	UCHAR* krnl = NULL;
+	UCHAR* krnlData = NULL;
 	UINT inittblSize = 0;
 	UINT bldrSize = 0;
 	UINT krnlSize = 0;
+	UINT krnlDataSize = 0;
 	BOOT_PARAMS* bootParams = NULL;
 
 	// read in the init tbl file
@@ -60,10 +62,19 @@ int XbTool::buildBios()
 		result = 1;
 		goto Cleanup;
 	}
+
+	// read in the uncompressed kernel data
+	print ("krnl data file:\t%s\n", params.krnlDataFile);
+	krnlData = readFile(params.krnlDataFile, &krnlDataSize);
+	if (krnlData == NULL)
+	{
+		result = 1;
+		goto Cleanup;
+	}
 	// required files were read successfully
 	
 	// create the bios in memory
-	result = bios.create(bldr, bldrSize, inittbl, inittblSize, krnl, krnlSize, NULL, 0);
+	result = bios.create(bldr, bldrSize, inittbl, inittblSize, krnl, krnlSize, krnlData, krnlDataSize);
 	if (!SUCCESS(result))
 	{
 		error("Error: Failed to create bios\n");
@@ -105,6 +116,11 @@ Cleanup:
 		xb_free(krnl);
 		krnl = NULL;
 	}
+	if (krnlData != NULL)
+	{
+		xb_free(krnlData);
+		krnlData = NULL;
+	}
 	
 	return result;
 }
@@ -145,6 +161,19 @@ int XbTool::extractBios()
 	if (!SUCCESS(result))
 	{
 		error("Failed to extract krnl.\n");
+		return 1;
+	}
+
+	// uncompressed krnl data
+	if (params.krnlDataFile != NULL)
+		filename = params.krnlDataFile;
+	else
+		filename = "krnl_data.bin";
+
+	result = bios.saveKernelDataToFile(filename);
+	if (!SUCCESS(result))
+	{
+		error("Failed to extract krnl data.\n");
 		return 1;
 	}
 	
