@@ -1,0 +1,52 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.9.34728.123
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XbBiosTool", "XbBiosTool\XbBiosTool.vcxproj", "{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		bld-inittbl|x86 = bld-inittbl|x86
+		build bios|x86 = build bios|x86
+		cmb_banks|x86 = cmb_banks|x86
+		Debug|x86 = Debug|x86
+		decode|x86 = decode|x86
+		decomp|x86 = decomp|x86
+		extract|x86 = extract|x86
+		help|x86 = help|x86
+		ls|x86 = ls|x86
+		Release|x86 = Release|x86
+		xcode-sim|x86 = xcode-sim|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.bld-inittbl|x86.ActiveCfg = bld-inittbl|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.bld-inittbl|x86.Build.0 = bld-inittbl|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.build bios|x86.ActiveCfg = build bios|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.build bios|x86.Build.0 = build bios|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.cmb_banks|x86.ActiveCfg = cmb_banks|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.cmb_banks|x86.Build.0 = cmb_banks|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.Debug|x86.ActiveCfg = Debug|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.Debug|x86.Build.0 = Debug|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.decode|x86.ActiveCfg = decode|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.decode|x86.Build.0 = decode|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.decomp|x86.ActiveCfg = decomp|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.decomp|x86.Build.0 = decomp|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.extract|x86.ActiveCfg = extract|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.extract|x86.Build.0 = extract|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.help|x86.ActiveCfg = help|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.help|x86.Build.0 = help|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.ls|x86.ActiveCfg = ls|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.ls|x86.Build.0 = ls|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.Release|x86.ActiveCfg = Release|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.Release|x86.Build.0 = Release|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.xcode-sim|x86.ActiveCfg = xcode-sim|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.xcode-sim|x86.Build.0 = xcode-sim|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {D4771D08-046A-4CCE-A096-CF90E5AC47A6}
+	EndGlobalSection
+EndGlobal

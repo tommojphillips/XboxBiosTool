@@ -1,0 +1,12 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs/XboxBiosTools
+/bios
+/keys
+/XbBiosTool/objd
+*.exe
+*.pdb
+*.bin
+*.img
