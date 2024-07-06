@@ -67,8 +67,6 @@ public:
 	int saveKernelImgToFile(const char* path);
 	int saveInitTblToFile(const char* filename);
 
-	void symmetricEncDecBldr(const UCHAR* key, const UINT keyLen);
-
 	void printBldrInfo();
 	void printKernelInfo();
 	void printInitTblInfo();
@@ -80,6 +78,8 @@ public:
 	int decompressKrnl();
 
 	int checkForPreldr();
+
+	int convertToBootFromMedia();
 
 	UCHAR* getBiosData() const { return _bios; };
 	UINT getBiosSize() const { return _size; };
@@ -119,8 +119,8 @@ private:
 
 	UINT _size;					// the size of the bios.	
 	UINT _decompressedKrnlSize;	// The size of the decompressed kernel
-	ULONG _totalSpaceAvailable; // the total space available in the bios. this is the size of the bios minus the bldr BLOCK
-	ULONG _availableSpace;		// the available space in the bios. 
+	UINT _totalSpaceAvailable; // the total space available in the bios. this is the size of the bios minus the bldr BLOCK
+	UINT _availableSpace;		// the available space in the bios. 
 
 	bool _isBldrEncrypted;		// true if the bldr is encrypted.
 	bool _isKernelEncrypted;	// true if the kernel is encrypted.
@@ -135,7 +135,8 @@ private:
 
 	int validateBldr();
 
-	int decryptKernel();
+	void symmetricEncDecBldr(const UCHAR* key, const UINT keyLen);
+	void symmetricEncDecKernel();
 
 	void reset();
 };

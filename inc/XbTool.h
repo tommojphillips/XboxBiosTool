@@ -55,10 +55,13 @@ struct MCPX_ROM
 
 struct Parameters
 {
-	int sw_flag;			// contains all flags that have been set on the command line.
-	int ls_flag;			// contains all set flags for the list command.
+	long long sw_flag;			// contains all flags that have been set on the command line.
+	long long ls_flag;
 
 	UINT romsize;
+	UINT binsize;
+
+	UINT simSize;
 
 	bool encBldr;
 	bool encKrnl;
@@ -82,14 +85,17 @@ struct Parameters
 
 	MCPX_ROM mcpx;
 
-	bool patchPubKey;
 	const char* pubKeyFile;
+	const char* certKeyFile;
+	const char* eepromKeyFile;
 
-	Parameters() : sw_flag(0), ls_flag(0), romsize(0), encBldr(true), encKrnl(true),
-		biosFile(NULL), outFile(NULL), inittblFile(NULL), bldrFile(NULL), 
-		krnlFile(NULL), krnlDataFile(NULL), keyBldrFile(NULL), keyKrnlFile(NULL),
-		keyBldr(NULL), keyKrnl(NULL), mcpxFile(NULL), mcpx(), 
-		pubKeyFile(NULL), patchPubKey(false)
+	Parameters() : sw_flag(0), ls_flag(0), romsize(0), binsize(0), simSize(0),
+		encBldr(true), encKrnl(true),
+		biosFile(NULL), outFile(NULL), inittblFile(NULL), bldrFile(NULL), krnlFile(NULL), krnlDataFile(NULL),
+		keyBldrFile(NULL), keyKrnlFile(NULL),
+		keyBldr(NULL), keyKrnl(NULL),
+		mcpxFile(NULL), mcpx(), 
+		pubKeyFile(NULL), certKeyFile(NULL), eepromKeyFile(NULL)
 	{
 		for (int i = 0; i < 4; i++)
 		{
@@ -169,7 +175,6 @@ class XbTool
 		// attempt to find the public key in the ptr.
 		int extractPubKey(UCHAR* data, UINT size);
 };
-
 
 int verifyPubKey(UCHAR* data, PUBLIC_KEY*& pubkey);
 int printPubKey(PUBLIC_KEY* pubkey);

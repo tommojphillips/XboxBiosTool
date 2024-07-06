@@ -113,7 +113,7 @@ int XbTool::buildBios()
 	}
 	else
 	{
-		print("\nSuccess! -> OUT: %s\n", filename);
+		print("\nSuccess! -> OUT: %s %dKb\n", filename, params.binsize / 1024);
 	}
 
 Cleanup:
@@ -232,6 +232,7 @@ int XbTool::splitBios()
 	UINT fnLen = 0;
 	UINT bankFnLen = 0;
 	UINT dataLeft = 0;
+	UINT loopCount = 0;
 	int bank = 0;
 	const UINT biosSize = bios.getBiosSize();
 	const char suffix[] = "_bank";
@@ -239,9 +240,10 @@ int XbTool::splitBios()
 	char* ext = NULL;
 	char* bankFn = NULL;
 	
-	if (biosSize == params.romsize)
+	// check if bios size is less than or equal to rom size
+	if (biosSize <= params.romsize)
 	{
-		error("Cannot split bios. Bios size is equal to rom size\n");
+		error("Cannot split bios. file size is less than or equal to romsize\n");
 		result = 1;
 		goto Cleanup;
 	}
@@ -293,8 +295,17 @@ int XbTool::splitBios()
 	// split the bios based on rom size
 
 	dataLeft = biosSize;
+	loopCount = 0;
 	while (dataLeft > 0)
 	{
+		// safe guard
+		if (loopCount > 4)
+		{ 
+			error("Error: loopCount exceeded 5\n");
+			result = 1;
+		}
+		loopCount++;
+
 		// set bank filename = [name][suffix][number].[ext] = bios_bank1.bin
 		bankFn[0] = '\0';
 		format(bankFn, "%s%s%d%s", biosFn, suffix, bank + 1, ext);
@@ -477,16 +488,16 @@ int XbTool::listBios()
 		return 1;
 	}
 
-	int flag = params.ls_flag;
+	long long flag = params.ls_flag;
 
 	if (flag == 0)
 	{
 		flag = SW_LS_OPT; // set to all flags.
 	}
 
-	print("bios size: %ld KB\n", bios.getBiosSize() / 1024UL);
-	print("rom size:  %ld KB\n", params.romsize / 1024UL);
-	print("\nmcpx block size:\t%ld bytes\n", MCPX_BLOCK_SIZE);
+	print("\nbios size:\t\t%ld KB\n", bios.getBiosSize() / 1024UL);
+	print("rom size:\t\t%ld KB\n", params.romsize / 1024UL);
+	print("mcpx block size:\t%ld bytes\n", MCPX_BLOCK_SIZE);
 	print("bldr block size:\t%ld bytes\n", BLDR_BLOCK_SIZE);
 	print("total space available:\t%ld bytes\n", bios.getTotalSpaceAvailable());
 
@@ -614,37 +625,61 @@ Cleanup:
 int XbTool::simulateXcodes() const
 {
 	// load the inittbl file
-		
-	const UINT SIM_SIZE = 32;
-
-	const UCHAR MOV_INSTRS[] = { 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF };
-	const char* MOV_NAMES[] = { "MOV EAX", "MOV ECX", "MOV EDX", "MOV EBX", "MOV ESP", "MOV EBP", "MOV ESI", "MOV EDI" };
 	
-	const USHORT JMP_INSTRS[] = { 0xE0FF, 0xE1FF, 0xE2FF, 0xE3FF, 0xE4FF, 0xE5FF, 0xE6FF, 0xE7FF };
-	const char* JMP_NAMES[] = { "JMP EAX", "JMP ECX", "JMP EDX", "JMP EBX", "JMP ESP", "JMP EBP", "JMP ESI", "JMP EDI" };
+	// 6 byte encoding
+	const USHORT MOV_PTR_INSTRS_2_BYTE[] = {	0x1D8B,		0x0D8B,		0x158B };
+	const char* MOV_PTR_NAMES_2_BYTE[] = {		"mov ebx",	"mov ecx",	"mov edx" };
+	
+	// 5 byte encoding
+	const UCHAR MOV_INSTRS[] = { 0xB8,		0xB9,		0xBA,		0xBB,		0xBC,		0xBD,		0xBE,		0xBF };
+	const char* MOV_NAMES[] = { "mov eax", "mov ecx",	"mov edx",	"mov ebx",	"mov esp",	"mov ebp",	"mov esi",	"mov edi" };
+	
+	// 5 byte encoding
+	const UCHAR MOV_EAX_PTR_INSTR = 0xA1;
+	const char* MOV_EAX_PTR_NAME = "mov eax";
 
-	const UCHAR NOP_INSTR = 0x90;	// nop
-	const char* NOP_NAME = "NOP";
+	// 2 byte encoding
+	const USHORT JMP_INSTRS[] = {	0xE0FF,		0xE1FF,		0xE2FF,		0xE3FF,		0xE4FF,		0xE5FF,		0xE6FF,		0xE7FF };
+	const char* JMP_NAMES[] = {		"jmp eax",	"jmp ecx",	"jmp edx",	"jmp ebx",	"jmp esp",	"jmp ebp",	"jmp esi",	"jmp edi" };
+	
+	// 2 byte encoding
+	const USHORT REP_INSTRS[] = {	0xA5F3 };
+	const char* REP_NAMES[] = {		"rep movsd" };
+
+	// 1 byte encoding
+	const UCHAR FAR_JMP_INSTR = 0xEA;
+	const char* FAR_JMP_NAME = "jmp far";
+	
+	// 1 byte encoding
+	const UCHAR NOP_INSTR = 0x90;
+	const char* NOP_NAME = "nop";
+	// 1 byte encoding
+	const UCHAR CLD_INSTR = 0xFC;
+	const char* CLD_NAME = "cld";
+
+	const UINT DEFAULT_SIM_SIZE = 32; // 32KB
+	
+	const UINT SIM_SIZE = (params.simSize > 0) ? params.simSize : DEFAULT_SIM_SIZE;
+
+	const char* filename = NULL;
+	const UCHAR opcode_zero[6] = { 0 };
 
 	int result = 0;
 	bool hasMemChanges_total = false;
-
 	UINT size = 0;
 	UINT offset = 0;
-
 	UCHAR* inittbl = NULL;	// inittbl file data
 	UCHAR* xcodes = NULL;	// xcodes start
 	UCHAR* mem_sim = NULL;	// simulated memory
-	
 	XcodeInterp interp = XcodeInterp();
 	XCODE* xcode;
-
-	const char* filename = params.inittblFile;
-
 	bool found = false;
-
+	bool unkInstrs = false;
 	char str_opcode[16] = { 0 };
 
+	UINT i, j, dumpTo;
+
+	filename = params.inittblFile;
 	if (filename == NULL)
 	{
 		filename = params.biosFile;
@@ -670,10 +705,7 @@ int XbTool::simulateXcodes() const
 		error("Error: Invalid inittbl size: %d. Expected atleast %d bytes\n", size, sizeof(INIT_TBL));
 		result = 1;
 		goto Cleanup;
-	}
-	// note: im only interested in the xcodes. so the inittbl size should be less than 0x100000 (way less)
-	// i could force check to 256, 512, 1024, but that prevents the user from using an extracted inittbl file. 
-	// (3-4KB or even more if there were a considerble amount of xcodes added)
+	}	
 	if (size > 0x100000)
 	{
 		error("Error: Invalid inittbl size: %d. Expected less than %d bytes\n", size, 0x100000);
@@ -708,10 +740,8 @@ int XbTool::simulateXcodes() const
 
 		// sanity check of addr.
 		if (xcode->addr < 0 || xcode->addr >= SIM_SIZE)
-		{
-			error("XCODE wrote to an address outside of the simulated memory space. addr: 0x%X\n", xcode->addr);
 			continue;
-		}
+
 		hasMemChanges_total = true;
 
 		// write the data to simulated memory
@@ -723,7 +753,7 @@ int XbTool::simulateXcodes() const
 		xb_zero(str_opcode, sizeof(str_opcode));
 		interp.getOpcodeStr(str_opcode);
 
-		print("%04x: %s 0x%02x, 0x%X\n", offset, str_opcode, xcode->addr, xcode->data);
+		print("%04x: %s 0x%02x, 0x%08X\n", offset, str_opcode, xcode->addr, xcode->data);
 	}
 
 	if (interp.getStatus() != XcodeInterp::EXIT_OP_FOUND)
@@ -738,15 +768,79 @@ int XbTool::simulateXcodes() const
 		goto Cleanup;
 	}
 	
-	// after successful simulation, lets try to make sense of the memory changes.
-	// we're looking for some x86 32-bit instructions within the memory sim
+	// after successful simulation, look for some x86 32-bit instructions.
 
 	print("\nx86 32-bit instructions:\nOFS   INSTRUCTION\n");
 
-	for (int i = 0; i < SIM_SIZE - 4;)
+	// sort by opcode len (2, 1); excluding size of operand/s
+	for (i = 0; i < SIM_SIZE;)
 	{
+		// check if the next [max_instr_size] bytes are zero
+		if (xb_cmp(mem_sim + i, opcode_zero, sizeof(opcode_zero)) == 0)
+			break;
+
 		found = false;
-		for (int j = 0; j < sizeof(MOV_INSTRS); j++)
+		
+		// check for 2 byte mov ptr instructions
+		for (j = 0; j < sizeof(MOV_PTR_INSTRS_2_BYTE) / sizeof(USHORT); j++)
+		{
+			if (xb_cmp(mem_sim + i, MOV_PTR_INSTRS_2_BYTE + j, 2) == 0)
+			{
+				print("%04x: %s, [0x%X]\n", i, MOV_PTR_NAMES_2_BYTE[j], *((UINT*)(mem_sim + i + 2)));
+				i += 6; // 2 byte opcode + 4 byte data
+				found = true;
+				break;
+			}
+		}
+		if (found)
+			continue;
+
+		// check for 2 byte jmp instructions
+		for (j = 0; j < sizeof(JMP_INSTRS) / sizeof(USHORT); j++)
+		{
+			if (xb_cmp(mem_sim + i, JMP_INSTRS + j, 2) == 0)
+			{
+				print("%04x: %s\n", i, JMP_NAMES[j]);
+				i += 2; // 2 byte opcode
+				found = true;
+				break;
+			}
+		}
+		if (found)
+			continue;
+
+		// check for 2 byte rep instructions
+		for (j = 0; j < sizeof(REP_INSTRS) / sizeof(USHORT); j++)
+		{
+			if (xb_cmp(mem_sim + i, REP_INSTRS + j, 2) == 0)
+			{
+				print("%04x: %s\n", i, REP_NAMES[j]);
+				i += 2; // 2 byte opcode
+				found = true;
+				break;
+			}
+		}
+		if (found)
+			continue;
+
+		// check for 1 byte far jmp instructions
+		if (mem_sim[i] == FAR_JMP_INSTR)
+		{
+			print("%04x: %s 0x%04x:0x%08X\n", i, FAR_JMP_NAME, *((USHORT*)(mem_sim + i + 5)), *((UINT*)(mem_sim + i + 1)));
+			i += 6; // 1 byte opcode + 4 byte for seg + 2 byte for offset
+			continue;
+		}
+
+		// check for 1 byte mov ptr instructions
+		if (mem_sim[i] == MOV_EAX_PTR_INSTR)
+		{
+			print("%04x: %s, [0x%X]\n", i, MOV_EAX_PTR_NAME, *((UINT*)(mem_sim + i + 1)));
+			i += 5; // 1 byte opcode + 4 byte data
+			continue;
+		}
+
+		// check for 1 byte mov instructions
+		for (j = 0; j < sizeof(MOV_INSTRS); j++)
 		{
 			if (xb_cmp(mem_sim + i, MOV_INSTRS + j, 1) == 0)
 			{
@@ -756,39 +850,61 @@ int XbTool::simulateXcodes() const
 				break;
 			}
 		}
-
-		if (found)
-			continue;
-
-		for (int j = 0; j < sizeof(JMP_INSTRS); j++)
-		{
-			if (xb_cmp(mem_sim + i, JMP_INSTRS + j, 2) == 0)
-			{
-				print("%04x: %s\n", i, JMP_NAMES[j]);
-				i += 2; // 2 byte opcode
-				found = true;	
-				break;
-			}
-		}
-
 		if (found)
 			continue;
 
 		if (mem_sim[i] == NOP_INSTR)
 		{
 			print("%04x: %s\n", i, NOP_NAME);
+			i++; // 1 byte opcode
+			continue;
 		}
 
-		if (!found)
-			i++;
-	}
+		if (mem_sim[i] == CLD_INSTR)
+		{
+			print("%04x: %s\n", i, CLD_NAME);
+			i++; // 1 byte opcode
+			continue;
+		}
 
-	// print memory dump
-	print("\nmem dump:\nOFS   MEM SIM\n");
-	for (int i = 0; i < SIM_SIZE; i += 8)
+		// opcode not found
+		error("Error: Unknown instruction at offset %04x, INSTR: %02X\n", i, mem_sim[i]);
+		i++;
+		unkInstrs = true;
+	}
+	dumpTo = i; // save the offset to dump to
+
+	if ((params.sw_flag & SW_DMP) != 0)
 	{
-		print("%04x: ", i);
-		printData(mem_sim + i, 8);
+		filename = params.outFile;
+		if (filename == NULL)
+		{
+			filename = "mem_sim.bin";
+		}
+
+		print("\nWriting memory dump to %s (%d bytes)\n", filename, SIM_SIZE);
+		result = writeFile(filename, mem_sim, SIM_SIZE);
+		if (!SUCCESS(result))
+		{
+			error("Error: Failed to write memory dump to %s\n", filename);
+		}
+	}
+	else
+	{
+		// print memory dump
+		print("\nmem dump:\n");
+		for (i = 0; i < dumpTo; i += 8)
+		{
+			print("%04x: ", i);
+			printData(mem_sim + i, 8);
+		}
+
+		if (unkInstrs)
+		{
+			print("\nUnknown instructions found. Dump to file ( -d ) to decompile with a x86 32-bit decompiler.\n" \
+				"Only a handful of opcodes have been implemented. Better off " \
+				"dumping to a file and analyzing with a x86 32-bit compatible decompiler.\n");
+		}
 	}
 
 Cleanup:
@@ -1015,40 +1131,44 @@ int XbTool::extractPubKey(UCHAR* data, UINT size)
 	// check if user is patching the public key, 
 	// the user might be using the 'pubkeyfile' switch to tell us where to save it.
 	// otherwise, patch the public key with the provided key. (pubkeyfile is providing us with the key)
-	if (!params.patchPubKey)
+
+	// do nothing if a public key file is not provided
+	if (params.pubKeyFile == NULL)
 	{
-		if (params.pubKeyFile != NULL)
+		print("No public key file provided\n");
+		return 0;
+	}
+
+	// if the 'patch-keys' flag is set, then use that key file to patch the pubkey.
+	// otherwise, if the 'patch-keys' flag is not set then save the found pubkey to that file (unmodified).
+	if ((params.sw_flag & SW_PATCH_KEYS) != 0)
+	{
+		print("Writing public key to %s (%d bytes)\n", params.pubKeyFile, sizeof(PUBLIC_KEY));
+		if (!SUCCESS(writeFile(params.pubKeyFile, pubkey, sizeof(PUBLIC_KEY))))
 		{
-			print("Writing public key to %s (%d bytes)\n", params.pubKeyFile, sizeof(PUBLIC_KEY));
-			if (!SUCCESS(writeFile(params.pubKeyFile, pubkey, sizeof(PUBLIC_KEY))))
-			{
-				error("Error: Failed to write public key to file\n");
-				return 1;
-			}
+			error("Error: Failed to write public key to file\n");
+			return 1;
 		}
 	}
 	else
 	{
-		if (params.pubKeyFile != NULL)
+		// patch the public key
+		print("\nPatching public key..\n");
+
+		PUBLIC_KEY* patch_pubkey = (PUBLIC_KEY*)readFile(params.pubKeyFile, NULL, sizeof(PUBLIC_KEY));
+		if (patch_pubkey == NULL)
 		{
-			// patch the public key
-			print("\nPatching public key..\n");
-
-			PUBLIC_KEY* patch_pubkey = (PUBLIC_KEY*)readFile(params.pubKeyFile, NULL, sizeof(PUBLIC_KEY));
-			if (patch_pubkey == NULL)
-			{
-				error("Error: Failed to patch public key\n");
-				return 1;
-			}
-
-			xb_cpy(pubkey->modulus, patch_pubkey->modulus, sizeof(pubkey->modulus));
-
-			xb_free(patch_pubkey);
-
-			printPubKey(pubkey);
-
-			print("Public key patched.\n");
+			error("Error: Failed to patch public key\n");
+			return 1;
 		}
+
+		xb_cpy(pubkey->modulus, patch_pubkey->modulus, sizeof(pubkey->modulus));
+
+		xb_free(patch_pubkey);
+
+		printPubKey(pubkey);
+
+		print("Public key patched.\n");
 	}
 
 	return 0;

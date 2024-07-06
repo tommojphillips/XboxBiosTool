@@ -38,6 +38,10 @@ const UCHAR BOOT_PARAMS_SIGNATURE[4] = { 'J', 'y', 'T', 'x' }; // hash of "JyTx"
 const UINT BLDR_RELOC = 0x00400000;
 const UINT BLDR_BASE =  0x00090000;
 
+static_assert(sizeof(USHORT) == 2, "USHORT is not 2 bytes");
+static_assert(sizeof(UINT) == 4, "UINT is not 4 bytes");
+static_assert(sizeof(ULONG) == 4, "ULONG is not 4 bytes");
+
 // The init table structure.
 typedef struct
 {
@@ -83,17 +87,17 @@ typedef struct _XCODE
 // The boot parameters structure.
 typedef struct
 {
-    ULONG krnlDataSize;         // size of the kernel data (uncompressed)
-    ULONG inittblSize;          // size of the init table	
+    UINT krnlDataSize;          // size of the kernel data (uncompressed)
+    UINT inittblSize;           // size of the init table	
     UCHAR signature[4];         // the bldr signature. mcpx checks this to verify the bldr
-    ULONG krnlSize;             // size of the kernel (compressed)
+    UINT krnlSize;              // size of the kernel (compressed)
     UCHAR digest[DIGEST_LEN];   // the ROM digest.
 } BOOT_PARAMS;
 
 // The loader parameters structure.
 typedef struct
 {
-    ULONG bldrEntryPoint;   // 32bit entry point
+    UINT bldrEntryPoint;    // 32bit entry point
     char cli[64];           // command line
 } BOOT_LDR_PARAM;
 
@@ -163,6 +167,7 @@ typedef struct
 // The bldr keys structure as found in the bios
 typedef struct
 {
+    UCHAR bfmKey[KEY_SIZE];     // bfm key; this is used for re-encryption of the 2bl to restore it's original state
     UCHAR eepromKey[KEY_SIZE];  // eeprom key
     UCHAR certKey[KEY_SIZE];    // certificate key
     UCHAR krnlKey[KEY_SIZE];    // kernel key
@@ -171,8 +176,8 @@ typedef struct
 // The bldr entry structure as found in the bios
 typedef struct
 {
-    ULONG keysPtr;          // rc4 crypto keys pointer
-    ULONG bfmEntryPoint;    // bldr entry point
+    UINT keysPtr;          // rc4 crypto keys pointer
+    UINT bfmEntryPoint;    // bldr entry point
 } BLDR_ENTRY;
 
 // The rsa header structure

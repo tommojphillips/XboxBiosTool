@@ -30,7 +30,7 @@ void swapByte(UCHAR* a, UCHAR* b)
     *b = tmp;
 }
 
-void rc4_key(UCHAR* s, const UCHAR* key, const ULONG len)
+void rc4_key(UCHAR* s, const UCHAR* key, const UINT len)
 {
     int i = 0;
     UCHAR j = 0;
@@ -47,12 +47,12 @@ void rc4_key(UCHAR* s, const UCHAR* key, const ULONG len)
         swapByte(&s[i], &s[j]);
     }
 }
-void rc4(UCHAR* s, UCHAR* data, const ULONG len)
+void rc4(UCHAR* s, UCHAR* data, const UINT len)
 {
     UCHAR i = 0;
     UCHAR j = 0;
     UCHAR t = 0;
-    ULONG k = 0;
+    UINT k = 0;
 
     for (k = 0; k < len; k++)
     {
@@ -64,7 +64,7 @@ void rc4(UCHAR* s, UCHAR* data, const ULONG len)
     }
 }
 
-void symmetricEncDec(UCHAR* data, const ULONG len, const UCHAR* key, const ULONG keyLen)
+void symmetricEncDec(UCHAR* data, const UINT len, const UCHAR* key, const UINT keyLen)
 {
     UCHAR s[256] = { 0 };
 

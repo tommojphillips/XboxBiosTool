@@ -24,9 +24,9 @@
 
 #include "type_defs.h"
 
-void rc4_key(UCHAR* s, const UCHAR* key, const ULONG len);
-void rc4(UCHAR* s, UCHAR* data, const ULONG len);
+void rc4_key(UCHAR* s, const UCHAR* key, const UINT len);
+void rc4(UCHAR* s, UCHAR* data, const UINT len);
 
-void symmetricEncDec(UCHAR* data, const ULONG len, const UCHAR* key, const ULONG keyLen);
+void symmetricEncDec(UCHAR* data, const UINT len, const UCHAR* key, const UINT keyLen);
 
 #endif // _RC4_H
