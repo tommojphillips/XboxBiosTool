@@ -554,17 +554,15 @@ int XbTool::listBios()
 	return 0;
 }
 
-int XbTool::decodeXcodes() const
+UCHAR* XbTool::load_init_tbl_file(UINT& size) const
 {
 	const UINT BASE_OFFSET = sizeof(INIT_TBL);
 
-	XcodeInterp interp = XcodeInterp();
 	UCHAR* inittbl = NULL;
-	UINT size = 0;
 	int result = 0;
 
 	// load the inittbl file (inittblFile or biosFile)
- 
+
 	const char* filename = params.inittblFile;
 	if (filename == NULL)
 	{
@@ -572,17 +570,14 @@ int XbTool::decodeXcodes() const
 		if (filename == NULL)
 		{
 			error("Error: No inittbl file provided\n");
-			return 1;
+			return NULL;
 		}
 	}
 
 	print("inittbl file: %s\n", filename);
 	inittbl = readFile(filename, &size);
 	if (inittbl == NULL)
-	{
-		result = 1;
-		goto Cleanup;
-	}
+		return NULL;
 
 	// validate the inittbl file
 	if (size < BASE_OFFSET)
@@ -601,10 +596,37 @@ int XbTool::decodeXcodes() const
 		result = 1;
 		goto Cleanup;
 	}
+
+Cleanup:
+
+	if (result != 0)
+	{
+		if (inittbl != NULL)
+		{
+			xb_free(inittbl);
+			inittbl = NULL;
+		}
+
+		return NULL;
+	}
+
+	return inittbl;
+}
+
+int XbTool::decodeXcodes() const
+{
+	XcodeInterp interp = XcodeInterp();
+	UCHAR* inittbl = NULL;
+	UINT size = 0;
+	int result = 0;
+	
+	inittbl = load_init_tbl_file(size);
+	if (inittbl == NULL)
+		return 1;
 	
 	print("\nDecode xcodes:\n");
 
-	result = interp.load(inittbl + BASE_OFFSET, size - BASE_OFFSET);
+	result = interp.load(inittbl + XCODE_BASE, size - XCODE_BASE);
 	if (!SUCCESS(result))
 	{
 		goto Cleanup;
@@ -624,288 +646,23 @@ Cleanup:
 
 int XbTool::simulateXcodes() const
 {
-	// load the inittbl file
-	
-	// 6 byte encoding
-	const USHORT MOV_PTR_INSTRS_2_BYTE[] = {	0x1D8B,		0x0D8B,		0x158B };
-	const char* MOV_PTR_NAMES_2_BYTE[] = {		"mov ebx",	"mov ecx",	"mov edx" };
-	
-	// 5 byte encoding
-	const UCHAR MOV_INSTRS[] = { 0xB8,		0xB9,		0xBA,		0xBB,		0xBC,		0xBD,		0xBE,		0xBF };
-	const char* MOV_NAMES[] = { "mov eax", "mov ecx",	"mov edx",	"mov ebx",	"mov esp",	"mov ebp",	"mov esi",	"mov edi" };
-	
-	// 5 byte encoding
-	const UCHAR MOV_EAX_PTR_INSTR = 0xA1;
-	const char* MOV_EAX_PTR_NAME = "mov eax";
-
-	// 2 byte encoding
-	const USHORT JMP_INSTRS[] = {	0xE0FF,		0xE1FF,		0xE2FF,		0xE3FF,		0xE4FF,		0xE5FF,		0xE6FF,		0xE7FF };
-	const char* JMP_NAMES[] = {		"jmp eax",	"jmp ecx",	"jmp edx",	"jmp ebx",	"jmp esp",	"jmp ebp",	"jmp esi",	"jmp edi" };
-	
-	// 2 byte encoding
-	const USHORT REP_INSTRS[] = {	0xA5F3 };
-	const char* REP_NAMES[] = {		"rep movsd" };
-
-	// 1 byte encoding
-	const UCHAR FAR_JMP_INSTR = 0xEA;
-	const char* FAR_JMP_NAME = "jmp far";
-	
-	// 1 byte encoding
-	const UCHAR NOP_INSTR = 0x90;
-	const char* NOP_NAME = "nop";
-	// 1 byte encoding
-	const UCHAR CLD_INSTR = 0xFC;
-	const char* CLD_NAME = "cld";
-
-	const UINT DEFAULT_SIM_SIZE = 32; // 32KB
-	
-	const UINT SIM_SIZE = (params.simSize > 0) ? params.simSize : DEFAULT_SIM_SIZE;
-
-	const char* filename = NULL;
-	const UCHAR opcode_zero[6] = { 0 };
-
-	int result = 0;
-	bool hasMemChanges_total = false;
-	UINT size = 0;
-	UINT offset = 0;
-	UCHAR* inittbl = NULL;	// inittbl file data
-	UCHAR* xcodes = NULL;	// xcodes start
-	UCHAR* mem_sim = NULL;	// simulated memory
 	XcodeInterp interp = XcodeInterp();
-	XCODE* xcode;
-	bool found = false;
-	bool unkInstrs = false;
-	char str_opcode[16] = { 0 };
+	UCHAR* inittbl = NULL;
+	UINT size = 0;
+	int result = 0;
 
-	UINT i, j, dumpTo;
-
-	filename = params.inittblFile;
-	if (filename == NULL)
-	{
-		filename = params.biosFile;
-		if (filename == NULL)
-		{
-			error("Error: No inittbl file provided\n");
-			return 1;
-		}
-	}
-
-	print("inittbl file: %s\n", params.biosFile);
-	print("mem space: %d bytes\n\n", SIM_SIZE);
-
-	inittbl = readFile(filename, &size);
+	inittbl = load_init_tbl_file(size);
 	if (inittbl == NULL)
-	{
 		return 1;
-	}
 
-	// validate the inittbl file
-	if (size < sizeof(INIT_TBL))
-	{
-		error("Error: Invalid inittbl size: %d. Expected atleast %d bytes\n", size, sizeof(INIT_TBL));
-		result = 1;
-		goto Cleanup;
-	}	
-	if (size > 0x100000)
-	{
-		error("Error: Invalid inittbl size: %d. Expected less than %d bytes\n", size, 0x100000);
-		result = 1;
-		goto Cleanup;
-	}
-
-	xcodes = (inittbl + sizeof(INIT_TBL));
-
-	result = interp.load(xcodes, size - sizeof(INIT_TBL));
+	result = interp.load(inittbl + XCODE_BASE, size - XCODE_BASE);
 	if (!SUCCESS(result))
 	{
 		error("Error: failed to load xcodes\n");
 		goto Cleanup;
 	}
 
-	mem_sim = (UCHAR*)xb_alloc(SIM_SIZE);
-	if (mem_sim == NULL)
-	{
-		result = 1;
-		goto Cleanup;
-	}
-
-	// simulate memory output
-	hasMemChanges_total = false;
-	print("xcode sim:\nOFS   XCODE\tADDR  DATA\n");
-	while (SUCCESS(interp.interpretNext(xcode)))
-	{
-		// skip this xcode. only care about xcodes that write to RAM
-		if (xcode->opcode != XC_MEM_WRITE)
-			continue; 
-
-		// sanity check of addr.
-		if (xcode->addr < 0 || xcode->addr >= SIM_SIZE)
-			continue;
-
-		hasMemChanges_total = true;
-
-		// write the data to simulated memory
-		xb_cpy(mem_sim + xcode->addr, (UCHAR*)&xcode->data, 4);
-		
-		offset = interp.getOffset() + sizeof(INIT_TBL) - sizeof(XCODE);
-
-		// print the xcode
-		xb_zero(str_opcode, sizeof(str_opcode));
-		interp.getOpcodeStr(str_opcode);
-
-		print("%04x: %s 0x%02x, 0x%08X\n", offset, str_opcode, xcode->addr, xcode->data);
-	}
-
-	if (interp.getStatus() != XcodeInterp::EXIT_OP_FOUND)
-	{
-		result = 1;
-		goto Cleanup;
-	}
-
-	if (!hasMemChanges_total)
-	{
-		print("No Memory changes in range 0x0 - 0x%x\n", SIM_SIZE);
-		goto Cleanup;
-	}
-	
-	// after successful simulation, look for some x86 32-bit instructions.
-
-	print("\nx86 32-bit instructions:\nOFS   INSTRUCTION\n");
-
-	// sort by opcode len (2, 1); excluding size of operand/s
-	for (i = 0; i < SIM_SIZE;)
-	{
-		// check if the next [max_instr_size] bytes are zero
-		if (xb_cmp(mem_sim + i, opcode_zero, sizeof(opcode_zero)) == 0)
-			break;
-
-		found = false;
-		
-		// check for 2 byte mov ptr instructions
-		for (j = 0; j < sizeof(MOV_PTR_INSTRS_2_BYTE) / sizeof(USHORT); j++)
-		{
-			if (xb_cmp(mem_sim + i, MOV_PTR_INSTRS_2_BYTE + j, 2) == 0)
-			{
-				print("%04x: %s, [0x%X]\n", i, MOV_PTR_NAMES_2_BYTE[j], *((UINT*)(mem_sim + i + 2)));
-				i += 6; // 2 byte opcode + 4 byte data
-				found = true;
-				break;
-			}
-		}
-		if (found)
-			continue;
-
-		// check for 2 byte jmp instructions
-		for (j = 0; j < sizeof(JMP_INSTRS) / sizeof(USHORT); j++)
-		{
-			if (xb_cmp(mem_sim + i, JMP_INSTRS + j, 2) == 0)
-			{
-				print("%04x: %s\n", i, JMP_NAMES[j]);
-				i += 2; // 2 byte opcode
-				found = true;
-				break;
-			}
-		}
-		if (found)
-			continue;
-
-		// check for 2 byte rep instructions
-		for (j = 0; j < sizeof(REP_INSTRS) / sizeof(USHORT); j++)
-		{
-			if (xb_cmp(mem_sim + i, REP_INSTRS + j, 2) == 0)
-			{
-				print("%04x: %s\n", i, REP_NAMES[j]);
-				i += 2; // 2 byte opcode
-				found = true;
-				break;
-			}
-		}
-		if (found)
-			continue;
-
-		// check for 1 byte far jmp instructions
-		if (mem_sim[i] == FAR_JMP_INSTR)
-		{
-			print("%04x: %s 0x%04x:0x%08X\n", i, FAR_JMP_NAME, *((USHORT*)(mem_sim + i + 5)), *((UINT*)(mem_sim + i + 1)));
-			i += 6; // 1 byte opcode + 4 byte for seg + 2 byte for offset
-			continue;
-		}
-
-		// check for 1 byte mov ptr instructions
-		if (mem_sim[i] == MOV_EAX_PTR_INSTR)
-		{
-			print("%04x: %s, [0x%X]\n", i, MOV_EAX_PTR_NAME, *((UINT*)(mem_sim + i + 1)));
-			i += 5; // 1 byte opcode + 4 byte data
-			continue;
-		}
-
-		// check for 1 byte mov instructions
-		for (j = 0; j < sizeof(MOV_INSTRS); j++)
-		{
-			if (xb_cmp(mem_sim + i, MOV_INSTRS + j, 1) == 0)
-			{
-				print("%04x: %s, 0x%X\n", i, MOV_NAMES[j], *((UINT*)(mem_sim + i + 1)));
-				i += 5; // 1 byte opcode + 4 byte data
-				found = true;
-				break;
-			}
-		}
-		if (found)
-			continue;
-
-		if (mem_sim[i] == NOP_INSTR)
-		{
-			print("%04x: %s\n", i, NOP_NAME);
-			i++; // 1 byte opcode
-			continue;
-		}
-
-		if (mem_sim[i] == CLD_INSTR)
-		{
-			print("%04x: %s\n", i, CLD_NAME);
-			i++; // 1 byte opcode
-			continue;
-		}
-
-		// opcode not found
-		error("Error: Unknown instruction at offset %04x, INSTR: %02X\n", i, mem_sim[i]);
-		i++;
-		unkInstrs = true;
-	}
-	dumpTo = i; // save the offset to dump to
-
-	if ((params.sw_flag & SW_DMP) != 0)
-	{
-		filename = params.outFile;
-		if (filename == NULL)
-		{
-			filename = "mem_sim.bin";
-		}
-
-		print("\nWriting memory dump to %s (%d bytes)\n", filename, SIM_SIZE);
-		result = writeFile(filename, mem_sim, SIM_SIZE);
-		if (!SUCCESS(result))
-		{
-			error("Error: Failed to write memory dump to %s\n", filename);
-		}
-	}
-	else
-	{
-		// print memory dump
-		print("\nmem dump:\n");
-		for (i = 0; i < dumpTo; i += 8)
-		{
-			print("%04x: ", i);
-			printData(mem_sim + i, 8);
-		}
-
-		if (unkInstrs)
-		{
-			print("\nUnknown instructions found. Dump to file ( -d ) to decompile with a x86 32-bit decompiler.\n" \
-				"Only a handful of opcodes have been implemented. Better off " \
-				"dumping to a file and analyzing with a x86 32-bit compatible decompiler.\n");
-		}
-	}
+	result = interp.simulateXcodes();
 
 Cleanup:
 
@@ -914,10 +671,7 @@ Cleanup:
 		xb_free(inittbl);
 	}
 
-	if (mem_sim != NULL)
-	{
-		xb_free(mem_sim);
-	}
+	interp.unload();
 
 	return result;
 }

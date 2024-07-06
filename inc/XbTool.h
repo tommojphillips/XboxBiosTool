@@ -174,6 +174,9 @@ class XbTool
 		
 		// attempt to find the public key in the ptr.
 		int extractPubKey(UCHAR* data, UINT size);
+
+private:
+	UCHAR* load_init_tbl_file(UINT& size) const;
 };
 
 int verifyPubKey(UCHAR* data, PUBLIC_KEY*& pubkey);

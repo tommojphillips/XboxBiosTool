@@ -31,6 +31,7 @@
 const UINT SMB_BASE = 0xC000;
 const UINT NV2A_BASE = 0x0F000000;
 const UINT NV2A_BASE_KERNEL = 0x0FD00000;
+const UINT XCODE_BASE = sizeof(INIT_TBL);
 
 // mcpx v1.1 xcode opcodes
 enum OPCODE : UCHAR
@@ -104,6 +105,7 @@ public:
     INTERP_STATUS getStatus() const { return _status; };    // get the status of the xcode interpreter.
 
     int decodeXcodes();
+    int simulateXcodes();
 private:
     UCHAR* _data;           // XCODE data
     UINT _size;		        // size of the XCODE data  

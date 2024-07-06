@@ -375,7 +375,6 @@ int validateArgs()
 	{
 		params.romsize = DEFAULT_ROM_SIZE;
 	}
-
 	params.romsize *= 1024; // convert to bytes
 	if (!SUCCESS(checkSize(params.romsize)))
 	{
@@ -402,6 +401,12 @@ int validateArgs()
 		if (params.simSize < 32 || params.simSize > (128 * 1024 * 1024))
 		{
 			error("Error: Invalid sim size: %d\n", params.simSize);
+			return 1;
+		}
+		// check simsze is a multiple of 4
+		if (params.simSize % 4 != 0)
+		{
+			error("Error: simsize must be devisible by 4.\n");
 			return 1;
 		}
 	}	
