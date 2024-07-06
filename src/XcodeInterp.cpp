@@ -403,10 +403,58 @@ int XcodeInterp::decodeXcodes()
 	return 0;
 }
 
+//#define XCODE_SIM_OLD_CODE 0
+
 int XcodeInterp::simulateXcodes()
 {
 	// load the inittbl file
 
+#ifndef XCODE_SIM_OLD_CODE
+	typedef struct X86_INSTR
+	{
+		USHORT opcode;
+		const char* asm_instr;
+		UINT opcode_len;
+		UINT instr_len;
+		bool uses_operand = false;
+		const char* data_str = NULL;
+	} X86_INSTR;
+
+	const char* PTR_DATA_STR = ", [0x%08x]";
+	const char* NUM_DATA_STR = ", 0x%08x";
+
+	const X86_INSTR instrs[] = {
+		{ 0x1D8B, "mov ebx", 2, 6, true, PTR_DATA_STR },
+		{ 0x0D8B, "mov ecx", 2, 6, true, PTR_DATA_STR },
+		{ 0x158B, "mov edx", 2, 6, true, PTR_DATA_STR },
+
+		{ 0xE0FF, "jmp eax", 2, 2 },
+		{ 0xE1FF, "jmp ecx", 2, 2 },
+		{ 0xE2FF, "jmp edx", 2, 2 },
+		{ 0xE3FF, "jmp ebx", 2, 2 },
+		{ 0xE4FF, "jmp esp", 2, 2 },
+		{ 0xE5FF, "jmp ebp", 2, 2 },
+		{ 0xE6FF, "jmp esi", 2, 2 },
+		{ 0xE7FF, "jmp edi", 2, 2 },
+
+		{ 0xA5F3, "rep movsd", 2, 2 },
+
+		{ 0xB8, "mov eax", 1, 5, true },
+		{ 0xB9, "mov ecx", 1, 5, true },
+		{ 0xBA, "mov edx", 1, 5, true },
+		{ 0xBB, "mov ebx", 1, 5, true },
+		{ 0xBC, "mov esp", 1, 5, true },
+		{ 0xBD, "mov ebp", 1, 5, true },
+		{ 0xBE, "mov esi", 1, 5, true },
+		{ 0xBF, "mov edi", 1, 5, true },
+		{ 0xA1, "mov eax", 1, 5, true, PTR_DATA_STR },
+
+		{ 0xEA, "jmp far", 1, 6, true },
+		{ 0x90, "nop", 1, 1 },
+		{ 0xFC, "cld", 1, 1 }
+	};
+
+#else
 	// 6 byte encoding
 	const USHORT MOV_PTR_INSTRS_2_BYTE[] = { 0x1D8B,		0x0D8B,		0x158B };
 	const char* MOV_PTR_NAMES_2_BYTE[] = { "mov ebx",	"mov ecx",	"mov edx" };
@@ -438,13 +486,19 @@ int XcodeInterp::simulateXcodes()
 	// 1 byte encoding
 	const UCHAR CLD_INSTR = 0xFC;
 	const char* CLD_NAME = "cld";
+#endif
 
-	const UINT DEFAULT_SIM_SIZE = 128; // 32KB
+	const UINT DEFAULT_SIM_SIZE = 32; // 32KB
 	const UINT SIM_SIZE = (params.simSize > 0) ? params.simSize : DEFAULT_SIM_SIZE;
 
 	const UINT MAX_INSTR_SIZE = 6;
 	const UCHAR zero_mem[MAX_INSTR_SIZE] = { 0 };
 	char str_opcode[16] = { 0 };
+	char str_operand[16] = { 0 };
+	char str_instr[32] = { 0 };
+
+	UINT operand = 0;
+	UINT operandLen = 0;
 
 	int result = 0;
 
@@ -517,6 +571,40 @@ int XcodeInterp::simulateXcodes()
 		if (xb_cmp(mem_sim + i, zero_mem, (i < SIM_SIZE - MAX_INSTR_SIZE ? MAX_INSTR_SIZE : SIM_SIZE - i)) == 0)
 			break;
 
+#ifndef XCODE_SIM_OLD_CODE
+		// iterate through the x86 instructions
+		for (j = 0; j < sizeof(instrs) / sizeof(X86_INSTR); j++)
+		{
+			if (xb_cmp(mem_sim + i, (UCHAR*)&instrs[j].opcode, instrs[j].opcode_len) == 0)
+			{
+				xb_zero(str_instr, sizeof(str_instr));
+				format(str_instr, "%04x: %s", i, instrs[j].asm_instr);
+
+				if (instrs[j].uses_operand)
+				{
+					operand = 0;
+					operandLen = instrs[j].instr_len - instrs[j].opcode_len;
+					if (operandLen > 4) // UINT is 4 bytes
+						operandLen = 4;
+
+					// to-do: fix jmp far operand. currently only supports 4 byte operand single operand instructions.
+
+					xb_cpy(&operand, (UCHAR*)(mem_sim + i + instrs[j].opcode_len), operandLen);
+					format(str_operand, instrs[j].data_str == NULL ? NUM_DATA_STR : instrs[j].data_str, operand);
+					strcat(str_instr, str_operand);
+				}
+				strcat(str_instr, "\n");
+
+				print(str_instr);
+
+				i += instrs[j].instr_len;
+				found = true;
+				break;
+			}
+		}
+		if (found)
+			continue;
+#else
 		found = false;
 
 		// check for 2 byte mov ptr instructions
@@ -604,6 +692,7 @@ int XcodeInterp::simulateXcodes()
 			i++; // 1 byte opcode
 			continue;
 		}
+#endif
 
 		// opcode not found
 		error("Error: Unknown instruction at offset %04x, INSTR: %02X\n", i, mem_sim[i]);

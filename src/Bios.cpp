@@ -35,7 +35,7 @@
 #include "lzx.h"
 #include "sha1.h"
 
-extern XbTool xbtool;
+extern Parameters& params;
 
 void Bios::reset()
 {
@@ -114,7 +114,7 @@ void Bios::getOffsets2(const UINT krnlSize, const UINT krnlDataSize)
 	krnl = (krnlData - krnlSize);
 
 	// calculate the total space available in the rom.
-	_totalSpaceAvailable = xbtool.params.romsize - BLDR_BLOCK_SIZE - MCPX_BLOCK_SIZE;
+	_totalSpaceAvailable = params.romsize - BLDR_BLOCK_SIZE - MCPX_BLOCK_SIZE;
 
 	// calculate the available space in the bios.
 	_availableSpace = _totalSpaceAvailable - krnlSize - krnlDataSize;
@@ -148,13 +148,13 @@ int Bios::checkForPreldr()
 
 	print("\npreldr found\n");
 
-	if (xbtool.params.mcpx.data == NULL)
+	if (params.mcpx.data == NULL)
 	{
 		error("Error: MCPX v1.1 rom is required to decrypt the preldr ( -mcpx )\n");
 		return PRELDR_STATUS_ERROR;
 	}
 
-	if (xbtool.params.mcpx.version != MCPX_ROM::MCPX_V1_1)
+	if (params.mcpx.version != MCPX_ROM::MCPX_V1_1)
 	{
 		// user has provided the incorrect mcpx rom. let 'em know.
 		error("Error: decrypting the bldr. MCPX v1.1 was expected but v1.0 was provided.\n");
@@ -163,7 +163,7 @@ int Bios::checkForPreldr()
 
 	PRELDR_ENTRY* preldrEntry = (PRELDR_ENTRY*)(preldr + (preldrParams->jmpInstr >> 8) + 0x5 - sizeof(PRELDR_ENTRY)); 
 
-	UCHAR* sbKey = (UCHAR*)(xbtool.params.mcpx.data + MCPX_BLOCK_SIZE - 0x64);
+	UCHAR* sbKey = (UCHAR*)(params.mcpx.data + MCPX_BLOCK_SIZE - 0x64);
 	
 #if 0
 	// decrypt the preldr pubkey
@@ -234,8 +234,8 @@ int Bios::load(UCHAR* data, const UINT size)
 	_size = size;
 	
 	// set encryption states based on user input.
-	_isBldrEncrypted = xbtool.params.encBldr;
-	_isKernelEncrypted = xbtool.params.encKrnl;
+	_isBldrEncrypted = params.encBldr;
+	_isKernelEncrypted = params.encKrnl;
 
 	getOffsets();
 
@@ -246,16 +246,16 @@ int Bios::load(UCHAR* data, const UINT size)
 		// only decrypt the bldr if the user has provided a key file or a mcpx rom and the bldr is encrypted.
 		if (_isBldrEncrypted)
 		{
-			if (xbtool.params.keyBldr != NULL) // bldr key is provided; use it.
+			if (params.keyBldr != NULL) // bldr key is provided; use it.
 			{
-				symmetricEncDecBldr(xbtool.params.keyBldr, KEY_SIZE);
+				symmetricEncDecBldr(params.keyBldr, KEY_SIZE);
 			}
-			else if (xbtool.params.mcpxFile != NULL)
+			else if (params.mcpxFile != NULL)
 			{
-				switch (xbtool.params.mcpx.version)
+				switch (params.mcpx.version)
 				{
 				case MCPX_ROM::MCPX_V1_0:
-					symmetricEncDecBldr(xbtool.params.mcpx.data+0x1A5, KEY_SIZE);
+					symmetricEncDecBldr(params.mcpx.data+0x1A5, KEY_SIZE);
 					break;
 				case MCPX_ROM::MCPX_V1_1:
 					error("Error: decrypting the bldr. MCPX v1.0 was expected but v1.1 was provided.\n");
@@ -329,7 +329,7 @@ int Bios::saveBiosToFile(const char* path)
 		return 1;
 	}
 
-	if (xbtool.params.binsize < _size)
+	if (params.binsize < _size)
 	{
 		error("Error: Desired bin size is less than the total size of the bios\n");
 		return 1;
@@ -337,23 +337,23 @@ int Bios::saveBiosToFile(const char* path)
 
 	// replicate up to 1Mb
 
-	UCHAR* biosData = (UCHAR*)xb_alloc(xbtool.params.binsize);
+	UCHAR* biosData = (UCHAR*)xb_alloc(params.binsize);
 
 	xb_cpy(biosData, _bios, _size); // copy the bios data
 
 	// replicate to 512 KB
-	if (_size < 0x80000 && xbtool.params.binsize >= 0x80000)
+	if (_size < 0x80000 && params.binsize >= 0x80000)
 	{
 		xb_cpy(biosData + 0x40000, biosData, _size);
 	}
 
 	// replicate to 1 MB
-	if (_size < 0x100000 && xbtool.params.binsize >= 0x100000)
+	if (_size < 0x100000 && params.binsize >= 0x100000)
 	{
 		xb_cpy(biosData + 0x80000, biosData, 0x80000);
 	}
 
-	int result = writeFile(path, biosData, xbtool.params.binsize);
+	int result = writeFile(path, biosData, params.binsize);
 
 	xb_free(biosData);
 
@@ -429,7 +429,7 @@ void Bios::symmetricEncDecKernel()
 	if (krnl == NULL)
 		return;
 
-	UCHAR* key = xbtool.params.keyKrnl;
+	UCHAR* key = params.keyKrnl;
 	if (key == NULL)
 	{
 		// key not provided on cli; try get key from bldr block.
@@ -490,8 +490,8 @@ void Bios::printBldrInfo()
 	UINT krnlSize = bootParams->krnlSize;
 	UINT krnlDataSize = bootParams->krnlDataSize;
 
-	bool isKrnlSizeValid = krnlSize >= 0 && krnlSize <= xbtool.params.romsize;
-	bool isKrnlDataSizeValid = krnlDataSize >= 0 && krnlDataSize <= xbtool.params.romsize;
+	bool isKrnlSizeValid = krnlSize >= 0 && krnlSize <= params.romsize;
+	bool isKrnlDataSizeValid = krnlDataSize >= 0 && krnlDataSize <= params.romsize;
 
 	print("kernel data size:\t");
 	print((CON_COL)isKrnlDataSizeValid, "%ld", krnlDataSize);
@@ -583,7 +583,7 @@ void Bios::printInitTblInfo()
 	print(" ( %04x )\nRevision:\t\trev %d.%02d\n", initTbl->init_tbl_identifier, initTbl->revision >> 8, initTbl->revision & 0xFF);
 
 	UINT initTblSize = bootParams->inittblSize;
-	bool isInitTblSizeValid = initTblSize >= 0 && initTblSize <= xbtool.params.romsize;
+	bool isInitTblSizeValid = initTblSize >= 0 && initTblSize <= params.romsize;
 
 	print("Size:\t\t\t");
 	print((CON_COL)isInitTblSizeValid, "%ld", initTblSize);
@@ -729,7 +729,7 @@ int Bios::validateBldr()
 	const UINT krnlDataSize = bootParams->krnlDataSize;
 	const UINT tblSize = bootParams->inittblSize;
 	const UINT availableSpace = _totalSpaceAvailable;
-	const UINT romSize = xbtool.params.romsize;
+	const UINT romSize = params.romsize;
 
 	const bool isKrnlSizeValid = krnlSize >= 0 && krnlSize <= romSize;
 	const bool isDataSizeValid = krnlDataSize >= 0 && krnlDataSize <= romSize;
@@ -791,25 +791,25 @@ int Bios::create(UCHAR* in_bl, UINT in_blSize, UCHAR* in_tbl, UINT in_tblSize, U
 	}
 
 	// check romsize is big enough for the bios.
-	if (xbtool.params.romsize < in_tblSize + BLDR_BLOCK_SIZE + MCPX_BLOCK_SIZE + in_kSize + in_kDataSize)
+	if (params.romsize < in_tblSize + BLDR_BLOCK_SIZE + MCPX_BLOCK_SIZE + in_kSize + in_kDataSize)
 	{
 		error("Error: romsize is less than the total size of the bios\n");
 		return BIOS_LOAD_STATUS_FAILED;
 	}
 
-	_bios = (UCHAR*)xb_alloc(xbtool.params.romsize);
+	_bios = (UCHAR*)xb_alloc(params.romsize);
 	if (_bios == NULL)
 	{
 		error("Error: Failed to allocate memory\n");
 		return BIOS_LOAD_STATUS_FAILED;
 	}
-	_size = xbtool.params.romsize;
+	_size = params.romsize;
 
 	// set encryption states based on user input.
 	// when building a bios. the bldr file, and kernel file is expected to be passed in UNENCRYPTED.
 	// This is because a bios can't be extracted unless the 2bl is decrypted.
-	_isBldrEncrypted = !xbtool.params.encBldr;
-	_isKernelEncrypted = !xbtool.params.encKrnl;
+	_isBldrEncrypted = !params.encBldr;
+	_isKernelEncrypted = !params.encKrnl;
 
 	getOffsets();
 
@@ -849,15 +849,15 @@ int Bios::create(UCHAR* in_bl, UINT in_blSize, UCHAR* in_tbl, UINT in_tblSize, U
 		{
 			// kernel was encrypted successfully. update the kernel key in the bldr.
 			
-			if (bldrKeys != NULL && xbtool.params.keyKrnl != NULL)
+			if (bldrKeys != NULL && params.keyKrnl != NULL)
 			{
 				print("Updating kernel key in bldr..\n");
-				xb_cpy(bldrKeys->krnlKey, xbtool.params.keyKrnl, KEY_SIZE);
+				xb_cpy(bldrKeys->krnlKey, params.keyKrnl, KEY_SIZE);
 			}
 		}
 	}
 
-	if ((xbtool.params.sw_flag & SW_BLD_BFM) != 0) // build a bios that boots from media.
+	if ((params.sw_flag & SW_BLD_BFM) != 0) // build a bios that boots from media.
 	{
 		convertToBootFromMedia();
 	}
@@ -865,16 +865,16 @@ int Bios::create(UCHAR* in_bl, UINT in_blSize, UCHAR* in_tbl, UINT in_tblSize, U
 	// only encrypt the bldr if the user has provided a key file or a mcpx rom and the bldr is not already encrypted.
 	if (!_isBldrEncrypted)
 	{
-		if (xbtool.params.keyBldr != NULL)
+		if (params.keyBldr != NULL)
 		{
-			symmetricEncDecBldr(xbtool.params.keyBldr, KEY_SIZE);
+			symmetricEncDecBldr(params.keyBldr, KEY_SIZE);
 		}
-		else if (xbtool.params.mcpxFile != NULL)
+		else if (params.mcpxFile != NULL)
 		{
-			switch (xbtool.params.mcpx.version)
+			switch (params.mcpx.version)
 			{
 			case MCPX_ROM::MCPX_V1_0:
-				symmetricEncDecBldr(xbtool.params.mcpx.data+0x1A5, KEY_SIZE);
+				symmetricEncDecBldr(params.mcpx.data+0x1A5, KEY_SIZE);
 				break;
 			case MCPX_ROM::MCPX_V1_1:
 				break;
@@ -904,7 +904,7 @@ int Bios::convertToBootFromMedia()
 
 	// encrypt the bldr with the bfm key.
 
-	if (xbtool.params.keyBldr == NULL)
+	if (params.keyBldr == NULL)
 	{
 		if (bldrKeys == NULL)
 		{
@@ -918,7 +918,7 @@ int Bios::convertToBootFromMedia()
 	}
 	else
 	{
-		if (xb_cmp(xbtool.params.keyBldr, bldrKeys->bfmKey, KEY_SIZE) != 0)
+		if (xb_cmp(params.keyBldr, bldrKeys->bfmKey, KEY_SIZE) != 0)
 		{
 			error("Error: BFM key does not match the key in the bldr\n");
 			return 1;
@@ -927,7 +927,7 @@ int Bios::convertToBootFromMedia()
 	}
 
 	// force the bfm bios to be 1Mb in size.
-	xbtool.params.binsize = 1 * 1024 * 1024; // 1Mb
+	params.binsize = 1 * 1024 * 1024; // 1Mb
 
 	return 0;
 }
