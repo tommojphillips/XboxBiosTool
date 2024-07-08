@@ -3,12 +3,14 @@
 ################################################################################
 
 /.vs/XboxBiosTools
+/bin
 /bios
 /keys
-/XbBiosTool/objd
 *.exe
 *.pdb
 *.bin
 *.img
-/XbBiosTool/obj
 *.zip
+/XbBiosTool/objd
+/XbBiosTool/obj
+/xbios.exe.lastcodeanalysissucceeded

@@ -74,6 +74,13 @@ void XcodeInterp::unload()
 	}
 }
 
+void XcodeInterp::reset()
+{
+	_offset = 0;
+	_status = INTERP_STATUS::UNK;
+	_ptr = (XCODE*)_data;
+}
+
 int XcodeInterp::interpretNext(XCODE*& xcode)
 {
 	if (_status == INTERP_STATUS::EXIT_OP_FOUND) // last xcode was an exit. dont interpret anymore xcodes after this
@@ -86,7 +93,7 @@ int XcodeInterp::interpretNext(XCODE*& xcode)
 		return 1;
 	}
 
-	_ptr = (XCODE*)((UCHAR*)_data + _offset);
+	_ptr = (XCODE*)(_data + _offset);
 	
 	xcode = _ptr;
 
@@ -104,13 +111,16 @@ int XcodeInterp::interpretNext(XCODE*& xcode)
 	return 0;
 }
 
-int XcodeInterp::isOpcodeValid(UCHAR opcode)
-{
-	return (opcode >= XC_MEM_READ && opcode <= XC_EXIT) == 0;
-}
+const char* INTERP_ERROR_XCODE_PTR_NULL = "Error: XCODE pointer is NULL\n";
 
 int XcodeInterp::getOpcodeStr(char* str)
 {
+	if (_ptr == NULL)
+	{
+		error(INTERP_ERROR_XCODE_PTR_NULL);
+		return 1;
+	}
+
 	const UCHAR opcode = _ptr->opcode;
 
 	switch (opcode)
@@ -160,9 +170,14 @@ int XcodeInterp::getOpcodeStr(char* str)
 
 	return 0;
 }
-
 int XcodeInterp::getAddressStr(char* str)
 {
+	if (_ptr == NULL)
+	{
+		error(INTERP_ERROR_XCODE_PTR_NULL);
+		return 1;
+	}
+
 	const UCHAR opcode = _ptr->opcode;
 
 	// opcodes that dont use addr field
@@ -177,9 +192,14 @@ int XcodeInterp::getAddressStr(char* str)
 
 	return 0;
 }
-
 int XcodeInterp::getDataStr(char* str)
 {
+	if (_ptr == NULL)
+	{
+		error(INTERP_ERROR_XCODE_PTR_NULL);
+		return 1;
+	}
+
 	switch (_ptr->opcode)
 	{
 		// opcodes that dont use data field
@@ -201,9 +221,14 @@ int XcodeInterp::getDataStr(char* str)
 
 	return 0;
 }
-
 int XcodeInterp::getCommentStr(char* str)
 {
+	if (_ptr == NULL)
+	{
+		error(INTERP_ERROR_XCODE_PTR_NULL);
+		return 1;
+	}
+
 	XC_WRITE_COMMENT(XC_JNE, 0x10, 0xFFFFFFEE, "\t ; spin until smbus is ready");
 
 	XC_WRITE_COMMENT(XC_IO_READ, SMB_BASE + 0x00, NULL, "smbus read status");
@@ -246,17 +271,8 @@ int XcodeInterp::getCommentStr(char* str)
 	return 0;
 }
 
-void XcodeInterp::reset()
+int XcodeInterp::decodeXcode(FILE* stream, XCODE*& xcode, std::list<LABEL>& labels) // decode xcode and print to stream
 {
-	_offset = 0;
-	_status = INTERP_STATUS::UNK;
-	_ptr = NULL;
-}
-
-int XcodeInterp::decodeXcode(XCODE*& xcode, std::list<LABEL>& labels)
-{
-	const UINT BASE_OFFSET = sizeof(INIT_TBL);
-
 	bool found = false;
 	UINT len = 0;
 	UINT offset = _offset - sizeof(XCODE);
@@ -335,8 +351,11 @@ int XcodeInterp::decodeXcode(XCODE*& xcode, std::list<LABEL>& labels)
 		xb_cpy(str_comment, "; ", 2);
 	}
 
-	// print the xcode
-	print("%s %04x: %s %s %s %s\n", &str_label, (BASE_OFFSET + offset), &str_opcode, &str_addr, &str_data, &str_comment);
+	if (stream == NULL)
+		return 1;
+
+	// print the xcode to the stream
+	print(stream, "%s %04x: %s %s %s %s\n", &str_label, (XCODE_BASE + offset), &str_opcode, &str_addr, &str_data, &str_comment);
 
 	return 0;
 }
@@ -351,33 +370,34 @@ int XcodeInterp::decodeXcodes()
 	{
 		// go through the xcodes and fix up jmp offsets.
 
-		// if the xcode is a jmp, then calculate the offset and set the data to the offset.
-		if (xcode->opcode == XC_JMP || xcode->opcode == XC_JNE)
+		if (xcode->opcode != XC_JMP && xcode->opcode != XC_JNE)
+			continue;
+
+		// calculate the offset and set the data to the offset.
+
+		bool isLabel = false;
+		UINT labelOffset = _offset + xcode->data;
+
+		// Fix up the xcode data to the offset for phase 2 decoding
+		xcode->data = labelOffset;
+
+		// check if offset is already a label
+		for (LABEL& label : labels)
 		{
-			bool isLabel = false;
-			UINT labelOffset = _offset + xcode->data;
-
-			// Fix up the xcode data to the offset for phase 2 decoding
-			xcode->data = labelOffset;
-
-			// check if offset is already a label
-			for (LABEL& label : labels)
+			if (label.offset == labelOffset)
 			{
-				if (label.offset == labelOffset)
-				{
-					isLabel = true;
-					break;
-				}
+				isLabel = true;
+				break;
 			}
+		}
 
-			// label does not exist. create one.
-			if (!isLabel)
-			{
-				char str[16] = { 0 };
-				format(str, "lb_%02d", labels.size());
+		// label does not exist. create one.
+		if (!isLabel)
+		{
+			char str[16] = { 0 };
+			format(str, "lb_%02d", labels.size());
 
-				labels.push_back(LABEL(labelOffset, str));
-			}
+			labels.push_back(LABEL(labelOffset, str));
 		}
 	}
 
@@ -386,16 +406,48 @@ int XcodeInterp::decodeXcodes()
 		error("Error: Failed to decode xcodes\n");
 		return 1;
 	}
-
-	print("xcodes: %d ( %ld bytes )\n", _offset / sizeof(XCODE), _offset);
-
+	
 	// decode phase 2
-		
-	reset(); // reset the interpreter to the start of the xcodes
+	
+	FILE* stream = stdout;
 
+	// if -d flag is set, dump the xcodes to a file, otherwise print the xcodes
+	if ((params.sw_flag & SW_DMP) != 0)
+	{
+		const char* filename = params.outFile;
+		if (filename == NULL)
+		{
+			filename = "xcodes.txt";
+		}
+
+		// del file if it exists
+		//if (fileExists(filename))
+		{
+			deleteFile(filename);
+		}
+
+		print("Writing decoded xcodes to %s (text format)\n", filename, _offset);
+		stream = fopen(filename, "w");
+		if (stream == NULL)
+		{
+			error("Error: Failed to open file %s\n", filename);
+			return 1;
+		}
+	}
+
+	print(stream, "xcodes: %d ( %ld bytes )\n", _offset / sizeof(XCODE), _offset);
+
+	// print the xcodes to the stream.
+	reset();
 	while (interpretNext(xcode) == 0)
 	{
-		decodeXcode(xcode, labels);		
+		decodeXcode(stream, xcode, labels);
+	}
+
+	if ((params.sw_flag & SW_DMP) != 0)
+	{
+		fclose(stream);
+		print("Done\n");
 	}
 
 	labels.clear();
@@ -403,13 +455,10 @@ int XcodeInterp::decodeXcodes()
 	return 0;
 }
 
-//#define XCODE_SIM_OLD_CODE 0
-
 int XcodeInterp::simulateXcodes()
 {
 	// load the inittbl file
 
-#ifndef XCODE_SIM_OLD_CODE
 	typedef struct X86_INSTR
 	{
 		USHORT opcode;
@@ -454,44 +503,9 @@ int XcodeInterp::simulateXcodes()
 		{ 0xFC, "cld", 1, 1 }
 	};
 
-#else
-	// 6 byte encoding
-	const USHORT MOV_PTR_INSTRS_2_BYTE[] = { 0x1D8B,		0x0D8B,		0x158B };
-	const char* MOV_PTR_NAMES_2_BYTE[] = { "mov ebx",	"mov ecx",	"mov edx" };
-
-	// 5 byte encoding
-	const UCHAR MOV_INSTRS[] = { 0xB8,		0xB9,		0xBA,		0xBB,		0xBC,		0xBD,		0xBE,		0xBF };
-	const char* MOV_NAMES[] = { "mov eax", "mov ecx",	"mov edx",	"mov ebx",	"mov esp",	"mov ebp",	"mov esi",	"mov edi" };
-
-	// 5 byte encoding
-	const UCHAR MOV_EAX_PTR_INSTR = 0xA1;
-	const char* MOV_EAX_PTR_NAME = "mov eax";
-
-	// 2 byte encoding
-	const USHORT JMP_INSTRS[] = { 0xE0FF,		0xE1FF,		0xE2FF,		0xE3FF,		0xE4FF,		0xE5FF,		0xE6FF,		0xE7FF };
-	const char* JMP_NAMES[] = { "jmp eax",	"jmp ecx",	"jmp edx",	"jmp ebx",	"jmp esp",	"jmp ebp",	"jmp esi",	"jmp edi" };
-
-	// 2 byte encoding
-	const USHORT REP_INSTRS[] = { 0xA5F3 };
-	const char* REP_NAMES[] = { "rep movsd" };
-
-	// 1 byte encoding
-	const UCHAR FAR_JMP_INSTR = 0xEA;
-	const char* FAR_JMP_NAME = "jmp far";
-
-	// 1 byte encoding
-	const UCHAR NOP_INSTR = 0x90;
-	const char* NOP_NAME = "nop";
-
-	// 1 byte encoding
-	const UCHAR CLD_INSTR = 0xFC;
-	const char* CLD_NAME = "cld";
-#endif
-
-	const UINT DEFAULT_SIM_SIZE = 32; // 32KB
-	const UINT SIM_SIZE = (params.simSize > 0) ? params.simSize : DEFAULT_SIM_SIZE;
-
+	const UINT memSize = (params.simSize > 0) ? params.simSize : 32;
 	const UINT MAX_INSTR_SIZE = 6;
+
 	const UCHAR zero_mem[MAX_INSTR_SIZE] = { 0 };
 	char str_opcode[16] = { 0 };
 	char str_operand[16] = { 0 };
@@ -510,11 +524,11 @@ int XcodeInterp::simulateXcodes()
 	XCODE* xcode = NULL;
 	
 
-	UINT i, j, offset, dumpTo;
+	UINT i, j, dumpTo;
 	
-	print("mem space: %d bytes\n\n", SIM_SIZE);
+	print("mem space: %d bytes\n\n", memSize);
 
-	mem_sim = (UCHAR*)xb_alloc(SIM_SIZE);
+	mem_sim = (UCHAR*)xb_alloc(memSize);
 	if (mem_sim == NULL)
 	{
 		result = 1;
@@ -526,26 +540,25 @@ int XcodeInterp::simulateXcodes()
 	print("xcode sim:\n");
 	while (SUCCESS(interpretNext(xcode)))
 	{
-		// skip this xcode. only care about xcodes that write to RAM
+		// only care about xcodes that write to RAM
 		if (xcode->opcode != XC_MEM_WRITE)
 			continue;
 
 		// sanity check of addr.
-		if (xcode->addr < 0 || xcode->addr >= SIM_SIZE)
+		if (xcode->addr < 0 || xcode->addr >= memSize)
+		{
 			continue;
-
+		}
 		hasMemChanges_total = true;
 
 		// write the data to simulated memory
 		xb_cpy(mem_sim + xcode->addr, (UCHAR*)&xcode->data, 4);
 
-		offset = _offset + sizeof(INIT_TBL) - sizeof(XCODE);
-
 		// print the xcode
 		xb_zero(str_opcode, sizeof(str_opcode));
 		getOpcodeStr(str_opcode);
 
-		print("%04x: %s 0x%02x, 0x%08X\n", offset, str_opcode, xcode->addr, xcode->data);
+		print("%04x: %s 0x%02x, 0x%08X\n", (XCODE_BASE + _offset - sizeof(XCODE)), str_opcode, xcode->addr, xcode->data);
 	}
 
 	if (_status != XcodeInterp::EXIT_OP_FOUND)
@@ -556,7 +569,7 @@ int XcodeInterp::simulateXcodes()
 
 	if (!hasMemChanges_total)
 	{
-		print("No Memory changes in range 0x0 - 0x%x\n", SIM_SIZE);
+		print("No Memory changes in range 0x0 - 0x%x\n", memSize);
 		goto Cleanup;
 	}
 
@@ -565,13 +578,12 @@ int XcodeInterp::simulateXcodes()
 	print("\nx86 32-bit instructions:\n");
 
 	// IMPORTANT: sort by opcode len (2, 1); to prevent a 1 byte instru from being parsed as a 2 byte instru.
-	for (i = 0; i < SIM_SIZE;)
+	for (i = 0; i < memSize;)
 	{
 		// check if the next [max_instr_size] bytes are zero, if so we are done.
-		if (xb_cmp(mem_sim + i, zero_mem, (i < SIM_SIZE - MAX_INSTR_SIZE ? MAX_INSTR_SIZE : SIM_SIZE - i)) == 0)
+		if (xb_cmp(mem_sim + i, zero_mem, (i < memSize - MAX_INSTR_SIZE ? MAX_INSTR_SIZE : memSize - i)) == 0)
 			break;
 
-#ifndef XCODE_SIM_OLD_CODE
 		// iterate through the x86 instructions
 		for (j = 0; j < sizeof(instrs) / sizeof(X86_INSTR); j++)
 		{
@@ -604,95 +616,6 @@ int XcodeInterp::simulateXcodes()
 		}
 		if (found)
 			continue;
-#else
-		found = false;
-
-		// check for 2 byte mov ptr instructions
-		for (j = 0; j < sizeof(MOV_PTR_INSTRS_2_BYTE) / sizeof(USHORT); j++)
-		{
-			if (xb_cmp(mem_sim + i, MOV_PTR_INSTRS_2_BYTE + j, 2) == 0)
-			{
-				print("%04x: %s, [0x%08x]\n", i, MOV_PTR_NAMES_2_BYTE[j], *((UINT*)(mem_sim + i + 2)));
-				i += 6; // 2 byte opcode + 4 byte data
-				found = true;
-				break;
-			}
-		}
-		if (found)
-			continue;
-
-		// check for 2 byte jmp instructions
-		for (j = 0; j < sizeof(JMP_INSTRS) / sizeof(USHORT); j++)
-		{
-			if (xb_cmp(mem_sim + i, JMP_INSTRS + j, 2) == 0)
-			{
-				print("%04x: %s\n", i, JMP_NAMES[j]);
-				i += 2; // 2 byte opcode
-				found = true;
-				break;
-			}
-		}
-		if (found)
-			continue;
-
-		// check for 2 byte rep instructions
-		for (j = 0; j < sizeof(REP_INSTRS) / sizeof(USHORT); j++)
-		{
-			if (xb_cmp(mem_sim + i, REP_INSTRS + j, 2) == 0)
-			{
-				print("%04x: %s\n", i, REP_NAMES[j]);
-				i += 2; // 2 byte opcode
-				found = true;
-				break;
-			}
-		}
-		if (found)
-			continue;
-
-		// check for 1 byte far jmp instructions
-		if (mem_sim[i] == FAR_JMP_INSTR)
-		{
-			print("%04x: %s 0x%x:0x%08x\n", i, FAR_JMP_NAME, *((USHORT*)(mem_sim + i + 5)), *((UINT*)(mem_sim + i + 1)));
-			i += 6; // 1 byte opcode + 2 byte for seg + 4 byte for offset
-			continue;
-		}
-
-		// check for 1 byte mov ptr instructions
-		if (mem_sim[i] == MOV_EAX_PTR_INSTR)
-		{
-			print("%04x: %s, [0x%8x]\n", i, MOV_EAX_PTR_NAME, *((UINT*)(mem_sim + i + 1)));
-			i += 5; // 1 byte opcode + 4 byte data
-			continue;
-		}
-
-		// check for 1 byte mov instructions
-		for (j = 0; j < sizeof(MOV_INSTRS); j++)
-		{
-			if (xb_cmp(mem_sim + i, MOV_INSTRS + j, 1) == 0)
-			{
-				print("%04x: %s, 0x%x\n", i, MOV_NAMES[j], *((UINT*)(mem_sim + i + 1)));
-				i += 5; // 1 byte opcode + 4 byte data
-				found = true;
-				break;
-			}
-		}
-		if (found)
-			continue;
-
-		if (mem_sim[i] == NOP_INSTR)
-		{
-			print("%04x: %s\n", i, NOP_NAME);
-			i++; // 1 byte opcode
-			continue;
-		}
-
-		if (mem_sim[i] == CLD_INSTR)
-		{
-			print("%04x: %s\n", i, CLD_NAME);
-			i++; // 1 byte opcode
-			continue;
-		}
-#endif
 
 		// opcode not found
 		error("Error: Unknown instruction at offset %04x, INSTR: %02X\n", i, mem_sim[i]);
@@ -712,8 +635,8 @@ int XcodeInterp::simulateXcodes()
 			filename = "mem_sim.bin";
 		}
 
-		print("\nWriting memory dump to %s (%d bytes)\n", filename, SIM_SIZE);
-		result = writeFile(filename, mem_sim, SIM_SIZE);
+		print("\nWriting memory dump to %s (%d bytes)\n", filename, memSize);
+		result = writeFile(filename, mem_sim, memSize);
 		if (!SUCCESS(result))
 		{
 			error("Error: Failed to write memory dump to %s\n", filename);

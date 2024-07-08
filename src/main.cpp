@@ -44,21 +44,18 @@ Parameters&  params = xbtool.params;	// global instance of parameters.
 const CMD_TBL cmd_tbl[] = {
 	{ "Help", "?", CMD_HELP, SW_NONE, SW_NONE, HELP_STR_HELP },
 
-	{ "List bios",			"ls", CMD_LIST, (SW_BIOS_FILE), (SW_ROMSIZE | SW_LS_OPT), HELP_STR_LIST },
+	{ "List bios", "ls", CMD_LIST, (SW_BIOS_FILE), (SW_ROMSIZE | SW_LS_OPT), HELP_STR_LIST },
 	
-	{ "Split bios",			"split", CMD_SPLIT, SW_BIOS_FILE, SW_NONE, HELP_STR_SPLIT },
-	{ "Combine banks",		"combine", CMD_COMBINE,	SW_NONE, (SW_OUT_FILE | SW_BANK_FILES), HELP_STR_COMBINE },
+	{ "Simulate xcodes", "xcode-sim", CMD_XCODE_SIM, SW_NONE, (SW_INITTBL_FILE | SW_BIOS_FILE | SW_OUT_FILE | SW_SIM_SIZE), HELP_STR_XCODE_SIM },
+	{ "Decode xcodes", "xcode-decode",	CMD_XCODE_DECODE, SW_NONE, (SW_INITTBL_FILE | SW_BIOS_FILE), HELP_STR_XCODE_DECODE },
 
-	{ "Extract bios",		"extr", CMD_EXTR, SW_BIOS_FILE, SW_BLD_BIOS, HELP_STR_EXTR_ALL },
-	{ "Build bios",			"bld", CMD_BLD_BIOS, SW_BLD_BIOS, SW_OUT_FILE, HELP_STR_BUILD },
+	{ "Extract bios", "extr", CMD_EXTR, SW_BIOS_FILE, SW_BLD_BIOS, HELP_STR_EXTR_ALL },
+	{ "Build bios",	"bld", CMD_BLD_BIOS, SW_BLD_BIOS, (SW_OUT_FILE | SW_ROMSIZE | SW_BINSIZE | SW_BLD_BFM | SW_PATCH_KEYS | SW_EEPROM_KEY_FILE | SW_CERT_KEY_FILE), HELP_STR_BUILD },
 
-	{ "Simulate xcodes",	"xcode-sim", CMD_XCODE_SIM, SW_NONE, (SW_INITTBL_FILE | SW_BIOS_FILE | SW_OUT_FILE | SW_DMP), HELP_STR_BUILD_INITTBL },
-	{ "Decode xcodes",		"xcode-decode",	CMD_XCODE_DECODE, SW_NONE, (SW_INITTBL_FILE | SW_BIOS_FILE), NULL },
+	{ "Decompress krnl", "decomp-krnl", CMD_KRNL_DECOMPRESS, SW_BIOS_FILE, (SW_OUT_FILE | SW_PATCH_KEYS | SW_PUB_KEY_FILE), NULL },
 
-	{ "Decompress krnl",	"decomp-krnl", CMD_KRNL_DECOMPRESS, SW_BIOS_FILE, (SW_OUT_FILE | SW_PATCH_KEYS | SW_PUB_KEY_FILE), NULL }
-
-	// rep command
-	// rep <bios> <out> <binsize>
+	{ "Split bios", "split", CMD_SPLIT, SW_BIOS_FILE, SW_NONE, HELP_STR_SPLIT },
+	{ "Combine banks", "combine", CMD_COMBINE,	SW_NONE, (SW_OUT_FILE | SW_BANK_FILES), HELP_STR_COMBINE },
 };
 
 PARAM_TBL PARAM_BLDR_KEY = { "key-bldr", SW_KEY_BLDR_FILE, &params.keyBldrFile,	PARAM_TBL::STR, NULL };
@@ -72,6 +69,7 @@ PARAM_TBL param_tbl[] = {
 	{ "bios",		SW_BIOS_FILE,	&params.biosFile,		PARAM_TBL::STR,		HELP_STR_PARAM_BIOS_FILE },
 	{ "out",		SW_OUT_FILE,	&params.outFile,		PARAM_TBL::STR,		HELP_STR_PARAM_OUT_FILE },
 	{ "romsize",	SW_ROMSIZE,		&params.romsize,		PARAM_TBL::INT,		HELP_STR_PARAM_ROMSIZE },
+	{ "binsize", SW_BINSIZE, &params.binsize, PARAM_TBL::INT, HELP_STR_PARAM_BINSIZE },
 
 	// crypto switches
 	PARAM_BLDR_KEY, PARAM_BLDR_ENC, PARAM_KRNL_KEY, PARAM_KRNL_ENC,
@@ -94,16 +92,15 @@ PARAM_TBL param_tbl[] = {
 	{ "2bl",	SW_LS_BLDR,		&params.ls_flag, PARAM_TBL::FLAG, HELP_STR_PARAM_LS_BIOS },
 	{ "datatbl",SW_LS_DATA_TBL,	&params.ls_flag, PARAM_TBL::FLAG, HELP_STR_PARAM_LS_DATA_TBL },
 
-	{ "pubkey", SW_PUB_KEY_FILE, &params.pubKeyFile, PARAM_TBL::STR, NULL },
-	{ "certkey", SW_CERT_KEY_FILE, &params.certKeyFile, PARAM_TBL::STR, NULL },
-	{ "eepromkey", SW_EEPROM_KEY_FILE, &params.eepromKeyFile, PARAM_TBL::STR, NULL },
+	{ "patchkeys",	SW_PATCH_KEYS, NULL, PARAM_TBL::FLAG, HELP_STR_PARAM_PATCH_KEYS },
+	{ "pubkey", SW_PUB_KEY_FILE, &params.pubKeyFile, PARAM_TBL::STR, HELP_STR_PARAM_PUB_KEY },
+	{ "certkey", SW_CERT_KEY_FILE, &params.certKeyFile, PARAM_TBL::STR, HELP_STR_PARAM_CERT_KEY },
+	{ "eepromkey", SW_EEPROM_KEY_FILE, &params.eepromKeyFile, PARAM_TBL::STR, HELP_STR_PARAM_EEPROM_KEY },
 	
-	{ "patchkeys",	SW_PATCH_KEYS, NULL, PARAM_TBL::FLAG, NULL },
 	
 	{ "bfm", SW_BLD_BFM, NULL, PARAM_TBL::FLAG, NULL },
-	{ "binsize", SW_BINSIZE, &params.binsize, PARAM_TBL::INT, NULL },
 
-	{ "simsize", SW_SIM_SIZE, &params.simSize, PARAM_TBL::INT, NULL },
+	{ "simsize", SW_SIM_SIZE, &params.simSize, PARAM_TBL::INT, HELP_STR_PARAM_SIM_SIZE },
 	{ "d", SW_DMP, NULL, PARAM_TBL::FLAG, NULL }
 };
 
@@ -154,15 +151,21 @@ void printHelp()
 
 	// bldr key
 	print(" -%s", PARAM_BLDR_KEY.sw);
-	print_f(HELP_STR_RC4_KEY, "Bldr");
-	print("\n -%s", PARAM_BLDR_ENC.sw);
-	print_f(HELP_STR_RC4_ENC, "Bldr");
+	print_f(HELP_STR_RC4_KEY, "2bl");
 
 	// krnl key
 	print("\n -%s", PARAM_KRNL_KEY.sw);
-	print_f(HELP_STR_RC4_KEY, "Krnl");
+	print_f(HELP_STR_KEY_KRNL);
+	
+	// enc switches
+	print("\n -%s", PARAM_BLDR_ENC.sw);
+	print_f(HELP_STR_RC4_ENC, "2bl");
 	print("\n -%s", PARAM_KRNL_ENC.sw);
 	print_f(HELP_STR_RC4_ENC, "Krnl");
+
+	// mcpx rom
+	print("\n -%s", "mcpx");
+	print_f(HELP_STR_MCPX_ROM);
 }
 
 int getFilename(char* path)
@@ -417,7 +420,6 @@ int validateArgs()
 int main(int argc, char* argv[])
 {
 	int result = 0;
-	const CMD_TBL* cmd = NULL;
 
 	// header
 	print(XB_BIOS_TOOL_HEADER_STR);
@@ -430,9 +432,7 @@ int main(int argc, char* argv[])
 	if (!SUCCESS(result))
 		goto Exit;
 
-	cmd = xbtool.cmd;
-
-	if (cmd->type == CMD_HELP)
+	if (xbtool.cmd->type == CMD_HELP)
 	{
 		printHelp();
 		goto Exit;
@@ -451,7 +451,7 @@ int main(int argc, char* argv[])
 		goto Exit;
 
 	// run command
-	switch (cmd->type)
+	switch (xbtool.cmd->type)
 	{
 		case CMD_LIST:
 			result = xbtool.listBios();

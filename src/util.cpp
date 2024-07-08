@@ -50,6 +50,18 @@ void setConsoleColor(const int col)
 	console_util_color = col;
 	printf("\x1B[%dm", col);
 }
+void setForegroundColor(const CON_COL col)
+{
+	int con_col = col;
+
+	if (col >= 0 && col < CON_COL::BLACK)
+	{
+		con_col += 31;
+	}
+
+	setConsoleColor((CON_COL)con_col);
+}
+
 void printData(UCHAR* data, const int len, bool newLine)
 {
     if (data == NULL)
@@ -73,7 +85,6 @@ void printData(UCHAR* data, const int len, bool newLine)
 		print("\n");
 	}
 }
-
 void print_f(const char* format, ...)
 {
 	// find {1}, {2}, etc and replace with the corresponding argument
@@ -214,6 +225,15 @@ void format(char* buffer, const char* format, ...)
 	va_end(args);
 }
 
+void print(FILE* stream, const char* format, ...)
+{
+	va_list args;
+
+	va_start(args, format);
+	vfprintf(stream, format, args);
+	va_end(args);
+}
+
 void print(const char* format, ...)
 {
 	va_list args;
@@ -221,27 +241,6 @@ void print(const char* format, ...)
 	va_start(args, format);
 	vfprintf(stdout, format, args);
 	va_end(args);
-}
-
-void error(const char* format, ...)
-{
-	va_list args;
-
-	va_start(args, format);
-	vfprintf(stderr, format, args);
-	va_end(args);
-}
-
-void setForegroundColor(const CON_COL col)
-{
-	int con_col = col;
-
-	if (col >= 0 && col < CON_COL::BLACK)
-	{
-		con_col += 31;
-	}
-
-	setConsoleColor((CON_COL)con_col);
 }
 
 void print(const CON_COL col, const char* format, ...)
@@ -255,16 +254,14 @@ void print(const CON_COL col, const char* format, ...)
 
 	setConsoleColor(0);
 }
-void error(const CON_COL col, const char* format, ...)
-{
-	setForegroundColor(col);
 
+void error(const char* format, ...)
+{
 	va_list args;
+
 	va_start(args, format);
 	vfprintf(stderr, format, args);
 	va_end(args);
-
-	setConsoleColor(0);
 }
 
 int checkSize(const UINT& size)
@@ -279,24 +276,26 @@ int checkSize(const UINT& size)
 	return 1;
 }
 
-void getTimestamp(unsigned int timestamp, char* timestamp_str)
+void getTimestamp(long long timestamp, char* timestamp_str)
 {
+	char* time_str = NULL;
+
 	if (timestamp_str == NULL)
-	{
-		//error("Error: timestamp_str is NULL\n");
 		return;
-	}
-	time_t rawtime = (time_t)timestamp;
+
 	struct tm* ptm;
+	ptm = gmtime(&timestamp);
+	if (ptm == NULL)
+		goto TimeStrZero;
 
-	ptm = gmtime(&rawtime);
-
-	char* time_str = asctime(ptm);
+	time_str = asctime(ptm);
 	if (time_str == NULL)
-	{
-		strcpy(timestamp_str, "0");
-		return;
-	}
+		goto TimeStrZero;
+
 	time_str[strlen(time_str) - 1] = '\0';
 	strcpy(timestamp_str, time_str);
+
+TimeStrZero:
+	strcpy(timestamp_str, "0");
+	return;
 }

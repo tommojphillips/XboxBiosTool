@@ -1,54 +1,73 @@
 # Command Table
 
-- `?` - Displays help information about how to use the program and its commands.
-- `ls` - Lists information about the BIOS file, boot params, sizes, rc4 keys.
-- `split` - Splits a BIOS file into banks based on romsize. Eg bios.bin 1Mb -> bios.bin 4x 256Kb
-- `combine` - Combine multiple bank files into a single bios file. Eg bios.bin x4 256Kb -> bios.bin 1Mb
-- `extr` - Extract the bootloader, compressed kernel, uncompressed kernel data and init table from a bios.
-- `bld` - Builds a BIOS file from a set of input files.
-- `xcode-sim` - Simulates mem-write xcodes and parse x86 opcodes. (visor sim)
-- `xcode-decode` - Decodes the xcodes from a BIOS file or an extracted init table
-- `decomp-krnl` - Decompresses the kernel from a BIOS file.
+| Command        | Description                                                                 |
+| -------------- | --------------------------------------------------------------------------- |
+| `-?`           | Displays help information about how to use the program and its commands.    |
+| `-ls`          | Lists information about the bios file, boot params, sizes, rc4 keys.        |
+| `-split`       | Splits a bios into banks based on romsize.                                  |
+| `-combine`     | Combine multiple bios files into a single bios.                             |
+| `-extr`        | Extract the 2bl, compressed kernel+data, init table from a bios.            |
+| `-bld`         | Builds a bios from an extracted 2bl, compressed kernel+data, init table.    |
+| `-xcode-sim`   | Simulates mem-write xcodes and parse x86 opcodes.                           |
+| `-xcode-decode`| Decode xcodes from a bios or an extracted init table.                       |
+| `-decomp-krnl` | Decompress the kernel from a bios.                                          |
 
 # Switches
+#### General switches
+| Switch            | Description                                                  |
+| ----------------- | ------------------------------------------------------------ |
+| `-enc-bldr`       | If supplied, the 2BL is assumed to be *unencrypted*.         |
+| `-enc-krnl`       | If supplied, the kernel is assumed to be *unencrypted*.      |
+| `-key-bldr <path>`| The path to the 16-byte .bin RC4 key file.                   |
+| `-key-krnl <path>`| The path to the 16-byte .bin RC4 key file.                   |
+| `-mcpx <path>`    | The path to the MCPX ROM.                                    |
+| `-d`              | The dump switch.                                             |
 
-- `enc-bldr` if flag is supplied the 2BL is assumed to be *unencrypted* within the bios file.
-- `enc-krnl` if flag is supplied the kernel is assumed to be *unencrypted* within the bios file.
-- `key-bldr` The path to the 16-byte .bin rc4 key file.
-- `key-krnl` The path to the 16-byte .bin rc4 key file.
-- `mcpx`     The path to the MCPX rom, used for en/decryption
+| List flag  | Description                                                  |
+| ---------- | ------------------------------------------------------------ |
+| `-nv2a`    | (List flag) Display NV2A init table magic values.            |
+| `-datatbl` | (List flag) Display ROM drive / slew calibration table data. |
+| `-2bl`     | (List flag) Display 2BL boot parameters, sizes.              |
 
 # Notes / Comments
-- Each command has a set of required and optional switches that modify that specific command's behavior. For example:
-  - The "Split bios" command requires the `-bios` and `-romsize` switches, which specify the BIOS file to split and the size of the ROM, respectively.
-  - The "list bios" command requires the `-bios` switch and has a few switches to hone-down what you are actually looking for. ( `-2bl`, `-nv2a`, `-datatbl` )
 
-- If an argument is provided without a switch, it is inferred to be associated with the `-bios` switch. This means that you don't necessarily have to explicitly use the `-bios` switch when providing your BIOS file. You can simply provide the argument and the program will understand that it is meant to be used with the `-bios` switch.
+- In order to decrypt parts of the bios, ( preldr, 2bl, krnl ) you will need to provide a 16-byte RC4 key file `rc4_key.bin` or the correct MCPX rom specific to your bios. Without these, the decryption process will fail.
+  - **You will need to provide your own key file or a MCPX rom**.
 
-- In order to decrypt parts of the BIOS, ( preldr, 2bl, krnl ) you will need to provide a 16-byte RC4 key file `key.bin` or the correct MCPX version specific to your BIOS. Without these, the decryption process cannot proceed.
-  - Please note that this repository does not contain any crypto keys. **You will need to provide your own key file or a MCPX rom**.
-
-- Supports all versions of the BIOS, However, to ensure correct decryption, you will need to supply the appropriate MCPX version for your specific BIOS.
-  - Please note that while this program supports all versions of the BIOS, there is no guarantee that it will work with custom BIOS versions. The functionality and compatibility with custom BIOS versions may vary. Always ensure to have a backup and proceed with caution when working with custom BIOS versions.
+- Supports all versions of the bios, however, to ensure correct decryption, you will need to supply the appropriate 2bl rc4 key or MCPX rom for your specific bios.
+  - Note that while this program supports all versions of the bios, there is *no guarantee* that it will work with custom bios versions.
 # Terminology
-**BIN SIZE**: This refers to the actual size of the BIOS binary file (with the `.bin` extension) on your disk. This size is determined by the total number of bytes that make up the file. You can think of it as the physical space that the file takes up on your hard drive.
+**BIN SIZE** refers to the size of the bios file.
 
-**ROM SIZE**: This is used to determine how much space is available inside the BIN size. If the **ROM SIZE** is less than the BIN size, the ROM would be replicated up to the **BIN SIZE**. This means that the BIOS file will be repeated as many times as necessary to fill up the BIN size.
-Example: you can have a 1MB bios.bin file and that file could contain `4x 256KB image` or `2x 512KB image` or a `1x 1MB image`. **ROM SIZE** should not exceed the bin (file) size of the bios.
+  **ROM SIZE** refers to the size of the bios image inside the bios file. If ROM SIZE is less than BIN SIZE, the bios image is replicated upto BIN SIZE.
+  * EG: `1MB bios.bin` could contain `4x 256KB img` or `2x 512KB img` or  `1x 1MB img`. 
+  * should not exceed BIN SIZE.
+
+Build (-bld) command curently only supports *compressed kernel binaries*, not *decompressed kernel images*. You will need to supply a `compressed_krnl.bin` and a `uncompressed_krnl_data.bin`. `uncompressed_krnl_data.bin` is a section. specifically, `.tad`. copied from a kernel image. The `-extr` command will extract this out of a bios for you.
+
+An original bios includes rc4 keys in the 2bl. To decrypt the 2bl, provide either an RC4 key file or an MCPX ROM file. This allows the kernel key to be located and the kernel to be decrypted.
+
+If your bios uses a bootloader that is compatible with the original boot process and doesn't encrypt its bootloader or kernel, you can use `enc-bldr` and `enc-krnl` to prevent them from being decrypted.
 
 # Examples
 
-```xbios.exe -ls bios.bin``` - Would list bios infomation. (most info is encrypted, so you will have to provide a key to atleast decrypt the 2bl.
+```xbios.exe -ls bios.bin``` - List bios info. (most info is encrypted)
 
-```xbios.exe -ls bios.bin -mcpx mcpx.bin``` - Would load the bios, decrypt using the mcpx rom and list bios infomation.
+```xbios.exe -ls bios.bin -mcpx mcpx.bin``` - Decrypt 2bl with mcpx rom and list bios info.
 
-```xbios.exe -ls bios.bin -key-bldr rc4_key.bin``` - Would load the bios, decrypt using the 16-byte key file and list bios infomation.
+```xbios.exe -ls bios.bin -key-bldr rc4_key.bin``` - Decrypt 2bl with rc4 key file and list bios info.
 
-```xbios.exe -xcode-sim bios.bin``` - would simulate xc_mem_write (useful for viewing implementations of the visor hack )
+```xbios.exe -xcode-sim bios.bin``` - Simulate xcode memory writes and parse x86 instructions
 
-```xbios.exe -xcode-decode bios.bin``` - would interp/decode xcodes 
+```xbios.exe -xcode-decode bios.bin``` - Decode xcode instructions. 
 
-```xbios.exe -decomp-krnl bios.bin -mcpx mcpx.bin``` - Load the bios, decrypt it, and decompress the kernel to 'krnl.img'.
+```xbios.exe -decomp-krnl bios.bin -mcpx mcpx.bin``` - Decrypt and decompress the kernel.
+
+```xbios.exe -decomp-krnl bios.bin -enc-krnl``` - Decompress the *unencrypted* kernel.
+
+```xbios.exe -split bios.bin -romsize 512``` - Split the bios into 512KB banks.
+
+```xbios.exe -combine bank1.bin bank2.bin bank3.bin bank4.bin``` - Combine the banks into a single bios file.
 
 # Example output:
 Xcode simulator (visor hack sim)

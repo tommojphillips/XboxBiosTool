@@ -32,7 +32,7 @@
 #define PRELDR_BLOCK_SIZE       10752   // preldr dev, mcpx v1.1 block size in bytes
 #define PRELDR_XM3_BLOCK_SIZE   2048    // preldr mcpx v1.0 block size in bytes
 
-#define DEFAULT_ROM_SIZE	    256     // default rom size in KB
+#define DEFAULT_ROM_SIZE	    256     // default rom size in Kb
 
 const UCHAR BOOT_PARAMS_SIGNATURE[4] = { 'J', 'y', 'T', 'x' }; // hash of "JyTx". MCPX checks this to verify the bldr.
 const UINT BLDR_RELOC = 0x00400000;

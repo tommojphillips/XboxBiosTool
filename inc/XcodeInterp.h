@@ -81,27 +81,25 @@ public:
     // xcode interpreter status
     enum INTERP_STATUS : int
     {
-        UNK =          -1,  // unknown status
-        DATA_OK =       0,   // data ok. more data to interpret.
-	    EXIT_OP_FOUND = 1,  // exit opcode found
-        DATA_ERROR =    2    // data error. end of data reached.
+        UNK =          -1, // unknown status
+        DATA_OK =       0, // data ok. more data to interpret.
+	    EXIT_OP_FOUND = 1, // exit opcode found
+        DATA_ERROR =    2  // data error. end of data reached.
     };
 
-    int load(UCHAR* data, UINT size);               // load the XCODE data ( inittbl ) from data. returns 0 if success.    
-    void unload();                                  // unload the XCODE data. returns 0 if success.
-    int interpretNext(XCODE*& xcode);               // interpret the next XCODE. Stores it in xcode and cosumes it returns 0 if success.
-    void reset();                                   // reset the XCODE interpreter.
-
-    int decodeXcode(XCODE*& xcode, std::list<LABEL>& labels);
-   
-    int isOpcodeValid(UCHAR opcode);                        // check if the opcode is valid. returns 0 if the opcode does something.
-    int getOpcodeStr(char* str);                            // get the opcode string. Stores the string in str.
-    int getAddressStr(char* str);                           // get the address string. Stores the string in str.
-    int getDataStr(char* str);                              // get the data string. Stores the string in str.
-    int getCommentStr(char* str);                           // get the comment string. Stores the string in str.
+    int load(UCHAR* data, UINT size);   // load the XCODE data ( inittbl ) from data. returns 0 if success.    
+    void unload();                      // unload the XCODE data. returns 0 if success.
+    void reset();                       // reset the XCODE interpreter.
     
-    XCODE* getPtr() const { return _ptr; };                 // get the ptr. current position in the XCODE data.
-    UINT getOffset() const { return _offset; };             // get the current offset from the start of the XCODE data.
+    int interpretNext(XCODE*& xcode);   // interpret the next XCODE. Stores it in xcode and cosumes it returns 0 if success.
+
+    int getOpcodeStr(char* str);        // get the opcode string. Stores the string in str.
+    int getAddressStr(char* str);       // get the address string. Stores the string in str.
+    int getDataStr(char* str);          // get the data string. Stores the string in str.
+    int getCommentStr(char* str);       // get the comment string. Stores the string in str.
+    
+    XCODE* getPtr() const { return _ptr; };                 // get the current position in the XCODE data.
+    UINT getOffset() const { return _offset; };             // get the offset from the start of the data to the end of the current XCODE (offset to the next XCODE)
     INTERP_STATUS getStatus() const { return _status; };    // get the status of the xcode interpreter.
 
     int decodeXcodes();
@@ -110,8 +108,10 @@ private:
     UCHAR* _data;           // XCODE data
     UINT _size;		        // size of the XCODE data  
     XCODE* _ptr;            // current position in the XCODE data
-    UINT _offset;           // offset from the start of the XCODE data.
+    UINT _offset;           // offset from the start of the data to the end of the current XCODE (offset to the next XCODE)
     INTERP_STATUS _status;  // status of the xcode interpreter
+
+    int decodeXcode(FILE* stream, XCODE*& xcode, std::list<LABEL>& labels); // decode the xcode, writes it to the stream. returns 0 if success.
 };
 
 #endif // !XB_BIOS_XCODE_INTERP_H

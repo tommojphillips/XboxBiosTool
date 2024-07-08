@@ -36,7 +36,7 @@ int XbMem::checkForLeaks()
 	if (_curAllocatedBytes != 0 || _curAllocations != 0)
 	{
 		_isPrinting = true;
-		error(CON_COL::RED, "LEAK DETECTED: %ld bytes in %d allocations\n", _curAllocatedBytes, _curAllocations);
+		print(CON_COL::RED, "LEAK DETECTED: %ld bytes in %d allocations\n", _curAllocatedBytes, _curAllocations);
 		return 1;
 	}
 	else if (_isPrinting)
