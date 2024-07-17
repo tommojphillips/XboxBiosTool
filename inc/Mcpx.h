@@ -1,4 +1,4 @@
-// type_defs.h
+// Mcpx.h:
 
 /* Copyright(C) 2024 tommojphillips
  *
@@ -19,21 +19,33 @@
 // Author: tommojphillips
 // GitHub: https:\\github.com\tommojphillips
 
-#ifndef  XB_TYPE_DEFS_H
-#define XB_TYPE_DEFS_H
+#ifndef XB_BIOS_MCPX_ROM_H
+#define XB_BIOS_MCPX_ROM_H
 
-#define NULL 0
+// user incl
+#include "type_defs.h"
 
-typedef unsigned long ULONG;
-typedef unsigned int UINT;
-typedef unsigned char UCHAR;
-typedef unsigned short USHORT;
+const UINT MCPX_BLOCK_SIZE = 512; // mcpx southbridge chip rom size in bytes
 
-static_assert(sizeof(USHORT) == 2, "USHORT is not 2 bytes");
-static_assert(sizeof(UINT) == 4, "UINT is not 4 bytes");
-static_assert(sizeof(ULONG) == 4, "ULONG is not 4 bytes");
+class MCPX_ROM
+{
+public:
+	enum MCPX_ROM_VERSION { MCPX_UNK, MCPX_V1_0, MCPX_V1_1 };
 
-const int MAX_FILENAME = 40; 
-const UINT DIGEST_LEN = 20; // sha1 digest length in bytes
+	MCPX_ROM_VERSION version;	// version of the mcpx rom.
+	UCHAR* data;				// allocated mcpx data.
+	UCHAR* sbkey;				// ptr to the sb key.
 
-#endif // ! XB_BIOS_TYPE_DEFS_H
+	MCPX_ROM() : version(MCPX_UNK), data(NULL), sbkey(NULL) { };
+
+	~MCPX_ROM() {
+		deconstruct();
+	};
+
+	int load(const char* filename);
+	void deconstruct();
+
+	int verifyMCPX();
+};
+
+#endif // !XB_BIOS_MCPX_ROM_H

@@ -12,13 +12,10 @@ enum {
     SHA_STATUS_STATE_ERROR,
 };
 
-// SHA-1 digest size
-#define SHA1_DIGEST_LEN 20
-
 // SHA-1 context
 typedef struct _SHA1Context
 {
-    UINT intermediate_hash[SHA1_DIGEST_LEN / 4]; // Digest
+    UINT intermediate_hash[DIGEST_LEN / 4U]; // Digest
 
     UINT length_low;    // Message length in bits
     UINT length_high;
@@ -32,6 +29,6 @@ typedef struct _SHA1Context
 
 int SHA1Reset(SHA1Context* context);
 int SHA1Input(SHA1Context* context, const UCHAR* message, UINT len);
-int SHA1Result(SHA1Context* context, UCHAR digest[SHA1_DIGEST_LEN]);
+int SHA1Result(SHA1Context* context, UCHAR digest[DIGEST_LEN]);
 
 #endif // _SHA1_H_

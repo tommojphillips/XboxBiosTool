@@ -1,0 +1,28 @@
+# Build bios command -bld 
+# 'enc-krnl' switch works different when building a bios.
+* if 'enc-krnl' is provided and the kernel key can be located in the 2bl and it's not all 00's or FF's, that key will be used to encrypt it.
+    - Keys are located by a pointer before the 2bl entry. if a custom bios removes this pointer or the keys, the keys will not be locatable.
+* if '-key-krnl' is passed in, that key file will be used to encrypt it.
+* if '-key-krnl' and 'enc-krnl' is NOT passed in, the kernel is NOT encrypted.
+* if '-key-krnl' and 'enc-krnl' is passed in, the kernel is NOT encrypted.
+
+Original bios kernel version / build timestamp
+
+# 3944:         Fri Sep 21 11:43:41 2001 UTC
+
+# 4034:         Thu Oct 25 22:26:49 2001 UTC
+# 4132:         Thu Oct 25 22:26:49 2001 UTC
+
+# 4627:         Tue Jun 04 12:12:32 2002 UTC
+# 4627 (debug)  Tue Jun 04 14:02:18 2002 UTC
+
+# 4817:         Thu Jul 11 12:09:09 2002 UTC
+# 5101:         Thu Oct 03 11:18:14 2002 UTC
+
+# 5530:         Tue Apr 29 11:45:37 2003 UTC
+# 5713:         Tue Aug 12 11:43:10 2003 UTC
+# 5838:         Tue Dec 09 12:44:11 2003 UTC
+
+# x2.5035: Sun Jun 05 15:20:55 2005 UTC
+# kernel size: 795,392 bytes
+-decomp-krnl x2.5035.bin -romsize 512 -out x2_5035_krnl.img

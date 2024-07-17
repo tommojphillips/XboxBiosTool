@@ -24,23 +24,9 @@
 
 #include "type_defs.h"
 
-#define KEY_SIZE	            16      // rc4 key size in bytes
-#define DIGEST_LEN              20
-
-#define MCPX_BLOCK_SIZE         512     // mcpx southbridge chip rom size in bytes
-#define BLDR_BLOCK_SIZE         24576   // bldr block size in bytes
-#define PRELDR_BLOCK_SIZE       10752   // preldr dev, mcpx v1.1 block size in bytes
-#define PRELDR_XM3_BLOCK_SIZE   2048    // preldr mcpx v1.0 block size in bytes
-
-#define DEFAULT_ROM_SIZE	    256     // default rom size in Kb
+const UINT KEY_SIZE = 16; // rc4 key size in bytes
 
 const UCHAR BOOT_PARAMS_SIGNATURE[4] = { 'J', 'y', 'T', 'x' }; // hash of "JyTx". MCPX checks this to verify the bldr.
-const UINT BLDR_RELOC = 0x00400000;
-const UINT BLDR_BASE =  0x00090000;
-
-static_assert(sizeof(USHORT) == 2, "USHORT is not 2 bytes");
-static_assert(sizeof(UINT) == 4, "UINT is not 4 bytes");
-static_assert(sizeof(ULONG) == 4, "ULONG is not 4 bytes");
 
 // The init table structure.
 typedef struct
@@ -60,18 +46,20 @@ typedef struct
     UINT val8;          // 0:40.
     UINT val9;          // 0:44.
     UINT val10;         // 0:48.
+
     UINT vals[14];      // 0:52 - 0:104.
 
-    USHORT revision;   // 0:108. initializtion table revision
-
+    USHORT revision;   // 0:108.
     USHORT val11;      // 0:110.
-    UINT val12;        // 0:112. MCP_ROM_BOOT_FREQ_STRAP
+
+    UINT val12;        // 0:112.
     UINT val13;        // 0:116. changes depending if dvt4, retail, or dvt6
 
     USHORT init_tbl_identifier; // 0:120. init table identifier code
     USHORT kernel_ver;          // 0:122. kernel version
-    USHORT data_tbl_offset;     // 0:124. offset from ROM base to the data tbl
-    USHORT val14;               // 0:126. fill value
+
+    UINT data_tbl_offset;       // 0:124. offset from ROM base to the data tbl
+
 } INIT_TBL; static_assert(sizeof(INIT_TBL) == 128, "INIT_TBL struct size is not 128 bytes");
 
 #pragma pack(push, 1)

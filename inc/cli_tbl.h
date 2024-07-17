@@ -29,7 +29,7 @@ enum COMMAND {
 	CMD_NONE, CMD_HELP, CMD_EXTR, CMD_LIST, CMD_SPLIT, CMD_COMBINE, CMD_BLD_BIOS, CMD_XCODE_SIM, CMD_KRNL_DECOMPRESS, CMD_XCODE_DECODE
 };
 
-enum SWITCH : long long {
+enum SWITCH : int {
 	SW_NONE =			1 << 0, 
 	SW_HELP =			1 << 1,
 	
@@ -41,47 +41,56 @@ enum SWITCH : long long {
 	SW_KEY_BLDR_FILE =	1 << 5,
 	SW_OUT_FILE =		1 << 6,
 
-	SW_BANK1_FILE =		1 << 7, 
-	SW_BANK2_FILE =		1 << 8,
-	SW_BANK3_FILE =		1 << 9,
-	SW_BANK4_FILE =		1 << 10,
+	SW_BANK_FILES =		1 << 7,
+
+	// ?? =				1 << 8,
+	// ?? =				1 << 9,
+	// ?? =				1 << 10,
 
 	SW_BLDR_FILE =		1 << 11,
 	SW_KRNL_FILE =		1 << 12,
 	SW_INITTBL_FILE =	1 << 13,
+	SW_KRNL_DATA_FILE =	1 << 14,
 
-	SW_ENC_BLDR =		1 << 14,
-	SW_ENC_KRNL =		1 << 15,
-
-	SW_KRNL_DATA_FILE =	1 << 16,
+	SW_ENC_BLDR =		1 << 15,
+	SW_ENC_KRNL =		1 << 16,
 	
 	SW_BINSIZE =		1 << 17,
 
-	SW_LS_NV2A_TBL =	1 << 18, 
-	SW_LS_BIOS =		1 << 19, 
-	SW_LS_KRNL =		1 << 20,
-	SW_LS_BLDR =		1 << 21, 
-	SW_LS_INITTBL =		1 << 22, 
-	SW_LS_DATA_TBL =	1 << 23,
+	SW_LS_NV2A_TBL =	1 << 18,
+	SW_LS_DATA_TBL =	1 << 19,
+	
+	// ?? =				1 << 20,
+	// ?? =				1 << 21,
+	// ?? =				1 << 22,
+	// ?? =				1 << 23,
 	
 	SW_MCPX_FILE =		1 << 24,
 
 	SW_PUB_KEY_FILE =	1 << 25,
-	SW_PATCH_KEYS =		1 << 26,
+	SW_CERT_KEY_FILE =	1 << 26,
+	SW_EEPROM_KEY_FILE = 1 << 27,
 
-	SW_BLD_BFM =		1 << 27,
+	SW_PATCH_KEYS =		1 << 28,
 
-	SW_DMP =			1 << 28,
+	SW_BLD_BFM =		1 << 29,
 
-	SW_SIM_SIZE =		1 << 29,
+	SW_DMP =			1 << 30,
 
-	SW_CERT_KEY_FILE =	1 << 30,
-	SW_EEPROM_KEY_FILE = 1 << 31,
+	SW_SIM_SIZE =		1 << 31,
 
 	SW_BLD_BIOS = SW_BLDR_FILE | SW_KRNL_FILE | SW_KRNL_DATA_FILE | SW_INITTBL_FILE,
-	SW_BANK_FILES = SW_BANK1_FILE | SW_BANK2_FILE | SW_BANK3_FILE | SW_BANK4_FILE,
-	
-	SW_LS_OPT = SW_LS_BIOS | SW_LS_NV2A_TBL | SW_LS_KRNL | SW_LS_BLDR | SW_LS_INITTBL
+};
+enum SW_LS : int {
+	LS_NONE = 0,
+	LS_BIOS = 1 << 1,
+	LS_KRNL = 1 << 2,
+	LS_INITTBL = 1 << 4,	
+	LS_DATA_TBL = 1 << 5,
+	LS_NV2A_TBL = 1 << 6,
+	LS_KEYS = 1 << 7,
+
+	LS_OPT = LS_BIOS | LS_KRNL | LS_INITTBL | LS_KEYS
 };
 
 struct CMD_TBL
@@ -108,6 +117,11 @@ struct PARAM_TBL
 	void* var;
 	PARAM_TYPE cmdType;
 	const char* help;
+	const int val;
+
+	PARAM_TBL() : sw(NULL), swType(SW_NONE), var(NULL), cmdType(NONE), help(NULL), val(0) { };
+	PARAM_TBL(const char s[MAX_SWITCH_LEN], const SWITCH t, void* v, PARAM_TYPE c, const char* h, const int val = NULL) :
+		sw(s), swType(t), var(v), cmdType(c), help(h), val(val) { };
 };
 
 #endif // XB_CLI_TBL_H

@@ -23,40 +23,17 @@
 #define XB_BIOS_TOOL_H
 
 #include "Bios.h"
+#include "Mcpx.h"
 
 #include "cli_tbl.h"
 #include "type_defs.h"
 
 #include "version.h"
 
-struct MCPX_ROM
-{
-	enum MCPX_ROM_VERSION { MCPX_UNK, MCPX_V1_0, MCPX_V1_1 };
-
-	MCPX_ROM_VERSION version;
-	UCHAR* data;
-
-	MCPX_ROM() : version(MCPX_UNK), data(NULL) { };
-
-	~MCPX_ROM()
-	{
-		deconstruct();
-	}
-
-	void deconstruct()
-	{
-		if (data != NULL)
-		{
-			xb_free(data);
-			data = NULL;
-		}
-	}
-};
-
 struct Parameters
 {
-	long long sw_flag;			// contains all flags that have been set on the command line.
-	long long ls_flag;
+	int sw_flag; // contains all flags that have been set on the command line.
+	int ls_flag;
 
 	UINT romsize;
 	UINT binsize;
@@ -64,7 +41,7 @@ struct Parameters
 	UINT simSize;
 
 	bool encBldr;
-	bool encKrnl;
+	bool encKrnl; // switch. Use 2bl-krnl key to en/decrypt kernel.
 
 	const char* biosFile;
 	const char* outFile;
@@ -142,6 +119,8 @@ class XbTool
 
 		void deconstruct();
 
+		int run();
+
 		// print the bios info. (boot params, sizes, xcodes, nv2a tbl, etc.)
 		int listBios();
 
@@ -176,6 +155,7 @@ class XbTool
 		int extractPubKey(UCHAR* data, UINT size);
 
 private:
+	// load the inittbl file.
 	UCHAR* load_init_tbl_file(UINT& size) const;
 };
 

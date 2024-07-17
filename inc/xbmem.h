@@ -42,15 +42,8 @@ public:
 	int getAllocations() const;
 	
 	void* xb_alloc(UINT size);
-	void* xb_realloc(void* ptr, UINT size);
-	
+	void* xb_realloc(void* ptr, UINT size);	
 	void xb_free(void* ptr);
-	void xb_zero(void* ptr, UINT size);
-	void xb_set(void* ptr, int val, UINT size);
-	void xb_cpy(void* dest, const void* src, UINT size);
-	void xb_mov(void* dest, void* src, UINT size);
-	
-	int xb_cmp(const void* ptr1, const void* ptr2, UINT size);
 
 private:
 	XbMem()  { };
@@ -70,7 +63,7 @@ private:
 
 // allocate memory
 void* xb_alloc(UINT size);
-// reallocate memory
+// reallocate memory. if ptr canot be reallocated, the original ptr is returned.
 void* xb_realloc(void* ptr, UINT size);
 // free memory allocated by xb_alloc
 void xb_free(void* ptr);

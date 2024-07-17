@@ -30,10 +30,7 @@ UCHAR* readFile(const char* filename, UINT* bytesRead, const int expectedSize)
 	UINT size = 0;
 
 	if (filename == NULL)
-	{
-		error("Error: filename is NULL\n");
 		return NULL;
-	}
 
 	file = fopen(filename, "rb");
 	if (file == NULL)
@@ -71,10 +68,7 @@ int writeFile(const char* filename, void* ptr, const UINT bytesToWrite)
 	UINT bytesWritten = 0;
 
 	if (filename == NULL)
-	{
-		error("Error: filename is NULL\n");
 		return 1;
-	}
 
 	file = fopen(filename, "wb");
 	if (file == NULL)
@@ -92,29 +86,36 @@ int writeFile(const char* filename, void* ptr, const UINT bytesToWrite)
 int getFileSize(FILE* file, UINT* fileSize)
 {
 	if (file == NULL)
-	{
 		return 1;
-	}
 
 	fseek(file, 0, SEEK_END);
 	*fileSize = ftell(file);
 	fseek(file, 0, SEEK_SET);
 	return 0;
 }
+bool fileExists(const char* filename)
+{
+	FILE* file = NULL;
 
+	if (filename == NULL)
+		return false;
+
+	file = fopen(filename, "rb");
+	if (file == NULL)
+		return false;
+	fclose(file);
+	return true;
+}
 int deleteFile(const char* filename)
 {
 	if (filename == NULL)
-	{
-		error("Error: filename is NULL\n");
 		return 1;
-	}
+
+	if (!fileExists(filename))
+		return 0;
 
 	if (remove(filename) != 0)
-	{
-		error("Error: Could not delete file: %s\n", filename);
 		return 1;
-	}
 
 	return 0;
 }

@@ -14,15 +14,114 @@
 #define max(a,b)                        (((a) > (b)) ? (a) : (b))
 #define min(a,b)                        (((a) < (b)) ? (a) : (b))
 
-#define TREE_ENC_REP_MIN                    4
-#define TREE_ENC_REPZ_FIRST_EXTRA_BITS      4
-#define TREE_ENC_REPZ_SECOND_EXTRA_BITS     5
-#define TREE_ENC_REP_ZERO_FIRST            16
-#define TREE_ENC_REP_SAME_EXTRA_BITS        1
-#define NUM_DECODE_SMALL	               20
-#define DS_TABLE_BITS		                8
-#define MAX_GROWTH                       6144
+#define TREE_ENC_REP_MIN                4
+#define TREE_ENC_REPZ_FIRST_EXTRA_BITS  4
+#define TREE_ENC_REPZ_SECOND_EXTRA_BITS 5
+#define TREE_ENC_REP_ZERO_FIRST         16
+#define TREE_ENC_REP_SAME_EXTRA_BITS    1
+#define NUM_DECODE_SMALL	            20
+#define DS_TABLE_BITS		            8
+#define MAX_GROWTH                      6144
 #define E8_CFDATA_FRAME_THRESHOLD       32768
+
+#define LZX_WINDOW_SIZE                 (128*1024)
+#define LZX_CHUNK_SIZE                  (32*1024)
+#define LZX_WORKSPACE                   (256*1024)
+
+// error codes
+#define ERROR_NOT_ENOUGH_MEMORY         1
+#define ERROR_BAD_PARAMETERS            2
+#define ERROR_BUFFER_OVERFLOW           3
+#define ERROR_FAILED                    4
+#define ERROR_CONFIGURATION             5
+
+#define ALIGNED_TABLE_BITS		        7
+#define ALIGNED_NUM_ELEMENTS	        8
+#define MAX_MAIN_TREE_ELEMENTS          672
+#define MAIN_TREE_TABLE_BITS            10
+#define SECONDARY_LEN_TREE_TABLE_BITS   8
+
+#define NUM_REPEATED_OFFSETS            3
+#define NUM_PRIMARY_LENGTHS             7
+#define NUM_SECONDARY_LENGTHS           (256 - NUM_PRIMARY_LENGTHS)
+
+typedef struct _LZX_BLOCK
+{
+    USHORT compressedSize;
+    USHORT uncompressedSize;
+} LZX_BLOCK;
+
+typedef enum
+{
+    BLOCKTYPE_INVALID = 0,
+    BLOCKTYPE_VERBATIM = 1,     // normal block
+    BLOCKTYPE_ALIGNED = 2,      // aligned offset block
+    BLOCKTYPE_UNCOMPRESSED = 3  // uncompressed block
+} BLOCK_TYPE;
+typedef enum
+{
+    DECSTATE_UNKNOWN = 0,
+    DECSTATE_START_NEW_BLOCK = 1,
+    DECSTATE_DECODING_DATA = 2,
+} DEC_STATE;
+typedef struct
+{
+    UCHAR* mem_window;
+
+    ULONG window_size;
+    ULONG window_mask;
+    ULONG last_matchpos_offset[NUM_REPEATED_OFFSETS];
+
+    short main_tree_table[1 << MAIN_TREE_TABLE_BITS];
+
+    short secondary_length_tree_table[1 << SECONDARY_LEN_TREE_TABLE_BITS];
+
+    UCHAR main_tree_len[MAX_MAIN_TREE_ELEMENTS];
+    UCHAR secondary_length_tree_len[NUM_SECONDARY_LENGTHS];
+    UCHAR pad1[3];
+
+    char aligned_table[1 << ALIGNED_TABLE_BITS];
+    UCHAR aligned_len[ALIGNED_NUM_ELEMENTS];
+
+    short main_tree_left_right[MAX_MAIN_TREE_ELEMENTS * 4];
+
+    short secondary_length_tree_left_right[NUM_SECONDARY_LENGTHS * 4];
+
+    const UCHAR* input_curpos;
+    const UCHAR* end_input_pos;
+
+    UCHAR* output_buffer;
+
+    long position_at_start;
+
+    UCHAR main_tree_prev_len[MAX_MAIN_TREE_ELEMENTS];
+    UCHAR secondary_length_tree_prev_len[NUM_SECONDARY_LENGTHS];
+
+    ULONG bitbuf;
+    char bitcount;
+
+    UCHAR num_position_slots;
+
+    bool first_time_this_group;
+    bool error_condition;
+
+    long pos;
+    ULONG current_file_size;
+    ULONG instr_pos;
+    ULONG num_cfdata_frames;
+
+    long original_block_size;
+    long block_size;
+    BLOCK_TYPE block_type;
+    DEC_STATE decoder_state;
+
+} DEC_CONTEXT;
+struct LDI_CONTEXT
+{
+    ULONG signature;
+    UINT blockMax;
+    DEC_CONTEXT* decoder_context;
+};
 
 #define FILL_BUF_FULLCHECK(N) \
 {                                    		\
@@ -725,13 +824,13 @@ long special_decode_aligned_block(DEC_CONTEXT& context, long pos, int amount_to_
                 }
             }
 
-            match_length += MIN_MATCH;
+            match_length += 2;
 
             do
             {
                 dec_mem_window[pos] = dec_mem_window[(pos - match_pos) & context.window_mask];
 
-                if (pos < MAX_MATCH)
+                if (pos < 257)
                     dec_mem_window[context.window_size + pos] = dec_mem_window[pos];
 
                 pos++;
@@ -834,7 +933,7 @@ long fast_decode_aligned_offset_block(DEC_CONTEXT& context, long pos, int amount
                 }
             }
 
-            match_length += MIN_MATCH;
+            match_length += 2;
             match_ptr = (pos - match_pos) & context.window_mask;
 
             do
@@ -857,12 +956,12 @@ long fast_decode_aligned_offset_block(DEC_CONTEXT& context, long pos, int amount
 }
 int decode_aligned_offset_block(DEC_CONTEXT& context, long pos, int amount_to_decode)
 {
-    if (pos < MAX_MATCH)
+    if (pos < 257)
     {
         long new_pos;
         long amount_to_slowly_decode;
 
-        amount_to_slowly_decode = min(MAX_MATCH - pos, amount_to_decode);
+        amount_to_slowly_decode = min(257 - pos, amount_to_decode);
 
         new_pos = special_decode_aligned_block(context, pos, amount_to_slowly_decode);
 
@@ -943,13 +1042,13 @@ long special_decode_verbatim_block(DEC_CONTEXT& context, long pos, int amount_to
                 }
             }
 
-            match_length += MIN_MATCH;
+            match_length += 2;
 
             do
             {
                 context.mem_window[pos] = context.mem_window[(pos - match_pos) & context.window_mask];
 
-                if (pos < MAX_MATCH)
+                if (pos < 257)
                     context.mem_window[context.window_size + pos] = context.mem_window[pos];
 
                 pos++;
@@ -1035,7 +1134,7 @@ long fast_decode_verbatim_block(DEC_CONTEXT& context, long pos, int amount_to_de
                 }
             }
 
-            match_length += MIN_MATCH;
+            match_length += 2;
             match_ptr = (pos - match_pos) & context.window_mask;
 
             do
@@ -1059,12 +1158,12 @@ long fast_decode_verbatim_block(DEC_CONTEXT& context, long pos, int amount_to_de
 
 int decode_verbatim_block(DEC_CONTEXT& context, long pos, int amount_to_decode)
 {
-    if (pos < MAX_MATCH)
+    if (pos < 257)
     {
         long new_pos;
         long amount_to_slowly_decode;
 
-        amount_to_slowly_decode = min(MAX_MATCH - pos, amount_to_decode);
+        amount_to_slowly_decode = min(257 - pos, amount_to_decode);
 
         new_pos = special_decode_verbatim_block(context, pos, amount_to_slowly_decode);
 
@@ -1102,7 +1201,7 @@ int decode_uncompressed_block(DEC_CONTEXT& context, long pos, int amount_to_deco
 
     context.input_curpos = p;
 
-    end_copy_pos = min(MAX_MATCH, pos_end);
+    end_copy_pos = min(257, pos_end);
 
     while (pos_start < end_copy_pos)
     {
@@ -1274,7 +1373,7 @@ bool lzx_decodeInit(DEC_CONTEXT& context, long compression_window_size)
         if (pos_start >= context.window_size)
             break;
     }
-    if (!(context.mem_window = (UCHAR*)lzx_alloc(context.window_size + (MAX_MATCH + 4))))
+    if (!(context.mem_window = (UCHAR*)lzx_alloc(context.window_size + (257 + 4))))
         return false;
 
     // reset decoder state
@@ -1303,38 +1402,8 @@ bool lzx_decodeInit(DEC_CONTEXT& context, long compression_window_size)
 
     return true;
 }
-int lzx_decode(DEC_CONTEXT* context,
-    const UCHAR* compressed_input, long input_size, 
-    UCHAR* uncompressed_output, long output_size,
-    long* bytes_decoded)
-{
-    long result;
 
-    context->input_curpos = compressed_input;
-    context->end_input_pos = (compressed_input + input_size + 4);
-
-    context->output_buffer = uncompressed_output;
-
-    initialise_decoder_bitbuf(*context);
-
-    result = decode_data(*context, output_size);
-
-    context->num_cfdata_frames++;
-
-    if (result < 0) // error
-    {
-        *bytes_decoded = 0;
-        return 1;
-    }
-    else
-    {
-        *bytes_decoded = result;
-        context->position_at_start += result;
-        return 0;
-    }
-}
-
-int ldi_createDecompression(UINT& bufferMin, LDI_CONTEXT*& context)
+int createDecompression(UINT& bufferMin, LDI_CONTEXT*& context)
 {
     bufferMin = LZX_CHUNK_SIZE + MAX_GROWTH;
 
@@ -1363,7 +1432,7 @@ int ldi_createDecompression(UINT& bufferMin, LDI_CONTEXT*& context)
 
     return 0;
 }
-int ldi_destroyDecompression(LDI_CONTEXT& context)
+int destroyDecompression(LDI_CONTEXT& context)
 {
     if (context.signature != LDI_SIGNATURE) // invalid signature
     {
@@ -1383,7 +1452,7 @@ int ldi_destroyDecompression(LDI_CONTEXT& context)
 
     return 0;
 }
-int ldi_decompress(LDI_CONTEXT& context, const UCHAR* pbSrc, UINT cbSrc, UCHAR* pbDst, UINT* pcbResult)
+int decompressBlock(LDI_CONTEXT& context, const UCHAR* src, UINT srcSize, UCHAR* dest, UINT& numOfDecompressedBytes)
 {
     int	result;
     long bytes_to_decode;
@@ -1394,24 +1463,45 @@ int ldi_decompress(LDI_CONTEXT& context, const UCHAR* pbSrc, UINT cbSrc, UCHAR* 
         return ERROR_BAD_PARAMETERS;   
     }
 
-    if (*pcbResult > context.blockMax) // buffer too small
+    if (numOfDecompressedBytes > context.blockMax) // buffer too small
     {
         return ERROR_BUFFER_OVERFLOW; 
     }
 
-    bytes_to_decode = (long)*pcbResult;
+    bytes_to_decode = (long)numOfDecompressedBytes;
 
-    result = lzx_decode(context.decoder_context, pbSrc, cbSrc, pbDst, bytes_to_decode, &total_bytes_written);
+    context.decoder_context->input_curpos = src;
+    context.decoder_context->end_input_pos = (src + srcSize + 4);
 
-    *pcbResult = (UINT)total_bytes_written;
+    context.decoder_context->output_buffer = dest;
 
-    if (result)
+    initialise_decoder_bitbuf(*context.decoder_context);
+
+    result = decode_data(*context.decoder_context, bytes_to_decode);
+
+    context.decoder_context->num_cfdata_frames++;
+
+    if (result < 0) // error
+    {
+        total_bytes_written = 0;
+        return 1;
+    }
+    else
+    {
+        total_bytes_written = result;
+        context.decoder_context->position_at_start += result;
+        return 0;
+    }
+
+    numOfDecompressedBytes = (UINT)total_bytes_written;
+
+    if (result != 0)
         return ERROR_FAILED;
     
     return 0;
 }
 
-int decompress(const UCHAR* data, const UINT dataSize, UCHAR*& buff, UINT& buffSize, UINT& decompressedSize)
+int decompress(const UCHAR* data, const UINT size, UCHAR*& buff, UINT& buffSize, UINT& decompressedSize)
 {
     LZX_BLOCK* block;
     const UCHAR* src;
@@ -1422,9 +1512,9 @@ int decompress(const UCHAR* data, const UINT dataSize, UCHAR*& buff, UINT& buffS
     UINT bytesDecompressed = 0;
     UINT bytesCompressed = 0;
     UINT destSize = 0;
-    ULONG totalUncompressedSize = 0;
+    UINT totalUncompressedSize = 0;
 
-    if (!SUCCESS(ldi_createDecompression(destSize, context)))
+    if (createDecompression(destSize, context) != 0)
     {
         error("LDICreateDecompression failed\n");
         return 1;
@@ -1439,7 +1529,7 @@ int decompress(const UCHAR* data, const UINT dataSize, UCHAR*& buff, UINT& buffS
     for (;;i++)
     {
         block = (LZX_BLOCK*)src;    // get the block header
-        src += sizeof(LZX_BLOCK*);  // compressed block starts after the header
+        src += sizeof(LZX_BLOCK);   // compressed block starts after the header
 
         // Perform decompression
         bytesDecompressed = block->uncompressedSize;
@@ -1456,31 +1546,26 @@ int decompress(const UCHAR* data, const UINT dataSize, UCHAR*& buff, UINT& buffS
 				result = 1;
 				goto Cleanup;
 			}
+            buffSize += LZX_CHUNK_SIZE;
 
-            // fix the pointers
-            dest = buff + totalUncompressedSize;
-
-            // update the buffer size
-            buffSize += bytesDecompressed;
+            // update the destination pointer
+            dest = (buff + totalUncompressedSize);
 		}
-
 
         //print("block %02d: %5d\n", i + 1, bytesDecompressed);
 
-        result = ldi_decompress(*context, (UCHAR*)src, bytesCompressed, (UCHAR*)dest, &bytesDecompressed);
-        if (!SUCCESS(result))
+        result = decompressBlock(*context, src, bytesCompressed, dest, bytesDecompressed);
+        if (result != 0)
         {
             error("Error: Block decompress failed. Error code: %d\n", result);
             goto Cleanup;
         }
 
-        // Advance the pointers
         src += bytesCompressed;
         dest += bytesDecompressed;
-        totalUncompressedSize += (ULONG)bytesDecompressed;
+        totalUncompressedSize += (UINT)bytesDecompressed;
 
-        // Check to see if we are done
-        if ((UINT)(src - data) >= dataSize)
+        if ((UINT)(src - data) >= size)
         {
             result = 0;
             break;
@@ -1489,11 +1574,12 @@ int decompress(const UCHAR* data, const UINT dataSize, UCHAR*& buff, UINT& buffS
 
     decompressedSize = totalUncompressedSize;
 
+    print("Decompressed %ld bytes (%d blocks)\n", totalUncompressedSize, i+1);
+
 Cleanup:
     
-    print("Decompressed %ld bytes (%d blocks)\n", totalUncompressedSize, i+1);
     
-    ldi_destroyDecompression(*context);
+    destroyDecompression(*context);
 
     return result;
 }

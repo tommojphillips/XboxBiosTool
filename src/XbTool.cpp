@@ -22,6 +22,8 @@
 #include "cstring"
 
 #include "XbTool.h"
+#include "Bios.h"
+#include "Mcpx.h"
 #include "XcodeInterp.h"
 
 #include "type_defs.h"
@@ -30,12 +32,68 @@
 #include "rc4.h"
 #include "nt_headers.h"
 
+const char SUCCESS_OUT[] = "Success! -> OUT: %s %d Kb\n";
+const char FAIL_OUT[] = "Error: Failed to write %s\n";
+
 void XbTool::deconstruct()
 {
 	params.deconstruct();
-
 	bios.deconstruct();
 };
+
+int XbTool::run()
+{
+	print("%s\n\n", cmd->name);
+
+	// read in keys if provided.
+	if (readKeys() != 0)
+		return 1;
+
+	// read in mcpx rom if provided
+	if (readMCPX() != 0)
+		return 1;
+
+	int result = 0;
+
+	// run command
+	switch (cmd->type)
+	{
+	case CMD_LIST:
+		result = listBios();
+		break;
+
+	case CMD_EXTR:
+		result = extractBios();
+		break;
+	case CMD_SPLIT:
+		result = splitBios();
+		break;
+	case CMD_COMBINE:
+		result = combineBios();
+		break;
+	case CMD_BLD_BIOS:
+		result = buildBios();
+		break;
+
+	case CMD_XCODE_SIM:
+		result = simulateXcodes();
+		break;
+
+	case CMD_KRNL_DECOMPRESS:
+		result = decompressKrnl();
+		break;
+
+	case CMD_XCODE_DECODE:
+		result = decodeXcodes();
+		break;
+
+	default:
+		error("Command not implemented\n");
+		result = 1;
+		break;
+	}
+	return result;
+}
 
 int XbTool::buildBios()
 {
@@ -91,7 +149,7 @@ int XbTool::buildBios()
 	
 	// create the bios in memory
 	result = bios.create(bldr, bldrSize, inittbl, inittblSize, krnl, krnlSize, krnlData, krnlDataSize);
-	if (!SUCCESS(result))
+	if (result != 0)
 	{
 		error("Error: Failed to create bios\n");
 		goto Cleanup;
@@ -105,15 +163,13 @@ int XbTool::buildBios()
 	}
 
 	result = bios.saveBiosToFile(filename);
-
-	if (!SUCCESS(result))
+	if (result == 0)
 	{
-		error("\nError: Failed to write bios to %s\n", filename);
-		goto Cleanup;
+		print(SUCCESS_OUT, filename, bios.getBiosSize() / 1024);
 	}
 	else
 	{
-		print("\nSuccess! -> OUT: %s %dKb\n", filename, params.binsize / 1024);
+		error(FAIL_OUT, "bios");
 	}
 
 Cleanup:
@@ -147,7 +203,7 @@ int XbTool::extractBios()
 
 	print("bios file: %s\n", params.biosFile);
 	result = bios.loadFromFile(params.biosFile);
-	if (result != BIOS_LOAD_STATUS_SUCCESS) // bldr needs to be valid to extract
+	if (result != Bios::BIOS_LOAD_STATUS_SUCCESS) // bldr needs to be valid to extract
 	{
 		return 1;
 	}
@@ -161,9 +217,9 @@ int XbTool::extractBios()
 		filename = "bldr.bin";
 
 	result = bios.saveBldrBlockToFile(filename);
-	if (!SUCCESS(result))
+	if (result != 0)
 	{
-		error("Failed to extract bldr.\n");
+		error(FAIL_OUT, "bldr");
 		return 1;
 	}
 
@@ -174,9 +230,9 @@ int XbTool::extractBios()
 		filename = "krnl.bin";
 
 	result = bios.saveKernelToFile(filename);
-	if (!SUCCESS(result))
+	if (result != 0)
 	{
-		error("Failed to extract krnl.\n");
+		error(FAIL_OUT, "krnl");
 		return 1;
 	}
 
@@ -187,9 +243,9 @@ int XbTool::extractBios()
 		filename = "krnl_data.bin";
 
 	result = bios.saveKernelDataToFile(filename);
-	if (!SUCCESS(result))
+	if (result != 0)
 	{
-		error("Failed to extract krnl data.\n");
+		error(FAIL_OUT, "krnl data");
 		return 1;
 	}
 	
@@ -200,9 +256,9 @@ int XbTool::extractBios()
 		filename = "inittbl.bin";
 
 	result = bios.saveInitTblToFile(filename);
-	if (!SUCCESS(result))
+	if (result != 0)
 	{
-		error("Failed to extract init tbl.\n");
+		error(FAIL_OUT, "init tbl");
 		return 1;
 	}
 
@@ -212,43 +268,44 @@ int XbTool::extractBios()
 int XbTool::splitBios()
 {
 	int result = 0;
-
-	print("bios file: %s\n", params.biosFile);
-
-	//romsize sanity check
-	if (params.romsize < DEFAULT_ROM_SIZE * 1024)
-	{
-		error("Error: Invalid rom size: %d\n", params.romsize);
-		return 1;
-	}
-
-	result = bios.loadFromFile(params.biosFile);
-	if (result == BIOS_LOAD_STATUS_FAILED) // bldr doesn't need to be valid to split
-	{
-		return result;
-	}
-	// bios file was read successfully
-
+	UCHAR* data = NULL;
+	UINT size = 0;
 	UINT fnLen = 0;
 	UINT bankFnLen = 0;
 	UINT dataLeft = 0;
 	UINT loopCount = 0;
 	int bank = 0;
-	const UINT biosSize = bios.getBiosSize();
 	const char suffix[] = "_bank";
 	char* biosFn = NULL;
 	char* ext = NULL;
 	char* bankFn = NULL;
+
+	print("bios file: %s\n", params.biosFile);
+
+	//romsize sanity check
+	if (params.romsize < DEFAULT_ROM_SIZE * 1024)
+		return 1;
+		
+	data = readFile(params.biosFile, &size);
+	if (data == NULL)
+		return 1;
+
+	result = checkSize(size);
+	if (result != 0)
+	{
+		error("Error: Invalid bios file size: %d\n", size);
+		goto Cleanup;
+	}
 	
 	// check if bios size is less than or equal to rom size
-	if (biosSize <= params.romsize)
+	if (size <= params.romsize)
 	{
 		error("Cannot split bios. file size is less than or equal to romsize\n");
 		result = 1;
 		goto Cleanup;
 	}
 
-	print("Splitting bios into %d banks (%dKB each)\n", (biosSize / params.romsize), (params.romsize / 1024));
+	print("Splitting bios into %d banks (%dKB each)\n", (size / params.romsize), (params.romsize / 1024));
 
 	fnLen = strlen(params.biosFile);
 	biosFn = (char*)xb_alloc(fnLen + 1); // +1 for null terminator
@@ -294,7 +351,7 @@ int XbTool::splitBios()
 
 	// split the bios based on rom size
 
-	dataLeft = biosSize;
+	dataLeft = size;
 	loopCount = 0;
 	while (dataLeft > 0)
 	{
@@ -303,6 +360,7 @@ int XbTool::splitBios()
 		{ 
 			error("Error: loopCount exceeded 5\n");
 			result = 1;
+			break;
 		}
 		loopCount++;
 
@@ -313,10 +371,10 @@ int XbTool::splitBios()
 		// write bank to file
 		print("Writing bank %d - %s %dKB\n", bank + 1, bankFn, params.romsize / 1024);
 
-		result = writeFile(bankFn, bios.getBiosData() + (params.romsize * bank), params.romsize);
-		if (!SUCCESS(result))
+		result = writeFile(bankFn, (data + (params.romsize * bank)), params.romsize);
+		if (result != 0)
 		{
-			error("Error: Failed to write %s\n", bankFn);
+			error(FAIL_OUT, bankFn);
 			goto Cleanup;
 		}
 
@@ -327,17 +385,18 @@ int XbTool::splitBios()
 	print("Bios split into %d banks\n", bank);
 
 Cleanup:
-
+	if (data != NULL)
+	{
+		xb_free(data);
+	}
 	if (biosFn != NULL)
 	{
 		xb_free(biosFn);
 	}
-
 	if (bankFn != NULL)
 	{
 		xb_free(bankFn);
 	}
-
 	if (ext != NULL)
 	{
 		xb_free(ext);
@@ -348,7 +407,6 @@ Cleanup:
 
 int XbTool::combineBios()
 {
-	const UINT MAX_BIOS_SIZE = 0x100000; // MB
 	const UINT MAX_BANKS = 4;
 	UINT totalSize = 0;
 	UINT offset = 0;
@@ -385,27 +443,22 @@ int XbTool::combineBios()
 			if (strcmp(params.bankFiles[i], params.bankFiles[j]) == 0)
 			{
 				isLoaded = true;
-				print("Reading %s from bank %d\n", params.bankFiles[i], j + 1);
-
 				banks[i] = (UCHAR*)xb_alloc(bankSizes[j]);
 				xb_cpy(banks[i], banks[j], bankSizes[i]);
 				bankSizes[i] = bankSizes[j];
-
 				break;
 			}
 		}
 
 		if (!isLoaded)
 		{
-			print("Reading %s from file\n", params.bankFiles[i]);
-
 			banks[i] = readFile(params.bankFiles[i], &bankSizes[i]);
 			if (banks[i] == NULL) // failed to load bank
 			{
 				goto Cleanup;
 			}
 
-			if (!SUCCESS(checkSize(bankSizes[i])))
+			if (checkSize(bankSizes[i]) != 0)
 			{
 				error("Error: %s has invalid file size: %d\n", params.bankFiles[i], bankSizes[i]);
 				result = 1;
@@ -422,7 +475,7 @@ int XbTool::combineBios()
 		goto Cleanup;
 	}
 
-	if (!SUCCESS(checkSize(totalSize)))
+	if (checkSize(totalSize) != 0)
 	{
 		error("Error: Invalid total bios size: %d\n", totalSize);
 		result = 1;
@@ -446,17 +499,14 @@ int XbTool::combineBios()
 		}
 	}
 
-	print("Writing bios to %s %dKB\n", filename, totalSize / 1024);
-
 	result = writeFile(filename, data, totalSize);
-
-	if (SUCCESS(result))
+	if (result == 0)
 	{
-		print("Success! -> OUT: %s\n", filename);
+		print(SUCCESS_OUT, filename, totalSize / 1024);
 	}
 	else
 	{
-		error("Error: Failed to write bios to %s\n", filename);
+		error(FAIL_OUT, "bios");
 	}
 
 Cleanup:
@@ -482,71 +532,33 @@ int XbTool::listBios()
 {
 	print("bios file: %s\n", params.biosFile);
 	int result = bios.loadFromFile(params.biosFile);
-	if (result == BIOS_LOAD_STATUS_FAILED) // bldr doesn't need to be valid to list it.
+	if (result > Bios::BIOS_LOAD_STATUS_INVALID_BLDR) // bldr doesn't need to be valid to list it.
 	{
-		error("Error: Failed to load bios\n");
 		return 1;
 	}
 
-	long long flag = params.ls_flag;
+	int flag = params.ls_flag;
 
 	if (flag == 0)
 	{
-		flag = SW_LS_OPT; // set to all flags.
-	}
+		print("\nbios size:\t\t%ld KB\n", bios.getBiosSize() / 1024UL);
+		print("rom size:\t\t%ld KB\n", params.romsize / 1024UL);
+		print("mcpx block size:\t%ld bytes\n", MCPX_BLOCK_SIZE);
+		print("bldr block size:\t%ld bytes\n", BLDR_BLOCK_SIZE);
+		print("total space available:\t%ld bytes\n", bios.getTotalSpaceAvailable());
 
-	print("\nbios size:\t\t%ld KB\n", bios.getBiosSize() / 1024UL);
-	print("rom size:\t\t%ld KB\n", params.romsize / 1024UL);
-	print("mcpx block size:\t%ld bytes\n", MCPX_BLOCK_SIZE);
-	print("bldr block size:\t%ld bytes\n", BLDR_BLOCK_SIZE);
-	print("total space available:\t%ld bytes\n", bios.getTotalSpaceAvailable());
-
-	if (flag & SW_LS_BLDR) // print bldr
-	{
 		bios.printBldrInfo();
-	}
-
-	if (flag & SW_LS_KRNL) // print kernel
-	{
 		bios.printKernelInfo();
-	}
-
-	if (flag & SW_LS_INITTBL) // print init tbl
-	{
 		bios.printInitTblInfo();
+		bios.printKeys();		
 	}
 
-	if (flag & SW_LS_BIOS)
-	{
-		// invalid boot params. probably encrypted or using the wrong bldr rc4 key.
-		if (!bios.isBootParamsValid())
-		{
-			print("\nbldr boot params are invalid. The bldr is probably encrypted");
-
-			if (params.keyBldrFile != NULL)
-				print(" with a different key or bldr is not encrypted.\n");
-			else
-				print(" (key not provided)");
-
-			print(".\nOffsets are calculated from the values in the bldr boot params.\n");
-		}
-		else
-		{
-			// if the boot params are valid, and available space is negative, then the incorrect romsize must have been provided.
-			if (bios.getAvailableSpace() < 0)
-			{
-				print("\nError: Incorrect rom size provided. The rom size is less than the total space available.\n" \
-					"Offsets are calculated from the values in the bldr boot params.\n");
-			}
-		}
-	}
-
-	if (flag & SW_LS_NV2A_TBL)
+	if (flag & LS_NV2A_TBL)
 	{
 		bios.printNv2aInfo();
 	}
 
-	if (flag & SW_LS_DATA_TBL)
+	if (flag & LS_DATA_TBL)
 	{
 		bios.printDataTbl();
 	}
@@ -556,12 +568,10 @@ int XbTool::listBios()
 
 UCHAR* XbTool::load_init_tbl_file(UINT& size) const
 {
-	const UINT BASE_OFFSET = sizeof(INIT_TBL);
-
 	UCHAR* inittbl = NULL;
 	int result = 0;
 
-	// load the inittbl file (inittblFile or biosFile)
+	// load the inittbl file ( -inittbl or -bios )
 
 	const char* filename = params.inittblFile;
 	if (filename == NULL)
@@ -580,19 +590,15 @@ UCHAR* XbTool::load_init_tbl_file(UINT& size) const
 		return NULL;
 
 	// validate the inittbl file
-	if (size < BASE_OFFSET)
+	if (size < XCODE_BASE + sizeof(XCODE))
 	{
-		error("Error: Invalid inittbl size: %d. Expected atleast %d bytes\n", size, BASE_OFFSET);
+		error("Error: Invalid inittbl size: %d. Expected atleast %d bytes\n", size, XCODE_BASE + sizeof(XCODE));
 		result = 1;
 		goto Cleanup;
 	}
-
-	// note: im only interested in the xcodes. so the inittbl size should be less than 0x100000 (way less)
-	// i could force check to 256, 512, 1024, but that prevents the user from using an extracted inittbl file. 
-	// (3-4KB or even more if there were a considerble amount of xcodes added)
-	if (size > 0x100000)
+	if (size > MAX_BIOS_SIZE)
 	{
-		error("Error: Invalid inittbl size: %d. Expected less than %d bytes\n", size, 0x100000);
+		error("Error: Invalid inittbl size: %d. Expected less than %d bytes\n", size, MAX_BIOS_SIZE);
 		result = 1;
 		goto Cleanup;
 	}
@@ -624,13 +630,9 @@ int XbTool::decodeXcodes() const
 	if (inittbl == NULL)
 		return 1;
 	
-	print("\nDecode xcodes:\n");
-
 	result = interp.load(inittbl + XCODE_BASE, size - XCODE_BASE);
-	if (!SUCCESS(result))
-	{
+	if (result != 0)
 		goto Cleanup;
-	}
 		
 	result = interp.decodeXcodes();
 
@@ -656,11 +658,8 @@ int XbTool::simulateXcodes() const
 		return 1;
 
 	result = interp.load(inittbl + XCODE_BASE, size - XCODE_BASE);
-	if (!SUCCESS(result))
-	{
-		error("Error: failed to load xcodes\n");
+	if (result != 0)
 		goto Cleanup;
-	}
 
 	result = interp.simulateXcodes();
 
@@ -682,14 +681,13 @@ int XbTool::decompressKrnl()
 
 	print("bios file: %s\n", params.biosFile);
 	result = bios.loadFromFile(params.biosFile);
-
-	if (result != BIOS_LOAD_STATUS_SUCCESS) // bldr needs to be valid to decompress kernel. 
+	if (result != Bios::BIOS_LOAD_STATUS_SUCCESS) // bldr needs to be valid to decompress kernel. 
 	{
 		return 1;
 	}
 
 	// decompress the kernel
-	if (!SUCCESS(bios.decompressKrnl()))
+	if (bios.decompressKrnl() != 0)
 	{
 		error("Error: Failed to decompress the kernel image\n");
 		return 1;
@@ -746,19 +744,14 @@ int XbTool::decompressKrnl()
 
 	// write out the kernel image to file
 	result = writeFile(filename, decompressedKrnl, decompressedSize);
-	if (!SUCCESS(result))
+	if (result == 0)
 	{
-		error("Error: Failed to write kernel image\n");
-		goto Cleanup;
+		print(SUCCESS_OUT, filename, decompressedSize / 1024);
 	}
 	else
 	{
-		print("Success! -> OUT: %s\n", filename);
+		error(FAIL_OUT, "kernel image");
 	}
-
-Cleanup:
-	
-	// bios frees it's allocated memory. no need to free decompressedKrnl
 
 	return result;
 }
@@ -802,57 +795,18 @@ int XbTool::readMCPX()
 	if (params.mcpxFile == NULL)
 		return 0;
 
-	params.mcpx.data = readFile(params.mcpxFile, NULL, MCPX_BLOCK_SIZE);
-	if (params.mcpx.data == NULL)
+	if (params.mcpx.load(params.mcpxFile) != 0)
 		return 1;
-
-	// verify we got a valid mcpx rom. readFile() has already checked the size.
-	// create some constants to check against.
-
-	const UINT MCPX_CONST_ONE = 280018995;
-	const UINT MCPX_CONST_TWO = 3230587022;
-	const UINT MCPX_CONST_THREE = 3993153540;
-	const UINT MCPX_CONST_FOUR = 2160066559;
-
-	if (xb_cmp(params.mcpx.data, &MCPX_CONST_ONE, 4) != 0 ||
-		xb_cmp(params.mcpx.data + 4, &MCPX_CONST_TWO, 4) != 0 ||
-		xb_cmp(params.mcpx.data + MCPX_BLOCK_SIZE - 4, &MCPX_CONST_THREE, 4) != 0)
-	{
-		error("Error: Invalid MCPX ROM\n");
-		return 1;
-	}
-
-	// valid mcpx rom
-
-	print("mcpx file: %s ", params.mcpxFile);
-
-	// mcpx v1.0 has a hardcoded signature at offset 0x187.
-	if (xb_cmp(params.mcpx.data + 0x187, BOOT_PARAMS_SIGNATURE, 4) == 0)
-	{
-		print("( v1.0 )\n");
-		params.mcpx.version = MCPX_ROM::MCPX_V1_0;
-		return 0;
-	}
-
-	// verify the mcpx rom is v1.1
-
-	if (xb_cmp(params.mcpx.data + 0xe0, &MCPX_CONST_FOUR, 4) != 0)
-	{
-		error("Error: Invalid MCPX v1.1 ROM\n");
-		return 1;
-	}
-
-	print("( v1.1 )\n");
-	params.mcpx.version = MCPX_ROM::MCPX_V1_1;
-
 	return 0;
 }
 
 int XbTool::extractPubKey(UCHAR* data, UINT size)
 {
-	// after successful decompression, lets see if we can find the public key.
-	// public key should start with the RSA1 magic number.
-	// if we find it, we can extract the public key and save it to a file.
+	// do nothing if a public key file is not provided
+	if (params.pubKeyFile == NULL)
+	{
+		return 0;
+	}
 
 	if (data == NULL || size == 0)
 	{
@@ -879,28 +833,16 @@ int XbTool::extractPubKey(UCHAR* data, UINT size)
 	}
 
 	print("Public key found at offset 0x%x\n", i);
-
 	printPubKey(pubkey);
 
-	// check if user is patching the public key, 
-	// the user might be using the 'pubkeyfile' switch to tell us where to save it.
-	// otherwise, patch the public key with the provided key. (pubkeyfile is providing us with the key)
-
-	// do nothing if a public key file is not provided
-	if (params.pubKeyFile == NULL)
-	{
-		print("No public key file provided\n");
-		return 0;
-	}
-
-	// if the 'patch-keys' flag is set, then use that key file to patch the pubkey.
-	// otherwise, if the 'patch-keys' flag is not set then save the found pubkey to that file (unmodified).
-	if ((params.sw_flag & SW_PATCH_KEYS) != 0)
+	// if the '-patchkeys' flag is set, then use that key file to patch the pubkey.
+	// otherwise, if the '-patchkeys' flag is not set then save the found pubkey to that file (unmodified).
+	if ((params.sw_flag & SW_PATCH_KEYS) == 0)
 	{
 		print("Writing public key to %s (%d bytes)\n", params.pubKeyFile, sizeof(PUBLIC_KEY));
-		if (!SUCCESS(writeFile(params.pubKeyFile, pubkey, sizeof(PUBLIC_KEY))))
+		if (writeFile(params.pubKeyFile, pubkey, sizeof(PUBLIC_KEY)) != 0)
 		{
-			error("Error: Failed to write public key to file\n");
+			error(FAIL_OUT, "public key");
 			return 1;
 		}
 	}
@@ -916,13 +858,18 @@ int XbTool::extractPubKey(UCHAR* data, UINT size)
 			return 1;
 		}
 
-		xb_cpy(pubkey->modulus, patch_pubkey->modulus, sizeof(pubkey->modulus));
+		if (xb_cmp(pubkey->modulus, patch_pubkey->modulus, sizeof(pubkey->modulus)) == 0)
+		{
+			print("Public key matches patch key\n");
+		}
+		else
+		{
+			xb_cpy(pubkey->modulus, patch_pubkey->modulus, sizeof(pubkey->modulus));
+			printPubKey(pubkey);
+			print("Public key patched.\n");
+		}
 
 		xb_free(patch_pubkey);
-
-		printPubKey(pubkey);
-
-		print("Public key patched.\n");
 	}
 
 	return 0;

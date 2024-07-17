@@ -89,7 +89,7 @@ int SHA1Reset(SHA1Context* context)
  *  Returns:
  *      sha Error Code.
  */
-int SHA1Result(SHA1Context* context, UCHAR digest[SHA1_DIGEST_LEN])
+int SHA1Result(SHA1Context* context, UCHAR digest[DIGEST_LEN])
 {
     int i;
 
@@ -117,7 +117,7 @@ int SHA1Result(SHA1Context* context, UCHAR digest[SHA1_DIGEST_LEN])
 
     }
 
-    for(i = 0; i < SHA1_DIGEST_LEN; ++i)
+    for(i = 0; i < DIGEST_LEN; ++i)
     {
         digest[i] = context->intermediate_hash[i >> 2] >> 8 * (3 - (i & 0x03));
     }

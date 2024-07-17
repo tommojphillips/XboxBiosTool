@@ -28,7 +28,8 @@
 // user incl
 #include "type_defs.h"
 
-#define SUCCESS(x) (x == 0)
+// check if a struct is within bounds of a buffer. the struct needs to live within the buffer.
+#define IN_BOUNDS(_struct, _buff, _buff_size) ((UCHAR*)_struct >= (UCHAR*)_buff && (UCHAR*)_struct + sizeof(*_struct) < (UCHAR*)_buff + _buff_size)
 
 enum CON_COL : int { ERR = 0, OK = 1, MSG = 3, BLACK = 30, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE };
 
@@ -39,13 +40,20 @@ void format(char* buffer, const char* format, ...);
 void print(FILE* stream, const char* format, ...);			// print to stream (stdout, stderr, FILE*)
 void print(const char* format, ...);						// std print to console
 void print(const CON_COL col, const char* format, ...);		// std print to console with color
-void print_f(const char* format, ...);						// print to console. format. {1} = arg1, {2} = arg2, etc.
+
+void print_f(char* buffer, const int bufferSize, const char* format, ...);		// print to buffer. format. {1} = arg1, {2} = arg2, etc.
+
 void printData(UCHAR* data, int len, bool newLine = true);	// print a char array
 
 void error(const char* format, ...);						// stderr print
 
 int checkSize(const UINT& size);						// check rom size.
 
-void getTimestamp(long long timestamp, char* timestamp_str);	// print timestamp to string.
+void getTimestamp(UINT timestamp, char* timestamp_str);	// print timestamp to string.
+
+void ltrim(char*& str);
+void rtrim(char*& str);
+void lpad(char buff[], const UINT buffSize, const char pad);
+void rpad(char buff[], const UINT buffSize, const char pad);
 
 #endif //XBT_UTIL_H

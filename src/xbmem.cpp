@@ -84,7 +84,7 @@ void* XbMem::xb_realloc(void* ptr, UINT size)
 	if (newPtr == NULL)
 	{
 		error("Error: Could not reallocate %d bytes\n", size);
-		return NULL;
+		return ptr;
 	}
 
 	_curAllocatedBytes -= oldSize;
@@ -114,26 +114,6 @@ void XbMem::xb_free(void* ptr)
 if (_isPrinting)
 	print("Freed %d bytes. total alloc: %ld bytes\n", size, _curAllocatedBytes);
 }
-void XbMem::xb_zero(void* ptr, UINT size)
-{
-	memset(ptr, 0, size);
-}
-void XbMem::xb_set(void* ptr, int val, UINT size)
-{
-	memset(ptr, val, size);
-}
-void XbMem::xb_cpy(void* dest, const void* src, UINT size)
-{
-	memcpy(dest, src, size);
-}
-void XbMem::xb_mov(void* dest, void* src, UINT size)
-{
-	memmove(dest, src, size);
-}
-int XbMem::xb_cmp(const void* ptr1, const void* ptr2, UINT size)
-{
-	return memcmp(ptr1, ptr2, size);
-}
 
 // static functions for memory allocation. wraps global xbmem instance
 void* xb_alloc(UINT size)
@@ -150,23 +130,23 @@ void xb_free(void* ptr)
 }
 void xb_zero(void* ptr, UINT size)
 {
-	XbMem::getInstance().xb_zero(ptr, size);
+	memset(ptr, 0, size);
 }
 void xb_set(void* ptr, int val, UINT size)
 {
-	XbMem::getInstance().xb_set(ptr, val, size);
+	memset(ptr, val, size);
 }
 void xb_cpy(void* dest, const void* src, UINT size)
 {
-	XbMem::getInstance().xb_cpy(dest, src, size);
+	memcpy(dest, src, size);
 }
-void xb_mov(void* dest, void* src, UINT size)
+void xb_mov(void* dest, const void* src, UINT size)
 {
-	XbMem::getInstance().xb_mov(dest, src, size);
+	memmove(dest, src, size);
 }
 int xb_cmp(const void* ptr1, const void* ptr2, UINT size)
 {
-	return XbMem::getInstance().xb_cmp(ptr1, ptr2, size);
+	return memcmp(ptr1, ptr2, size);
 }
 int xb_leaks()
 {

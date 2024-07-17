@@ -64,16 +64,8 @@ void setForegroundColor(const CON_COL col)
 
 void printData(UCHAR* data, const int len, bool newLine)
 {
-    if (data == NULL)
-    {
-		error("Error: data is NULL\n");
+	if (data == NULL || len <= 0)
 		return;
-	}
-    if (len <= 0)
-    {
-		error("Error: len is less than or equal to 0\n");
-		return;
-	}
 
     for (int i = 0; i < len; i++)
     {
@@ -85,35 +77,30 @@ void printData(UCHAR* data, const int len, bool newLine)
 		print("\n");
 	}
 }
-void print_f(const char* format, ...)
+
+void print_f(char* buffer, const int bufferSize, const char* format, ...)
 {
 	// find {1}, {2}, etc and replace with the corresponding argument
+
+	const char BUFFER_OVERFLOW[] = "BUFFER OVERRUN: print_f\n";
 	const char START_TOKEN = '{';
 	const char END_TOKEN = '}';
-	const int BUF_SIZE = 8;
 
-	char msg[BUF_SIZE] = { 0 };
-	int len = strlen(format);
+	const char* p = format;
+	const char* og_buff = buffer;
 
-	char* p = (char*)format; // set pointer to the start of the format string
+	const char* startToken = NULL;
+	const char* endToken = NULL;
+		
+	UINT argLen = 0;
+	
+	if (buffer == NULL || format == NULL || bufferSize < 1 || strlen(format) < 1)
+		return;
 
-	char* startToken = NULL;
-	char* endToken = NULL;
-
-	char* argPtr = NULL;
-
-	int curIter = -1;
-	while (++curIter < BUF_SIZE - 1)
+	while (true)
 	{
-		if (*p == '\0')
-		{
+		if (*p == '\0') // check if we are done
 			break;
-		}
-
-		if (BUF_SIZE - 1 <= curIter)
-		{
-			break;
-		}
 
 		// check for token
 		if (*p == START_TOKEN)
@@ -122,100 +109,106 @@ void print_f(const char* format, ...)
 			while (*p != END_TOKEN)
 			{
 				if (*p == '\0')
-				{
 					break;
-				}
-
 				p++;
 			}
 
 			if (*p != END_TOKEN)
-			{
 				break;
-			}
-
-			endToken = p;
 
 			// replace token with argument
+			
+			endToken = p;
 
 			// get the number between the tokens
 			int num = 0;
-			char* token = startToken + 1;
-			int tokenLen = endToken - token;
-			char tokenStr[10] = { "\0" };
+			int tokenLen = (endToken - startToken + 1) - 2; // -2 to remove the '{' and '}'
+			char tokenStr[10] = {0};
+			xb_set(tokenStr, 0xCC, sizeof(tokenStr));
 
-			strncpy(tokenStr, token, tokenLen);
-			tokenStr[9] = '\0';
+			if (tokenLen + 1 > sizeof(tokenStr))
+			{
+				print(BUFFER_OVERFLOW);
+				break;
+			}
+			strncpy(tokenStr, startToken + 1, tokenLen);
+			tokenStr[tokenLen] = '\0';
 
 			num = atoi(tokenStr);
+			if (num < 1)
+			{
+				print("Invalid token number: %d\n", num);
+				break;
+			}
 
 			// get the argument based on the number
 
 			char* arg = NULL;
-			int argLen = 0;
 			va_list ap;
 
-			if (argPtr == NULL)
+			va_start(ap, format);
+			for (int i = 0; i < num; ++i)
 			{
-				va_start(ap, format);
-				for (int i = 0; i < num; ++i)
+				arg = va_arg(ap, char*);
+				if (arg == NULL)
 				{
-					if (i == num - 1)
-					{
-						arg = va_arg(ap, char*);
-						argLen = strlen(arg);
-						break;
-					}
+					break;
 				}
-				va_end(ap);
-			}
-			else
-			{
-				arg = argPtr;
 				argLen = strlen(arg);
 			}
+			va_end(ap);			
 
 			if (argLen > 0)
 			{
-				if (argLen > BUF_SIZE - curIter - 1)
+				if (buffer + argLen >= og_buff + bufferSize)
 				{
-					argLen = BUF_SIZE - curIter - 1;
-					argPtr = arg + argLen;
-					msg[curIter] = '\0';
-					p = startToken - 1;
-				}
-				else
-				{
-					argPtr = NULL;
-				}
-
-				xb_cpy(msg + curIter, arg, argLen);
-
-				curIter += argLen;
+					print(BUFFER_OVERFLOW);
+					break;
+				}				
+				xb_cpy(buffer, arg, argLen);
+				buffer += argLen;
 			}
 		}
 		else
 		{
-			// copy the character
-			msg[curIter] = *p;
+			// go find next '{'
+			startToken = p;
+			while (*p != '\0')
+			{
+				if (*p == START_TOKEN)
+				{
+					break;
+				}
+				p++;
+			}		
+
+			// copy up to '{'
+			argLen = p - startToken;
+			if (argLen > 0)
+			{
+				if (buffer + argLen >= og_buff + bufferSize)
+				{
+					print(BUFFER_OVERFLOW);
+					break;
+				}
+				xb_cpy(buffer, startToken, argLen);
+				buffer += argLen;
+			}
+
+			if (*p == '\0') // check if we are done
+				break;
+
+			if (*p != START_TOKEN)
+				p += argLen;
 		}
 
-		// move to the next character
-		p++;
-
-		// print the message
-		print(msg);
-
-		if (*p == '\0')
-		{
-			break;
-		}
-
-		curIter = -1;
-		xb_zero(msg, BUF_SIZE);
+		if (*p != START_TOKEN)
+			p++;
 	}
-}
 
+	// null terminate the buffer
+	buffer[0] = '\0';
+}
 void format(char* buffer, const char* format, ...)
 {
 	va_list args;
@@ -233,7 +226,6 @@ void print(FILE* stream, const char* format, ...)
 	vfprintf(stream, format, args);
 	va_end(args);
 }
-
 void print(const char* format, ...)
 {
 	va_list args;
@@ -242,7 +234,6 @@ void print(const char* format, ...)
 	vfprintf(stdout, format, args);
 	va_end(args);
 }
-
 void print(const CON_COL col, const char* format, ...)
 {
 	setForegroundColor(col);
@@ -254,7 +245,6 @@ void print(const CON_COL col, const char* format, ...)
 
 	setConsoleColor(0);
 }
-
 void error(const char* format, ...)
 {
 	va_list args;
@@ -276,26 +266,79 @@ int checkSize(const UINT& size)
 	return 1;
 }
 
-void getTimestamp(long long timestamp, char* timestamp_str)
+void getTimestamp(UINT timestamp, char* timestamp_str)
 {
-	char* time_str = NULL;
-
 	if (timestamp_str == NULL)
 		return;
 
+	time_t rawtime = (time_t)timestamp;
 	struct tm* ptm;
-	ptm = gmtime(&timestamp);
-	if (ptm == NULL)
-		goto TimeStrZero;
 
-	time_str = asctime(ptm);
+	ptm = gmtime(&rawtime);
+
+	char* time_str = asctime(ptm);
 	if (time_str == NULL)
-		goto TimeStrZero;
-
+	{
+		strcpy(timestamp_str, "0");
+		return;
+	}
 	time_str[strlen(time_str) - 1] = '\0';
 	strcpy(timestamp_str, time_str);
+}
 
-TimeStrZero:
-	strcpy(timestamp_str, "0");
-	return;
+void ltrim(char*& str)
+{
+	if (str == NULL)
+		return;
+
+	while (*str == ' ' || *str == '\t')
+	{
+		str++;
+	}
+}
+void rtrim(char*& str)
+{
+	if (str == NULL)
+		return;
+
+	int len = strlen(str);
+	if (len == 0)
+		return;
+
+	char* end = str + len - 1;
+	while (end > str && (*end == ' ' || *end == '\t'))
+	{
+		end--;
+	}
+	*(end + 1) = '\0';
+}
+void lpad(char buff[], const UINT buffSize, const char pad)
+{
+	if (buff == NULL)
+		return;
+
+	// pad left
+	UINT slen = strlen(buff);
+	if (slen >= buffSize)
+		return;
+
+	// shift right
+	for (UINT i = buffSize - 1; i >= slen; i--)
+	{
+		buff[i] = buff[i - buffSize + slen];
+	}
+
+	// pad left
+	for (UINT i = 0; i < buffSize - slen; i++)
+	{
+		buff[i] = pad;
+	}
+}
+void rpad(char buff[], const UINT buffSize, const char pad)
+{
+	if (buff == NULL)
+		return;
+
+	UINT slen = strlen(buff);
+	xb_set(buff + slen, ' ', buffSize - slen - 1);
 }

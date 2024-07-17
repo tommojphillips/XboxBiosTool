@@ -22,24 +22,20 @@
 #ifndef XB_HELP_STR_H
 #define XB_HELP_STR_H
 
+// All lines are limited to 80 characters.
+
 const char HELP_STR_HELP[] = "Display help";
 
 const char HELP_STR_LIST[] = "Display bios info: boot params, sizes, signatures, keys, nv2a tbl, etc.";
 
-const char HELP_STR_EXTR_ALL[] = "Extract the 2bl, compressed kernel+data, init table from a bios.";
-const char HELP_STR_BUILD[] = "Build a bios from a 2bl, compressed kernel+data, init table";
+const char HELP_STR_EXTR_ALL[] = "Extract the 2bl, compressed krnl, uncompressed krnl data, init table";
+const char HELP_STR_BUILD[] = "Build a bios from a 2bl, compressed krnl, uncompressed krnl data, init table";
 
-const char HELP_STR_SPLIT[] = "Split a bios into banks. bios.bin 1Mb -> bios.bin 4x 256Kb";
+const char HELP_STR_SPLIT[] = "Split a bios into banks. Eg: bios.bin 1Mb -> bios.bin 4x 256Kb";
 
-const char HELP_STR_COMBINE[] = "Combine banks into a single bios. bios.bin x4 256Kb -> bios.bin 1Mb\n" \
-"* bank arguments are inferred. eg -> -combine bank1.bin bank2.bin is the\n" \
-"  same as -combine -bank1 bank1.bin -bank2 bank2.bin\n" \
-"* banks are combined in the order they are specified.\n" \
-"* WARNING. Since xcodes are read from the top of the FLASH and everything else\n" \
-"  is calculated from the bottom of FLASH, you acan run into a configuration that\n" \
-"  just isn't compatible. If you dont know what you are doing, i would highly\n" \
-"  recommend NOT using this utility.\n" \
-"* This is more so designed for custom bootloaders or modchips.";
+const char HELP_STR_COMBINE[] = "Combine banks into a single bios. Eg: bios.bin x4 256Kb -> bios.bin 1Mb\n" \
+"* bank arguments are inferred. eg -> -combine bank1.bin bank2.bin\n" \
+"* banks are combined in the order they are specified.";
 
 const char HELP_STR_XCODE_SIM[] = "Simulate mem-write xcodes and parse x86 instructions. (visor sim)\n" \
 " -d\t\t - write sim memory to a file for analysis in a disassembler.";
@@ -47,12 +43,15 @@ const char HELP_STR_XCODE_SIM[] = "Simulate mem-write xcodes and parse x86 instr
 const char HELP_STR_XCODE_DECODE[] = "Decode xcodes from a bios file. currently only supports retail opcodes.\n" \
 " -d\t\t - write decoded xcodes to a .txt. Use -out to set output file.";
 
-const char HELP_STR_PARAM_SIM_SIZE[] = " <size> - The size of the simulated memory in bytes. default is 32.";
+const char HELP_STR_PARAM_SIM_SIZE[] = " <size> - The size of the simulated memory in bytes.";
 
 const char HELP_STR_PARAM_BIOS_FILE[] = " <path>\t - The bios file";
 const char HELP_STR_PARAM_OUT_FILE[] = " <path>\t - The output file";
-const char HELP_STR_PARAM_ROMSIZE[] = " <size> - The rom size in Kb. valid opts: 256, 512, 1024";
-const char HELP_STR_PARAM_BINSIZE[] = " <size> - The bin size in Kb, valid opts: 256, 512, 1024";
+
+#define VALID_ROM_SIZES " valid opts: 256, 512, 1024"
+const char HELP_STR_PARAM_ROMSIZE[] = " <size> - The rom size in Kb." VALID_ROM_SIZES;
+const char HELP_STR_PARAM_BINSIZE[] = " <size> - The bin size in Kb." VALID_ROM_SIZES;
+#undef VALID_ROM_SIZES
 
 const char HELP_STR_MCPX_ROM[] = " <path>\t  - path to the MCPX ROM file. Can be used for decrypting the\n" \
 "\t\t   2bl instead of the -key-bldr switch.\n";
@@ -69,15 +68,10 @@ const char HELP_STR_KEY_KRNL[] = " <path> - path to the 16 byte rc4_key.bin file
 const char HELP_STR_RC4_ENC[] = "\t  - If flag is provided, the {1} is assumed to be unencrypted\n"
 "\t\t   or will not be encrypted; depending on context.\n";
 
-const char HELP_STR_PARAM_BANK1[] = " <path>\t - Bank 1 file";
-const char HELP_STR_PARAM_BANK2[] = " <path>\t - Bank 2 file";
-const char HELP_STR_PARAM_BANK3[] = " <path>\t - Bank 3 file";
-const char HELP_STR_PARAM_BANK4[] = " <path>\t - Bank 4 file";
-
-const char HELP_STR_PARAM_BLDR[] = " <path>\t - bldr file";
-const char HELP_STR_PARAM_KRNL[] = " <path>\t - Kernel file";
-const char HELP_STR_PARAM_KRNL_DATA[] = " <path>  Uncompressed kernel data file";
-const char HELP_STR_PARAM_INITTBL[] = " <path> - Init table file";
+const char HELP_STR_PARAM_BLDR[] = " <path>\t - The boot loader file";
+const char HELP_STR_PARAM_KRNL[] = " <path>\t - The compressed kernel file";
+const char HELP_STR_PARAM_KRNL_DATA[] = " <path>  The uncompressed kernel data file";
+const char HELP_STR_PARAM_INITTBL[] = " <path> - The init table file";
 
 const char HELP_STR_PARAM_EEPROM_KEY[] = " <path> path to the eeprom key file.";
 const char HELP_STR_PARAM_CERT_KEY[] = " <path> - path to the cert key file.";
