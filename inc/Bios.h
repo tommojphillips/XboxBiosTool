@@ -1,4 +1,4 @@
-// Bios.h 
+// Bios.h
 
 /* Copyright(C) 2024 tommojphillips
  *
@@ -48,10 +48,6 @@ public:
 
 		// pointers, offsets
 		reset();
-	};
-	~Bios()
-	{
-		deconstruct();
 	};
 	
 	enum BIOS_LOAD_STATUS : int

@@ -38,11 +38,8 @@ public:
 
 	MCPX_ROM() : version(MCPX_UNK), data(NULL), sbkey(NULL) { };
 
-	~MCPX_ROM() {
-		deconstruct();
-	};
-
 	int load(const char* filename);
+
 	void deconstruct();
 
 	int verifyMCPX();

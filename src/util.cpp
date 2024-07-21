@@ -78,16 +78,15 @@ void printData(UCHAR* data, const int len, bool newLine)
 	}
 }
 
-void print_f(char* buffer, const int bufferSize, const char* format, ...)
+void print_f(char* const buffer, const int bufferSize, const char* format, ...)
 {
 	// find {1}, {2}, etc and replace with the corresponding argument
 
-	const char BUFFER_OVERFLOW[] = "BUFFER OVERRUN: print_f\n";
 	const char START_TOKEN = '{';
 	const char END_TOKEN = '}';
 
-	const char* p = format;
-	const char* og_buff = buffer;
+	const char* formatPtr = format;	
+	char* bufferPtr = buffer;
 
 	const char* startToken = NULL;
 	const char* endToken = NULL;
@@ -99,26 +98,26 @@ void print_f(char* buffer, const int bufferSize, const char* format, ...)
 
 	while (true)
 	{
-		if (*p == '\0') // check if we are done
+		if (*formatPtr == '\0') // check if we are done
 			break;
 
 		// check for token
-		if (*p == START_TOKEN)
+		if (*formatPtr == START_TOKEN)
 		{
-			startToken = p;
-			while (*p != END_TOKEN)
+			startToken = formatPtr;
+			while (*formatPtr != END_TOKEN)
 			{
-				if (*p == '\0')
+				if (*formatPtr == '\0')
 					break;
-				p++;
+				formatPtr++;
 			}
 
-			if (*p != END_TOKEN)
+			if (*formatPtr != END_TOKEN)
 				break;
 
 			// replace token with argument
 			
-			endToken = p;
+			endToken = formatPtr;
 
 			// get the number between the tokens
 			int num = 0;
@@ -128,7 +127,6 @@ void print_f(char* buffer, const int bufferSize, const char* format, ...)
 
 			if (tokenLen + 1 > sizeof(tokenStr))
 			{
-				print(BUFFER_OVERFLOW);
 				break;
 			}
 			strncpy(tokenStr, startToken + 1, tokenLen);
@@ -137,7 +135,6 @@ void print_f(char* buffer, const int bufferSize, const char* format, ...)
 			num = atoi(tokenStr);
 			if (num < 1)
 			{
-				print("Invalid token number: %d\n", num);
 				break;
 			}
 
@@ -160,54 +157,52 @@ void print_f(char* buffer, const int bufferSize, const char* format, ...)
 
 			if (argLen > 0)
 			{
-				if (buffer + argLen >= og_buff + bufferSize)
+				if (bufferPtr + argLen >= buffer + bufferSize)
 				{
-					print(BUFFER_OVERFLOW);
 					break;
 				}				
-				xb_cpy(buffer, arg, argLen);
-				buffer += argLen;
+				xb_cpy(bufferPtr, arg, argLen);
+				bufferPtr += argLen;
 			}
 		}
 		else
 		{
 			// go find next '{'
-			startToken = p;
-			while (*p != '\0')
+			startToken = formatPtr;
+			while (*formatPtr != '\0')
 			{
-				if (*p == START_TOKEN)
+				if (*formatPtr == START_TOKEN)
 				{
 					break;
 				}
-				p++;
+				formatPtr++;
 			}		
 
 			// copy up to '{'
-			argLen = p - startToken;
+			argLen = formatPtr - startToken;
 			if (argLen > 0)
 			{
-				if (buffer + argLen >= og_buff + bufferSize)
+				if (bufferPtr + argLen >= buffer + bufferSize)
 				{
-					print(BUFFER_OVERFLOW);
 					break;
 				}
-				xb_cpy(buffer, startToken, argLen);
-				buffer += argLen;
+				xb_cpy(bufferPtr, startToken, argLen);
+				bufferPtr += argLen;
 			}
 
-			if (*p == '\0') // check if we are done
+			if (*formatPtr == '\0') // check if we are done
 				break;
 
-			if (*p != START_TOKEN)
-				p += argLen;
+			if (*formatPtr != START_TOKEN)
+				formatPtr += argLen;
 		}
 
-		if (*p != START_TOKEN)
-			p++;
+		if (*formatPtr != START_TOKEN)
+			formatPtr++;
 	}
 
 	// null terminate the buffer
-	buffer[0] = '\0';
+	bufferPtr[0] = '\0';
 }
 void format(char* buffer, const char* format, ...)
 {
@@ -341,4 +336,14 @@ void rpad(char buff[], const UINT buffSize, const char pad)
 
 	UINT slen = strlen(buff);
 	xb_set(buff + slen, ' ', buffSize - slen - 1);
+}
+
+void errorExit(const int code, const char* format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	vfprintf(stderr, format, args);
+	va_end(args);
+
+	exit(code);
 }

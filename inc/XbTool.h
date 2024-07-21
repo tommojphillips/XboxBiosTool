@@ -40,8 +40,8 @@ struct Parameters
 
 	UINT simSize;
 
-	bool encBldr;
-	bool encKrnl; // switch. Use 2bl-krnl key to en/decrypt kernel.
+	UCHAR* keyBldr;
+	UCHAR* keyKrnl;
 
 	const char* biosFile;
 	const char* outFile;
@@ -57,9 +57,6 @@ struct Parameters
 	const char* keyBldrFile;
 	const char* keyKrnlFile;
 
-	UCHAR* keyBldr;
-	UCHAR* keyKrnl;
-
 	MCPX_ROM mcpx;
 
 	const char* pubKeyFile;
@@ -67,7 +64,6 @@ struct Parameters
 	const char* eepromKeyFile;
 
 	Parameters() : sw_flag(0), ls_flag(0), romsize(0), binsize(0), simSize(0),
-		encBldr(true), encKrnl(true),
 		biosFile(NULL), outFile(NULL), inittblFile(NULL), bldrFile(NULL), krnlFile(NULL), krnlDataFile(NULL),
 		keyBldrFile(NULL), keyKrnlFile(NULL),
 		keyBldr(NULL), keyKrnl(NULL),
@@ -78,11 +74,6 @@ struct Parameters
 		{
 			bankFiles[i] = NULL;
 		}
-	}
-
-	~Parameters()
-	{
-		deconstruct();
 	}
 
 	void deconstruct()
@@ -113,9 +104,6 @@ class XbTool
 		Parameters params;
 		
 		XbTool() : exe_filename(), cmd(NULL), bios(), params() { };
-		~XbTool() {
-			deconstruct();
-		};
 
 		void deconstruct();
 

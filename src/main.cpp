@@ -1,4 +1,4 @@
-// main.cpp: This file contains the 'main' function. Program execution begins and ends there.
+// main.cpp: This file contains the 'main' function. Implements the command line interface for the Xbox BIOS Tool.
 
 /* Copyright(C) 2024 tommojphillips
  *
@@ -25,14 +25,11 @@
 #include <cstring>
 
 // user incl
-
 #include "XbTool.h"
-
 #include "main.h"
 #include "bldr.h"
 #include "type_defs.h"
 #include "util.h"
-
 #include "cli_tbl.h"
 #include "help_strings.h"
 #include "version.h"
@@ -61,8 +58,8 @@ const CMD_TBL cmd_tbl[] = {
 PARAM_TBL PARAM_BLDR_KEY = { "key-bldr", SW_KEY_BLDR_FILE, &params.keyBldrFile,	PARAM_TBL::STR, NULL };
 PARAM_TBL PARAM_KRNL_KEY = { "key-krnl", SW_KEY_KRNL_FILE, &params.keyKrnlFile,	PARAM_TBL::STR, NULL };
 
-PARAM_TBL PARAM_BLDR_ENC = { "enc-bldr", SW_ENC_BLDR, &params.encBldr, PARAM_TBL::BOOL,	NULL };
-PARAM_TBL PARAM_KRNL_ENC = { "enc-krnl", SW_ENC_KRNL, &params.encKrnl, PARAM_TBL::BOOL, NULL };
+PARAM_TBL PARAM_BLDR_ENC = { "enc-bldr", SW_ENC_BLDR, NULL, PARAM_TBL::FLAG, NULL };
+PARAM_TBL PARAM_KRNL_ENC = { "enc-krnl", SW_ENC_KRNL, NULL, PARAM_TBL::FLAG, NULL };
 
 // Parameter table. switch, type, variable, variable type, help string
 PARAM_TBL param_tbl[] = {
@@ -393,31 +390,40 @@ int validateArgs()
 	}
 	
 	// xcode sim size in bytes
-	if (params.simSize != 0)
+	if (params.simSize < 32)
 	{
-		// sanity check the user. 32b to 128MB
-		if (params.simSize < 32 || params.simSize > (128 * 1024 * 1024))
-		{
-			error("Error: Invalid sim size: %d\n", params.simSize);
-			return 1;
-		}
-		// check simsze is a multiple of 4
-		if (params.simSize % 4 != 0)
-		{
-			error("Error: simsize must be devisible by 4.\n");
-			return 1;
-		}
-	}	
+		params.simSize = 32;
+	}
+	if (params.simSize > (128 * 1024 * 1024)) // 128mb
+	{
+		error("Error: Invalid sim size: %d\n", params.simSize);
+		return 1;
+	}
+	if (params.simSize % 4 != 0)
+	{
+		error("Error: simsize must be devisible by 4.\n");
+		return 1;
+	}
 
 	return 0;
+}
+
+void cleanup()
+{
+	xbtool.deconstruct();
+	xb_leaks();
 }
 
 int main(int argc, char* argv[])
 {
 	int result = 0;
 
+	atexit(cleanup); // register cleanup function; called on exit()
+
+#ifndef _DEBUG
 	print(XB_BIOS_TOOL_HEADER_STR);
-	
+#endif
+
 	result = parseArgs(argc, argv);
 	if (result != 0)
 		goto Exit;
@@ -436,10 +442,6 @@ int main(int argc, char* argv[])
 
 Exit:
 
-	xbtool.deconstruct();
-
-	xb_leaks();	// check for memory leaks. All memory should be freed by now.
-
 	if (result != 0) // force exit code to be -1 if error
 	{
 		result = -1;
@@ -447,3 +449,4 @@ Exit:
 
 	return result;
 }
+

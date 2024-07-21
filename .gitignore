@@ -4,8 +4,6 @@
 
 /.vs/XboxBiosTools
 /bin
-/bios
-/keys
 *.exe
 *.pdb
 *.bin
@@ -14,3 +12,6 @@
 /XbBiosTool/objd
 /XbBiosTool/obj
 /xbios.exe.lastcodeanalysissucceeded
+*.log
+/tests/decode.ini
+/.vscode

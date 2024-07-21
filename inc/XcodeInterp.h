@@ -22,8 +22,10 @@
 #ifndef XB_XCODE_INTERP_H
 #define XB_XCODE_INTERP_H
 
+// std incl
 #include<list>
 
+// user incl
 #include "bldr.h"
 #include "type_defs.h"
 #include "xbmem.h"
@@ -62,14 +64,47 @@ enum OPCODE : UCHAR
     XC_NOP_80 =      0X80
 };
 
-struct DECODE_SETTINGS
-{   
-    struct DECODE_OPCODE
-    {
-        char* str = NULL;
-        UCHAR opcode = 0;
-    };
+typedef struct _OPCODE_VERSION_INFO
+{
+    char* str;
+    UCHAR opcode;
 
+    _OPCODE_VERSION_INFO() : str(NULL), opcode(0) { }
+    
+    _OPCODE_VERSION_INFO(const char* s, UCHAR opcode) {
+        if (s != NULL)
+        {
+            str = (char*)xb_alloc(strlen(s) + 1);
+            if (str != NULL)
+            {
+				strcpy(str, s);
+            }
+		}
+        else
+        {
+            str = NULL;
+        }
+
+        this->opcode = opcode;
+	}
+
+    ~_OPCODE_VERSION_INFO() {
+        deconstruct();
+	}
+
+    void deconstruct()
+    {
+        if (str != NULL)
+        {
+            xb_free(str);
+            str = NULL;
+        }
+    }
+
+} OPCODE_VERSION_INFO;
+
+struct DECODE_SETTINGS
+{
     char* format_str;
     char* jmp_str;
     char* no_operand_str;
@@ -78,16 +113,15 @@ struct DECODE_SETTINGS
 
     bool label_on_new_line;
     
-    DECODE_OPCODE opcodes[15];
+    OPCODE_VERSION_INFO opcodes[15];
 
-    DECODE_SETTINGS() : opcodes{ NULL }, format_str(NULL), jmp_str(NULL), no_operand_str(NULL), num_str(NULL), num_str_format(NULL), 
-        label_on_new_line(false) { }
+    DECODE_SETTINGS() : opcodes{}, format_str(NULL), jmp_str(NULL), no_operand_str(NULL), num_str(NULL), num_str_format(NULL), label_on_new_line(false) { }
 
     ~DECODE_SETTINGS() {
-        reset();
+        deconstruct();
     }
 
-    void reset()
+    void deconstruct()
     {
         if (format_str != NULL)
         {
@@ -115,13 +149,9 @@ struct DECODE_SETTINGS
 			num_str_format = NULL;
 		}
 
-        for (int i = 0; i < (sizeof(opcodes) / sizeof(DECODE_SETTINGS::DECODE_OPCODE)); i++)
+        for (int i = 0; i < (sizeof(opcodes) / sizeof(OPCODE_VERSION_INFO)); i++)
         {
-            if (opcodes[i].str != NULL)
-            {
-				xb_free(opcodes[i].str);
-                opcodes[i].str = NULL;
-			}
+            opcodes[i].deconstruct();
         }
     }
 };
@@ -146,70 +176,113 @@ typedef struct _LABEL {
             name[sizeof(name) - 1] = '\0';
         }        
     }
-    void unload()
-    {
-		offset = 0;
-        name[0] = '\0';
-    }
+
 } LABEL;
 
 struct DECODE_CONTEXT
 {
     XCODE*& xcode;
-    std::list<LABEL*>& labels;
     FILE* stream;
-    DECODE_SETTINGS& settings;
+    DECODE_SETTINGS settings;
+    std::list<LABEL*> labels;
+
+    DECODE_CONTEXT(XCODE*& xcode, FILE* stream) : xcode(xcode), stream(stream), settings(), labels() { }
+
+    ~DECODE_CONTEXT() { 
+        deconstruct();
+    }
+
+    void deconstruct()
+    {
+        // free labels
+        for (LABEL* label : labels)
+        {
+            if (label != NULL)
+            {
+                xb_free(label);
+                label = NULL;
+            }
+        }
+        labels.clear();
+
+        // free settings
+        settings.deconstruct();
+	}
 };
 
 // XcodeInterp class
 class XcodeInterp
 {
 public:
-    XcodeInterp() 
-    {
+    XcodeInterp() {
 		_size = 0;
         reset();
         _data = NULL;
     };
-    ~XcodeInterp() 
-    {
-        unload();
+    ~XcodeInterp() {
+        deconstruct();
 	};
 
     // xcode interpreter status
-    enum INTERP_STATUS : int
-    {
+    enum INTERP_STATUS : int {
         UNK =          -1, // unknown status
         DATA_OK =       0, // data ok. more data to interpret.
 	    EXIT_OP_FOUND = 1, // exit opcode found
         DATA_ERROR =    2  // data error. end of data reached.
     };
 
+    void deconstruct();                 // deconstruct the XCODE interpreter, free memory etc.
+
     int load(UCHAR* data, UINT size);   // load the XCODE data ( inittbl ) from data. returns 0 if success.    
-    void unload();                      // unload the XCODE data. returns 0 if success.
-    void reset();                       // reset the XCODE interpreter.
+    void reset();                       // reset the XCODE interpreter, set the status to UNK, set the offset to 0, set the ptr to NULL.
     
     int interpretNext(XCODE*& xcode);   // interpret the next XCODE. Stores it in xcode and cosumes it returns 0 if success.
 
-    int getAddressStr(char* str, const char* format_str);       // get the address string. Stores the string in str.
-    int getDataStr(char* str, const char* format_str);          // get the data string. Stores the string in str.
-    int getCommentStr(char* str);       // get the comment string. Stores the string in str.
+    int getAddressStr(char* str, const char* format_str);   // get the address string. Stores the string in str.
+    int getDataStr(char* str, const char* format_str);      // get the data string. Stores the string in str.
+    int getCommentStr(char* str);                           // get the comment string. Stores the string in str.
     
     XCODE* getPtr() const { return _ptr; };                 // get the current position in the XCODE data.
     UINT getOffset() const { return _offset; };             // get the offset from the start of the data to the end of the current XCODE (offset to the next XCODE)
     INTERP_STATUS getStatus() const { return _status; };    // get the status of the xcode interpreter.
 
-    int decodeXcodes();
+    // get default xcode opcode str from the provided opcode, stores it in opcode_str. returns 0 if success.
+    int getDefOpcodeStr(const UCHAR opcode, char*& opcode_str) const;
+
     int simulateXcodes();
+
+    // decode the xcode, writes it to the stream. returns 0 if success.
+    int decodeXcode(DECODE_CONTEXT& context);
+
+    // load settings from the settings file.
+    int loadini(DECODE_SETTINGS& settings) const;
+
 private:
     UCHAR* _data;           // XCODE data
     UINT _size;		        // size of the XCODE data  
     XCODE* _ptr;            // current position in the XCODE data
     UINT _offset;           // offset from the start of the data to the end of the current XCODE (offset to the next XCODE)
     INTERP_STATUS _status;  // status of the xcode interpreter
+    
+    // opcode map
+    OPCODE_VERSION_INFO opcodeMap[15] = {
+        { "nop",        XC_NOP },
+        { "mem_read",	XC_MEM_READ },
+		{ "mem_write",	XC_MEM_WRITE },
+		{ "pci_write",	XC_PCI_WRITE },
+		{ "pci_read",	XC_PCI_READ },
+		{ "and_or",		XC_AND_OR },
+		{ "use_rslt",	XC_USE_RESULT },
+		{ "jne",		XC_JNE },
+		{ "jmp",		XC_JMP },
+		{ "accum",		XC_ACCUM },
+		{ "io_write",	XC_IO_WRITE },
+		{ "io_read",	XC_IO_READ },
+		{ "nop_80",		XC_NOP_80 },
+		{ "exit",		XC_EXIT },
+		{ "nop_f5",		XC_NOP_F5 }
+    };
 
-    // decode the xcode, writes it to the stream. returns 0 if success.
-    int decodeXcode(DECODE_CONTEXT& context);
 };
 
 #endif // !XB_BIOS_XCODE_INTERP_H

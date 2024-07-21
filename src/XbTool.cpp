@@ -1,4 +1,4 @@
-// XbTool.cpp : Implements command functions for the Xbox Bios Tool.
+// XbTool.cpp : Implements command functions for the Xbox Bios Tool. Logic for each command is implemented here.
 
 /* Copyright(C) 2024 tommojphillips
  *
@@ -19,13 +19,15 @@
 // Author: tommojphillips
 // GitHub: https:\\github.com\tommojphillips
 
+// std incl
 #include "cstring"
 
+// user incl
 #include "XbTool.h"
 #include "Bios.h"
 #include "Mcpx.h"
 #include "XcodeInterp.h"
-
+#include "X86Interp.h"
 #include "type_defs.h"
 #include "file.h"
 #include "util.h"
@@ -455,6 +457,7 @@ int XbTool::combineBios()
 			banks[i] = readFile(params.bankFiles[i], &bankSizes[i]);
 			if (banks[i] == NULL) // failed to load bank
 			{
+				result = 1;
 				goto Cleanup;
 			}
 
@@ -622,6 +625,9 @@ Cleanup:
 int XbTool::decodeXcodes() const
 {
 	XcodeInterp interp = XcodeInterp();
+	XCODE* xcode;
+	DECODE_CONTEXT context = { xcode, stdout };
+
 	UCHAR* inittbl = NULL;
 	UINT size = 0;
 	int result = 0;
@@ -634,14 +640,111 @@ int XbTool::decodeXcodes() const
 	if (result != 0)
 		goto Cleanup;
 		
-	result = interp.decodeXcodes();
+	// decode phase 1
+	while (interp.interpretNext(xcode) == XcodeInterp::DATA_OK)
+	{
+		// go through the xcodes and fix up jmp offsets.
+
+		if (xcode->opcode != XC_JMP && xcode->opcode != XC_JNE)
+			continue;
+
+		// calculate the offset and set the data to the offset.
+
+		bool isLabel = false;
+		UINT labelOffset = interp.getOffset() + xcode->data;
+
+		// Fix up the xcode data to the offset for phase 2 decoding
+		xcode->data = labelOffset;
+
+		// check if offset is already a label
+		for (LABEL* label : context.labels)
+		{
+			if (label->offset == labelOffset)
+			{
+				isLabel = true;
+				break;
+			}
+		}
+
+		// label does not exist. create one.
+		if (!isLabel)
+		{
+			char str[16] = { 0 };
+			format(str, "lb_%02d", context.labels.size());
+
+			LABEL* label_ptr = (LABEL*)xb_alloc(sizeof(LABEL));
+			if (label_ptr == NULL)
+			{
+				result = 1;
+				goto Cleanup;
+			}
+			label_ptr->load(labelOffset, str);
+
+			context.labels.push_back(label_ptr);
+		}
+	}
+
+	if (interp.getStatus() == XcodeInterp::DATA_ERROR)
+	{
+		error("Error: Failed to decode xcodes\n");
+		result = 1;
+		goto Cleanup;
+	}
+
+	// load the decode settings from the ini file
+	if (interp.loadini(context.settings) != 0)
+	{
+		result = 1;
+		goto Cleanup;
+	}
+
+	// setup the file stream, if -d flag is set
+	if ((params.sw_flag & SW_DMP) != 0)
+	{
+		const char* filename = params.outFile;
+		if (filename == NULL)
+		{
+			filename = "xcodes.txt";
+		}
+
+		// del file if it exists		
+		deleteFile(filename);
+
+		print("Writing decoded xcodes to %s (text format)\n", filename, interp.getOffset());
+		context.stream = fopen(filename, "w");
+		if (context.stream == NULL)
+		{
+			error("Error: Failed to open file %s\n", filename);
+			result = 1;
+			goto Cleanup;
+		}
+	}
+
+	print("xcodes: %d ( %ld bytes )\n", interp.getOffset() / sizeof(XCODE), interp.getOffset());
+
+	// decode phase 2
+
+	interp.reset();
+	while (interp.interpretNext(xcode) == XcodeInterp::DATA_OK)
+	{
+		interp.decodeXcode(context);
+	}
+
+	if ((params.sw_flag & SW_DMP) != 0)
+	{
+		fclose(context.stream);
+		print("Done\n");
+	}
 
 Cleanup:
 
 	if (inittbl != NULL)
 	{
 		xb_free(inittbl);
-	}	
+	}
+
+	context.deconstruct();
+	interp.deconstruct();
 
 	return result;
 }
@@ -649,9 +752,14 @@ Cleanup:
 int XbTool::simulateXcodes() const
 {
 	XcodeInterp interp = XcodeInterp();
-	UCHAR* inittbl = NULL;
+	XCODE* xcode = NULL;
+	
 	UINT size = 0;
 	int result = 0;
+	bool hasMemChanges_total = false;
+	char* opcode_str = NULL;
+	UCHAR* mem_sim = NULL;
+	UCHAR* inittbl = NULL;
 
 	inittbl = load_init_tbl_file(size);
 	if (inittbl == NULL)
@@ -661,7 +769,91 @@ int XbTool::simulateXcodes() const
 	if (result != 0)
 		goto Cleanup;
 
-	result = interp.simulateXcodes();
+	print("mem space: %d bytes\n\n", params.simSize);
+
+	mem_sim = (UCHAR*)xb_alloc(params.simSize);
+	if (mem_sim == NULL)
+	{
+		result = 1;
+		goto Cleanup;
+	}
+
+	// simulate memory output
+	hasMemChanges_total = false;
+	print("xcode sim:\n");
+	while (interp.interpretNext(xcode) == 0)
+	{
+		// only care about xcodes that write to RAM
+		if (xcode->opcode != XC_MEM_WRITE)
+			continue;
+
+		// sanity check of addr.
+		if (xcode->addr < 0 || xcode->addr >= params.simSize)
+		{
+			continue;
+		}
+		hasMemChanges_total = true;
+
+		// write the data to simulated memory
+		xb_cpy(mem_sim + xcode->addr, (UCHAR*)&xcode->data, 4);
+
+		if (interp.getDefOpcodeStr(xcode->opcode, opcode_str) != 0)
+		{
+			error("Error: Unknown opcode %X\n", xcode->opcode);
+			result = 1;
+			goto Cleanup;
+		}
+
+		// print the xcode
+		print("%04x: %s 0x%02x, 0x%08X\n", (XCODE_BASE + interp.getOffset() - sizeof(XCODE)), opcode_str, xcode->addr, xcode->data);
+	}
+
+	if (interp.getStatus() != XcodeInterp::EXIT_OP_FOUND)
+	{
+		result = 1;
+		goto Cleanup;
+	}
+
+	if (!hasMemChanges_total)
+	{
+		print("No Memory changes in range 0x0 - 0x%x\n", params.simSize);
+		goto Cleanup;
+	}
+
+	// decode the x86 instructions.
+	result = decodeX86(mem_sim, params.simSize, stdout);
+	if (result != 0)
+	{
+		error("Error: Failed to decode x86 instructions\n");
+		goto Cleanup;
+	}
+
+	print("size of code: %d bytes\n", params.simSize);
+
+	// if -d flag is set, dump the memory to a file, otherwise print the memory dump
+	if ((params.sw_flag & SW_DMP) != 0)
+	{
+		const char* filename = params.outFile;
+		if (filename == NULL)
+			filename = "mem_sim.bin";
+
+		print("\nWriting memory dump to %s (%d bytes)\n", filename, size);
+		if (writeFile(filename, mem_sim, size) != 0)
+		{
+			result = 1;
+			goto Cleanup;
+		}
+	}
+	else
+	{
+		// print memory dump
+		print("\nmem dump:\n");
+		for (UINT i = 0; i < params.simSize; i += 8)
+		{
+			print("%04x: ", i);
+			printData(mem_sim + i, 8);
+		}
+	}
 
 Cleanup:
 
@@ -670,7 +862,12 @@ Cleanup:
 		xb_free(inittbl);
 	}
 
-	interp.unload();
+	if (mem_sim != NULL)
+	{
+		xb_free(mem_sim);
+	}
+
+	interp.deconstruct();
 
 	return result;
 }
@@ -767,8 +964,7 @@ int XbTool::readKeys()
 		if (params.keyBldr == NULL)
 			return 1;
 		print("bldr key: ");
-		printData(params.keyBldr, KEY_SIZE, false);
-		print("%s\n", !params.encBldr ? " ( -enc-bldr )" : "");
+		printData(params.keyBldr, KEY_SIZE);
 	}
 
 	if (params.keyKrnlFile != NULL)
@@ -778,8 +974,7 @@ int XbTool::readKeys()
 		if (params.keyKrnl == NULL)
 			return 1;
 		print("krnl key: ");
-		printData(params.keyKrnl, KEY_SIZE, false);
-		print("%s\n", !params.encKrnl ? " ( -enc-krnl )" : "");
+		printData(params.keyKrnl, KEY_SIZE);
 	}
 
 	if (params.keyBldr != NULL || params.keyKrnl != NULL)

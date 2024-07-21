@@ -146,6 +146,7 @@
     <ClCompile Include="..\src\rc4.cpp" />
     <ClCompile Include="..\src\sha1.cpp" />
     <ClCompile Include="..\src\util.cpp" />
+    <ClCompile Include="..\src\X86Interp.cpp" />
     <ClCompile Include="..\src\xbmem.cpp" />
     <ClCompile Include="..\src\Bios.cpp" />
     <ClCompile Include="..\src\XbTool.cpp" />
@@ -162,6 +163,7 @@
     <ClInclude Include="..\inc\type_defs.h" />
     <ClInclude Include="..\inc\util.h" />
     <ClInclude Include="..\inc\version.h" />
+    <ClInclude Include="..\inc\X86Interp.h" />
     <ClInclude Include="..\inc\xbmem.h" />
     <ClInclude Include="..\inc\bldr.h" />
     <ClInclude Include="..\inc\help_strings.h" />

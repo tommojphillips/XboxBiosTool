@@ -1,4 +1,4 @@
-// Bios.cpp: defines functions for handling bios data
+// Bios.cpp: Implements functions for loading an Original Xbox BIOS file, decrypting it, and extracting the bootloader, kernel, and other data.
  
 /* Copyright(C) 2024 tommojphillips
  * 
@@ -261,10 +261,17 @@ int Bios::load(UCHAR* data, const UINT size)
 	_bios = data;
 	_size = size;
 	_buffersize = _size;
+
+	// check size
+	if (checkSize(size) != 0)
+	{
+		error("Error: Invalid bios size, expecting 256Kb, 512Kb or 1Mb bios file.\n");
+		return BIOS_LOAD_STATUS_FAILED;
+	}
 	
 	// set encryption states based on user input.
-	_isBldrEncrypted = params.encBldr;
-	_isKernelEncrypted = params.encKrnl;
+	_isBldrEncrypted = (params.sw_flag & SW_ENC_BLDR) == 0;
+	_isKernelEncrypted = (params.sw_flag & SW_ENC_KRNL) == 0;
 
 	getOffsets();
 
@@ -824,8 +831,10 @@ int Bios::create(UCHAR* in_bl, UINT in_blSize, UCHAR* in_tbl, UINT in_tblSize, U
 	_buffersize = params.binsize;
 
 	// set encryption states.
-	_isBldrEncrypted = !params.encBldr;
-	_isKernelEncrypted = ((params.encKrnl && params.keyKrnl == NULL) || (!params.encKrnl && params.keyKrnl != NULL));
+	// is flag set = encrypted
+	_isBldrEncrypted = (params.sw_flag & SW_ENC_BLDR) != 0;
+	// is flag set = not encrypted ; key provided = encrypted ; flag set + key provided = not encrypted
+	_isKernelEncrypted = (((params.sw_flag & SW_ENC_KRNL) == 0 && params.keyKrnl == NULL) || ((params.sw_flag & SW_ENC_KRNL) != 0 && params.keyKrnl != NULL)); 
 
 	getOffsets();
 

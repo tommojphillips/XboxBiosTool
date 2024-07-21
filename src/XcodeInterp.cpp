@@ -19,18 +19,14 @@
 // Author: tommojphillips
 // GitHub: https:\\github.com\tommojphillips
 
-// std incl
-#include <cstring>
-
 // user incl
 #include "XcodeInterp.h"
-#include "XbTool.h"
 #include "file.h"
 #include "util.h"
 
 #define IS_NEG_TRUE(x, y) (y < 0 ? true : x == y)
 
-#define XC_WRITE_MASK(i, xc_cmd, xc_addr, addr_mask, xc_data) (((UCHAR*)(_ptr+i)) > _data) && ((_ptr+i)->opcode == xc_cmd && ((_ptr+i)->addr & addr_mask) == xc_addr && IS_NEG_TRUE((_ptr+i)->data, xc_data))
+#define XC_WRITE_MASK(i, xc_cmd, xc_addr, addr_mask, xc_data) (((UCHAR*)(_ptr+i)) >= _data) && ((_ptr+i)->opcode == xc_cmd && ((_ptr+i)->addr & addr_mask) == xc_addr && IS_NEG_TRUE((_ptr+i)->data, xc_data))
 #define XC_WRITE(i, xc_cmd, xc_addr, xc_data) XC_WRITE_MASK(i, xc_cmd, xc_addr, 0xFFFFFFFF, xc_data)
 
 // write comment base on current xcode and address mask.
@@ -100,8 +96,6 @@
 			return 0; \
 		}
 
-extern Parameters& params;
-
 int XcodeInterp::load(UCHAR* data, UINT size)
 {
 	if (_data != NULL)
@@ -125,7 +119,7 @@ int XcodeInterp::load(UCHAR* data, UINT size)
 	return 0;
 }
 
-void XcodeInterp::unload()
+void XcodeInterp::deconstruct()
 {
 	_size = 0;
 	reset();
@@ -134,6 +128,11 @@ void XcodeInterp::unload()
 	{
 		xb_free(_data);
 		_data = NULL;
+	}
+
+	for (int i = 0; i < (sizeof(opcodeMap) / sizeof(OPCODE_VERSION_INFO)); i++)
+	{
+		opcodeMap[i].deconstruct();
 	}
 }
 
@@ -180,43 +179,18 @@ int XcodeInterp::interpretNext(XCODE*& xcode)
 	return 0;
 }
 
-const char* getDefOpcodeStr(const UCHAR opcode)
+int XcodeInterp::getDefOpcodeStr(const UCHAR opcode, char*& opcode_str) const
 {
-	switch (opcode)
+	for (int i = 0; i < sizeof(opcodeMap) / sizeof(OPCODE_VERSION_INFO); i++)
 	{
-	case XC_MEM_READ:
-		return "mem_read";
-	case XC_MEM_WRITE:
-		return "mem_write";
-	case XC_PCI_WRITE:
-		return "pci_write";
-	case XC_PCI_READ:
-		return "pci_read";
-	case XC_AND_OR:
-		return "and_or";
-	case XC_USE_RESULT:
-		return "use_rslt";
-	case XC_JNE:
-		return "jne";
-	case XC_JMP:
-		return "jmp";
-	case XC_ACCUM:
-		return "accum";
-	case XC_IO_WRITE:
-		return "io_write";
-	case XC_IO_READ:
-		return "io_read";
-	case XC_EXIT:
-		return "exit";
-	case XC_NOP:
-		return "nop";
-	case XC_NOP_F5:
-		return "nop_f5";
-	case XC_NOP_80:
-		return "nop_80";
-	default:
-		return NULL;
+		if (opcodeMap[i].opcode == opcode)
+		{
+			opcode_str = opcodeMap[i].str;
+			return 0;
+		}
 	}
+	opcode_str = NULL;
+	return 1;
 }
 
 int XcodeInterp::getAddressStr(char* str, const char* format_str)
@@ -228,7 +202,7 @@ int XcodeInterp::getAddressStr(char* str, const char* format_str)
 	}
 
 	const UCHAR opcode = _ptr->opcode;
-	const char* opcode_str;
+	char* opcode_str;
 
 	// opcodes that dont use addr field
 	switch (opcode)
@@ -237,8 +211,7 @@ int XcodeInterp::getAddressStr(char* str, const char* format_str)
 			str[0] = '\0';
 			return 1;
 		case XC_USE_RESULT:
-			opcode_str = getDefOpcodeStr(_ptr->addr);
-			if (opcode_str != NULL)
+			if (getDefOpcodeStr(_ptr->addr, opcode_str) == 0)
 			{
 				sprintf(str, "%s", opcode_str);
 				break;
@@ -375,6 +348,7 @@ int XcodeInterp::getCommentStr(char* str)
 	return 0;
 }
 
+// load ini file helper function
 static int ll(char* output, char* str, UINT i, UINT& j, UINT len)
 {
 	if (len < 1)
@@ -403,7 +377,20 @@ static int ll(char* output, char* str, UINT i, UINT& j, UINT len)
 
 	return 0;
 }
-int loadini(DECODE_SETTINGS& settings)
+// set setting value helper function
+static void setSettingValue(char** setting, const char* value, UINT len)
+{
+	if (*setting != NULL)  // setting already set, skip
+		return;
+
+	*setting = (char*)xb_alloc(len + 1);
+	if (*setting == NULL)
+		return;
+
+	strcpy(*setting, value);
+}
+
+int XcodeInterp::loadini(DECODE_SETTINGS& settings) const
 {
 	const char* filename = "decode.ini";
 	FILE* stream = fopen(filename, "r");
@@ -420,14 +407,11 @@ int loadini(DECODE_SETTINGS& settings)
 	char* key = NULL;
 	char* value = NULL;
 
-	UINT valueLen = 0;
 	UINT len = 0;
 	UINT i, j;
+	UCHAR k;
+
 	int result = 0;
-
-	char* repl = NULL;
-
-	const int OK = 0;
 
 	const int ERROR_INVALID_KEY = 3;
 	const int ERROR_INVALID_VALUE = 4;
@@ -454,244 +438,121 @@ int loadini(DECODE_SETTINGS& settings)
 		value = strtok(NULL, delim);
 		if (value == NULL)
 			continue;
-		valueLen = strlen(value);
+		len = strlen(value);
 		ltrim(value);
-		if (value[valueLen - 1] == '\n')
-			value[valueLen - 1] = '\0';
+		if (value[len - 1] == '\n')
+			value[len - 1] = '\0';
 		rtrim(value);
 
 		// cmp key and set values.
 
 		strcpy(buf, key);
-		repl = NULL;
 
 		if (strcmp(buf, "format_str") == 0)
 		{
-			if (settings.format_str != NULL)
-				continue;
-			settings.format_str = (char*)xb_alloc(valueLen + 1);
-			if (settings.format_str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.format_str;
+			setSettingValue(&settings.format_str, value, len);
 		}
 		else if (strcmp(buf, "jmp_str") == 0)
 		{
-			if (settings.jmp_str != NULL)
-				continue;
-			settings.jmp_str = (char*)xb_alloc(valueLen + 1);
-			if (settings.jmp_str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.jmp_str;
+			setSettingValue(&settings.jmp_str, value, len);
 		}
 		else if (strcmp(buf, "no_operand_str") == 0)
 		{
-			if (settings.no_operand_str != NULL)
-				continue;
-			settings.no_operand_str = (char*)xb_alloc(valueLen + 1);
-			if (settings.no_operand_str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.no_operand_str;
+			setSettingValue(&settings.no_operand_str, value, len);
 		}
 		else if (strcmp(buf, "num_str") == 0)
 		{
-			if (settings.num_str != NULL)
-				continue;
-			settings.num_str = (char*)xb_alloc(valueLen + 1);
-			if (settings.num_str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.num_str;
+			setSettingValue(&settings.num_str, value, len);
 		}
 		else if (strcmp(buf, "xc_nop") == 0)
 		{
 			// nop opcode
 			settings.opcodes[0].opcode = XC_NOP;
-			settings.opcodes[0].str = (char*)xb_alloc(valueLen + 1);
-			if (settings.opcodes[0].str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.opcodes[0].str;
+			setSettingValue(&settings.opcodes[0].str, value, len);
 		}
 		else if (strcmp(buf, "xc_mem_read") == 0)
 		{
 			// mem_read opcode
 			settings.opcodes[1].opcode = XC_MEM_READ;
-			settings.opcodes[1].str = (char*)xb_alloc(valueLen + 1);
-			if (settings.opcodes[1].str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.opcodes[1].str;
+			setSettingValue(&settings.opcodes[1].str, value, len);
 		}
 		else if (strcmp(buf, "xc_mem_write") == 0)
 		{
 			// mem_write opcode
 			settings.opcodes[2].opcode = XC_MEM_WRITE;
-			settings.opcodes[2].str = (char*)xb_alloc(valueLen + 1);
-			if (settings.opcodes[2].str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.opcodes[2].str;
+			setSettingValue(&settings.opcodes[2].str, value, len);
 		}
 		else if (strcmp(buf, "xc_pci_write") == 0)
 		{
 			// pci_write opcode
 			settings.opcodes[3].opcode = XC_PCI_WRITE;
-			settings.opcodes[3].str = (char*)xb_alloc(valueLen + 1);
-			if (settings.opcodes[3].str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.opcodes[3].str;
+			setSettingValue(&settings.opcodes[3].str, value, len);
 		}
 		else if (strcmp(buf, "xc_pci_read") == 0)
 		{
 			// pci_read opcode
 			settings.opcodes[4].opcode = XC_PCI_READ;
-			settings.opcodes[4].str = (char*)xb_alloc(valueLen + 1);
-			if (settings.opcodes[4].str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.opcodes[4].str;
+			setSettingValue(&settings.opcodes[4].str, value, len);
 		}
 		else if (strcmp(buf, "xc_and_or") == 0)
 		{
 			// and_or opcode
 			settings.opcodes[5].opcode = XC_AND_OR;
-			settings.opcodes[5].str = (char*)xb_alloc(valueLen + 1);
-			if (settings.opcodes[5].str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.opcodes[5].str;
+			setSettingValue(&settings.opcodes[5].str, value, len);
 		}
 		else if (strcmp(buf, "xc_use_result") == 0)
 		{
 			// use_result opcode
 			settings.opcodes[6].opcode = XC_USE_RESULT;
-			settings.opcodes[6].str = (char*)xb_alloc(valueLen + 1);
-			if (settings.opcodes[6].str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.opcodes[6].str;
+			setSettingValue(&settings.opcodes[6].str, value, len);
 		}
 		else if (strcmp(buf, "xc_jne") == 0)
 		{
 			// jne opcode
 			settings.opcodes[7].opcode = XC_JNE;
-			settings.opcodes[7].str = (char*)xb_alloc(valueLen + 1);
-			if (settings.opcodes[7].str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.opcodes[7].str;
+			setSettingValue(&settings.opcodes[7].str, value, len);
 		}
 		else if (strcmp(buf, "xc_jmp") == 0)
 		{
 			// jmp opcode
 			settings.opcodes[8].opcode = XC_JMP;
-			settings.opcodes[8].str = (char*)xb_alloc(valueLen + 1);
-			if (settings.opcodes[8].str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.opcodes[8].str;
+			setSettingValue(&settings.opcodes[8].str, value, len);
 		}
 		else if (strcmp(buf, "xc_accum") == 0)
 		{
 			// accum opcode
 			settings.opcodes[9].opcode = XC_ACCUM;
-			settings.opcodes[9].str = (char*)xb_alloc(valueLen + 1);
-			if (settings.opcodes[9].str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.opcodes[9].str;
+			setSettingValue(&settings.opcodes[9].str, value, len);
 		}
 		else if (strcmp(buf, "xc_io_write") == 0)
 		{
 			// io_write opcode
 			settings.opcodes[10].opcode = XC_IO_WRITE;
-			settings.opcodes[10].str = (char*)xb_alloc(valueLen + 1);
-			if (settings.opcodes[10].str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.opcodes[10].str;
+			setSettingValue(&settings.opcodes[10].str, value, len);
 		}
 		else if (strcmp(buf, "xc_io_read") == 0)
 		{
 			// io_read opcode
 			settings.opcodes[11].opcode = XC_IO_READ;
-			settings.opcodes[11].str = (char*)xb_alloc(valueLen + 1);
-			if (settings.opcodes[11].str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.opcodes[11].str;
+			setSettingValue(&settings.opcodes[11].str, value, len);
 		}
 		else if (strcmp(buf, "xc_nop_f5") == 0)
 		{
 			// nop_f5 opcode
 			settings.opcodes[12].opcode = XC_NOP_F5;
-			settings.opcodes[12].str = (char*)xb_alloc(valueLen + 1);
-			if (settings.opcodes[12].str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.opcodes[12].str;
+			setSettingValue(&settings.opcodes[12].str, value, len);
 		}
 		else if (strcmp(buf, "xc_exit") == 0)
 		{
 			// exit opcode
 			settings.opcodes[13].opcode = XC_EXIT;
-			settings.opcodes[13].str = (char*)xb_alloc(valueLen + 1);
-			if (settings.opcodes[13].str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.opcodes[13].str;
+			setSettingValue(&settings.opcodes[13].str, value, len);
 		}		 
 		else if (strcmp(buf, "xc_nop_80") == 0)
 		{
 			// nop_80 opcode
 			settings.opcodes[14].opcode = XC_NOP_80;
-			settings.opcodes[14].str = (char*)xb_alloc(valueLen + 1);
-			if (settings.opcodes[14].str == NULL)
-			{
-				result = ERROR_OUT_OF_MEMORY;
-				goto Cleanup;
-			}
-			repl = settings.opcodes[14].str;
+			setSettingValue(&settings.opcodes[14].str, value, len);
 		}		
 		else if (strcmp(buf, "label_on_new_line") == 0)
 		{
@@ -715,12 +576,6 @@ int loadini(DECODE_SETTINGS& settings)
 			result = ERROR_INVALID_KEY;
 			goto Cleanup;
 		}
-
-		if (repl != NULL)
-		{
-			strcpy(repl, value);
-			print("%s: '%s'\n", buf, value);
-		}
 	}
 
 	// verify settings
@@ -730,7 +585,7 @@ int loadini(DECODE_SETTINGS& settings)
 	{
 		// format_str may contain '{offset}' '{op}' '{addr}' '{data}' '{comment}'
 		
-		const char* repl1 = NULL;
+		const char* repl = NULL;
 		len = strlen(settings.format_str);
 		for (i = 0; i < len; i++)
 		{
@@ -748,23 +603,23 @@ int loadini(DECODE_SETTINGS& settings)
 
 			if (strcmp(buf, "{op}") == 0)
 			{
-				repl1 = "{2}";
+				repl = "{2}";
 			}
 			else if (strcmp(buf, "{addr}") == 0)
 			{
-				repl1 = "{3}";
+				repl = "{3}";
 			}
 			else if (strcmp(buf, "{data}") == 0)
 			{
-				repl1 = "{4}";
+				repl = "{4}";
 			}
 			else if (strcmp(buf, "{comment}") == 0)
 			{
-				repl1 = "{5}";
+				repl = "{5}";
 			}
 			else if (strcmp(buf, "{offset}") == 0)
 			{
-				repl1 = "{1}";
+				repl = "{1}";
 			}
 			else
 			{
@@ -772,12 +627,12 @@ int loadini(DECODE_SETTINGS& settings)
 				goto Cleanup;
 			}
 
-			xb_cpy(settings.format_str + i, repl1, 3);
+			xb_cpy(settings.format_str + i, repl, 3);
 		}		
 	}
 	else
 	{
-		settings.format_str = (char*)xb_alloc(100);
+		settings.format_str = (char*)xb_alloc(22);
 		if (settings.format_str == NULL)
 		{
 			result = ERROR_OUT_OF_MEMORY;
@@ -820,7 +675,7 @@ int loadini(DECODE_SETTINGS& settings)
 	}
 	else
 	{
-		settings.jmp_str = (char*)xb_alloc(32);
+		settings.jmp_str = (char*)xb_alloc(6);
 		if (settings.jmp_str == NULL)
 		{
 			result = ERROR_OUT_OF_MEMORY;
@@ -891,7 +746,7 @@ int loadini(DECODE_SETTINGS& settings)
 	}
 	else
 	{
-		settings.num_str = (char*)xb_alloc(32);
+		settings.num_str = (char*)xb_alloc(8);
 		if (settings.num_str == NULL)
 		{
 			result = ERROR_OUT_OF_MEMORY;
@@ -913,16 +768,16 @@ int loadini(DECODE_SETTINGS& settings)
 	}
 
 	// default opcodes
-	j = 0;
-	for (i = 0; i < (sizeof(settings.opcodes) / sizeof(DECODE_SETTINGS::DECODE_OPCODE)); i++)
+	k = 0;
+	for (i = 0; i < (sizeof(settings.opcodes) / sizeof(OPCODE_VERSION_INFO)); i++)
 	{
 		if (settings.opcodes[i].str == NULL)
 		{
 			// find next valid opcode
-			OPCODE opcode;
-			const char* str = NULL;
+			UCHAR opcode;
+			char* str = NULL;
 
-			while ((opcode = (OPCODE)j) < 255 && (str = getDefOpcodeStr(j++)) == NULL); // find next valid opcode (range 0-255)
+			while ((opcode = k) < 255 && getDefOpcodeStr(k++, str) != 0); // find next valid opcode (range 0-255)
 
 			if (str == NULL)
 			{
@@ -970,14 +825,11 @@ int XcodeInterp::decodeXcode(DECODE_CONTEXT& context)
 	char* str_opcode = NULL;
 
 	char str_label[16] = { 0 };
-
 	char str_addr[15 + 1] = { 0 };
 	char str_data[15 + 1] = { 0 };
-
 	char str_comment[64] = { 0 };
 	char str_offset[6 + 1] = { 0 };
 	char str_decode[128] = { 0 };
-
 	char str_num[15 + 1] = { 0 };
 
 	// check if offset should be a label
@@ -1004,7 +856,7 @@ int XcodeInterp::decodeXcode(DECODE_CONTEXT& context)
 	print_f(str_num, sizeof(str_num), context.settings.num_str, context.settings.num_str_format);
 
 	// get the opcode string
-	for (int i = 0; i < (sizeof(context.settings.opcodes) / sizeof(DECODE_SETTINGS::DECODE_OPCODE)); i++)
+	for (int i = 0; i < (sizeof(context.settings.opcodes) / sizeof(OPCODE_VERSION_INFO)); i++)
 	{
 		if (context.settings.opcodes[i].opcode == context.xcode->opcode)
 		{
@@ -1073,338 +925,4 @@ int XcodeInterp::decodeXcode(DECODE_CONTEXT& context)
 	print(context.stream, "%s%s\n", &str_label, &str_decode);
 
 	return 0;
-}
-
-int XcodeInterp::decodeXcodes()
-{
-	int result = 0;
-	XCODE* xcode;
-	std::list<LABEL*> labels;
-	DECODE_SETTINGS settings;
-	DECODE_CONTEXT context = { xcode, labels, stdout, settings };
-
-	// decode phase 1
-	while (interpretNext(xcode) == INTERP_STATUS::DATA_OK)
-	{
-		// go through the xcodes and fix up jmp offsets.
-
-		if (xcode->opcode != XC_JMP && xcode->opcode != XC_JNE)
-			continue;
-
-		// calculate the offset and set the data to the offset.
-
-		bool isLabel = false;
-		UINT labelOffset = _offset + xcode->data;
-
-		// Fix up the xcode data to the offset for phase 2 decoding
-		xcode->data = labelOffset;
-
-		// check if offset is already a label
-		for (LABEL* label : labels)
-		{
-			if (label->offset == labelOffset)
-			{
-				isLabel = true;
-				break;
-			}
-		}
-
-		// label does not exist. create one.
-		if (!isLabel)
-		{
-			char str[16] = { 0 };
-			format(str, "lb_%02d", labels.size());
-
-			LABEL* label_ptr = (LABEL*)xb_alloc(sizeof(LABEL));
-			if (label_ptr == NULL)
-			{
-				result = 1;
-				goto Cleanup;
-			}
-			label_ptr->load(labelOffset, str);
-
-			labels.push_back(label_ptr);
-		}
-	}
-
-	if (_status == XcodeInterp::DATA_ERROR)
-	{
-		error("Error: Failed to decode xcodes\n");
-		result = 1;
-		goto Cleanup;
-	}
-	
-	// load the decode settings from the ini file
-	if (loadini(settings) != 0)
-	{
-		// reset strings
-		settings.reset();
-		
-		result = 1;
-		goto Cleanup;
-	}
-	
-	// setup the file stream, if -d flag is set
-	if ((params.sw_flag & SW_DMP) != 0)
-	{
-		const char* filename = params.outFile;
-		if (filename == NULL)
-		{
-			filename = "xcodes.txt";
-		}
-
-		// del file if it exists		
-		deleteFile(filename);
-
-		print("Writing decoded xcodes to %s (text format)\n", filename, _offset);
-		context.stream = fopen(filename, "w");
-		if (context.stream == NULL)
-		{
-			error("Error: Failed to open file %s\n", filename);
-			result = 1;
-			goto Cleanup;
-		}
-	}
-
-	print("xcodes: %d ( %ld bytes )\n", _offset / sizeof(XCODE), _offset);
-	
-	// decode phase 2
-
-	reset();
-	while (interpretNext(xcode) == INTERP_STATUS::DATA_OK)
-	{
-		decodeXcode(context);
-	}
-
-	if ((params.sw_flag & SW_DMP) != 0)
-	{
-		fclose(context.stream);
-		print("Done\n");
-	}
-
-Cleanup:
-	// free the labels
-	for (LABEL* label : labels)
-	{
-		if (label != NULL)
-		{
-			label->unload();
-			xb_free(label);
-			label = NULL;
-		}
-	}
-	labels.clear();
-
-	return result;
-}
-
-int XcodeInterp::simulateXcodes()
-{
-	// load the inittbl file
-
-	typedef struct X86_INSTR
-	{
-		USHORT opcode;
-		const char* asm_instr;
-		UINT opcode_len;
-		UINT instr_len;
-		bool uses_operand = false;
-		const char* data_str = NULL;
-	} X86_INSTR;
-
-	const char* PTR_DATA_STR = ", [0x%08x]";
-	const char* NUM_DATA_STR = ", 0x%08x";
-
-	const X86_INSTR instrs[] = {
-		{ 0x1D8B, "mov ebx", 2, 6, true, PTR_DATA_STR },
-		{ 0x0D8B, "mov ecx", 2, 6, true, PTR_DATA_STR },
-		{ 0x158B, "mov edx", 2, 6, true, PTR_DATA_STR },
-
-		{ 0xE0FF, "jmp eax", 2, 2 },
-		{ 0xE1FF, "jmp ecx", 2, 2 },
-		{ 0xE2FF, "jmp edx", 2, 2 },
-		{ 0xE3FF, "jmp ebx", 2, 2 },
-		{ 0xE4FF, "jmp esp", 2, 2 },
-		{ 0xE5FF, "jmp ebp", 2, 2 },
-		{ 0xE6FF, "jmp esi", 2, 2 },
-		{ 0xE7FF, "jmp edi", 2, 2 },
-
-		{ 0xA5F3, "rep movsd", 2, 2 },
-
-		{ 0xB8, "mov eax", 1, 5, true },
-		{ 0xB9, "mov ecx", 1, 5, true },
-		{ 0xBA, "mov edx", 1, 5, true },
-		{ 0xBB, "mov ebx", 1, 5, true },
-		{ 0xBC, "mov esp", 1, 5, true },
-		{ 0xBD, "mov ebp", 1, 5, true },
-		{ 0xBE, "mov esi", 1, 5, true },
-		{ 0xBF, "mov edi", 1, 5, true },
-		{ 0xA1, "mov eax", 1, 5, true, PTR_DATA_STR },
-
-		{ 0xEA, "jmp far", 1, 6, true },
-		{ 0x90, "nop", 1, 1 },
-		{ 0xFC, "cld", 1, 1 }
-	};
-
-	const UINT memSize = (params.simSize > 0) ? params.simSize : 32;
-	const UINT MAX_INSTR_SIZE = 6;
-
-	const UCHAR zero_mem[MAX_INSTR_SIZE] = { 0 };
-
-	char str_operand[16] = { 0 };
-	char str_instr[32] = { 0 };
-
-	UINT operand = 0;
-	UINT operandLen = 0;
-
-	int result = 0;
-
-	bool hasMemChanges_total = false;	
-	bool found = false;
-	bool unkInstrs = false;
-
-	UCHAR* mem_sim = NULL;
-	XCODE* xcode = NULL;
-	
-	UINT i, j, dumpTo;
-	
-	print("mem space: %d bytes\n\n", memSize);
-
-	mem_sim = (UCHAR*)xb_alloc(memSize);
-	if (mem_sim == NULL)
-	{
-		result = 1;
-		goto Cleanup;
-	}
-
-	// simulate memory output
-	hasMemChanges_total = false;
-	print("xcode sim:\n");
-	while (interpretNext(xcode) == 0)
-	{
-		// only care about xcodes that write to RAM
-		if (xcode->opcode != XC_MEM_WRITE)
-			continue;
-
-		// sanity check of addr.
-		if (xcode->addr < 0 || xcode->addr >= memSize)
-		{
-			continue;
-		}
-		hasMemChanges_total = true;
-
-		// write the data to simulated memory
-		xb_cpy(mem_sim + xcode->addr, (UCHAR*)&xcode->data, 4);
-
-		// print the xcode
-
-		print("%04x: %s 0x%02x, 0x%08X\n", (XCODE_BASE + _offset - sizeof(XCODE)), getDefOpcodeStr(xcode->opcode), xcode->addr, xcode->data);
-	}
-
-	if (_status != XcodeInterp::EXIT_OP_FOUND)
-	{
-		result = 1;
-		goto Cleanup;
-	}
-
-	if (!hasMemChanges_total)
-	{
-		print("No Memory changes in range 0x0 - 0x%x\n", memSize);
-		goto Cleanup;
-	}
-
-	// after successful simulation, look for some x86 32-bit instructions.
-
-	print("\nx86 32-bit instructions:\n");
-
-	for (i = 0; i < memSize;)
-	{
-		// check if the next [max_instr_size] bytes are zero, if so we are done.
-		if (xb_cmp(mem_sim + i, zero_mem, (i < memSize - MAX_INSTR_SIZE ? MAX_INSTR_SIZE : memSize - i)) == 0)
-			break;
-
-		// iterate through the x86 instructions
-		for (j = 0; j < sizeof(instrs) / sizeof(X86_INSTR); j++)
-		{
-			if (xb_cmp(mem_sim + i, (UCHAR*)&instrs[j].opcode, instrs[j].opcode_len) == 0)
-			{
-				xb_zero(str_instr, sizeof(str_instr));
-				format(str_instr, "%04x: %s", i, instrs[j].asm_instr);
-
-				if (instrs[j].uses_operand)
-				{
-					operand = 0;
-					operandLen = instrs[j].instr_len - instrs[j].opcode_len;
-					if (operandLen > 4) // UINT is 4 bytes
-						operandLen = 4;
-
-					// to-do: fix jmp far operand. currently only supports 4 byte operand single operand instructions.
-
-					xb_cpy(&operand, (UCHAR*)(mem_sim + i + instrs[j].opcode_len), operandLen);
-					format(str_operand, instrs[j].data_str == NULL ? NUM_DATA_STR : instrs[j].data_str, operand);
-					strcat(str_instr, str_operand);
-				}
-				strcat(str_instr, "\n");
-
-				print(str_instr);
-
-				i += instrs[j].instr_len;
-				found = true;
-				break;
-			}
-		}
-		if (found)
-			continue;
-
-		// x86 op not found
-		error("Error: Unknown x86 instruction at offset %04x, INSTR: %02X\n", i, mem_sim[i]);
-		i++;
-		unkInstrs = true;
-	}
-	dumpTo = i; // save the offset to dump to
-
-	print("size of code: %d bytes\n", dumpTo);
-
-	// if -d flag is set, dump the memory to a file, otherwise print the memory dump
-	if ((params.sw_flag & SW_DMP) != 0)
-	{
-		const char* filename = params.outFile;
-		if (filename == NULL)
-		{
-			filename = "mem_sim.bin";
-		}
-
-		print("\nWriting memory dump to %s (%d bytes)\n", filename, memSize);
-		result = writeFile(filename, mem_sim, memSize);
-		if (result != 0)
-		{
-			error("Error: Failed to write memory dump to %s\n", filename);
-		}
-	}
-	else
-	{
-		// print memory dump
-		print("\nmem dump:\n");
-		for (i = 0; i < dumpTo; i += 8)
-		{
-			print("%04x: ", i);
-			printData(mem_sim + i, 8);
-		}
-
-		if (unkInstrs)
-		{
-			print("\nUnknown instructions found. Dump to file ( -d ) to decompile with a x86 32-bit decompiler.\n" \
-				"Only a handful of opcodes have been implemented. Better off " \
-				"dumping to a file and analyzing with a x86 32-bit compatible decompiler.\n");
-		}
-	}
-
-Cleanup:
-
-	if (mem_sim != NULL)
-	{
-		xb_free(mem_sim);
-	}
-
-	return result;
 }

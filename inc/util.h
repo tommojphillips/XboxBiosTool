@@ -1,4 +1,4 @@
-// util.h
+// util.h: implements various utility functions for manipulating strings, printing to console, changing console foreground color, size checking, etc.
 
 /* Copyright(C) 2024 tommojphillips
  *
@@ -31,29 +31,52 @@
 // check if a struct is within bounds of a buffer. the struct needs to live within the buffer.
 #define IN_BOUNDS(_struct, _buff, _buff_size) ((UCHAR*)_struct >= (UCHAR*)_buff && (UCHAR*)_struct + sizeof(*_struct) < (UCHAR*)_buff + _buff_size)
 
+// console colors
 enum CON_COL : int { ERR = 0, OK = 1, MSG = 3, BLACK = 30, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE };
 
+// set console color
 void setConsoleColor(const int col = -1);
 
+// format string
 void format(char* buffer, const char* format, ...);
 
-void print(FILE* stream, const char* format, ...);			// print to stream (stdout, stderr, FILE*)
-void print(const char* format, ...);						// std print to console
-void print(const CON_COL col, const char* format, ...);		// std print to console with color
+// print to stream (stdout, stderr, FILE*)
+void print(FILE* stream, const char* format, ...);
 
-void print_f(char* buffer, const int bufferSize, const char* format, ...);		// print to buffer. format. {1} = arg1, {2} = arg2, etc.
+// std print to console			
+void print(const char* format, ...);
 
-void printData(UCHAR* data, int len, bool newLine = true);	// print a char array
+// std print to console with color
+void print(const CON_COL col, const char* format, ...);
 
-void error(const char* format, ...);						// stderr print
+// print to buffer. format. {1} = arg1, {2} = arg2, etc.
+void print_f(char* buffer, const int bufferSize, const char* format, ...);
 
-int checkSize(const UINT& size);						// check rom size.
+// print a char array
+void printData(UCHAR* data, int len, bool newLine = true);
 
-void getTimestamp(UINT timestamp, char* timestamp_str);	// print timestamp to string.
+// stderr print
+void error(const char* format, ...);
 
+// check rom size.
+int checkSize(const UINT& size);						
+
+// get timestamp string.
+void getTimestamp(UINT timestamp, char* timestamp_str);
+
+// trim left side of string.
 void ltrim(char*& str);
+
+// trim right side of string.
 void rtrim(char*& str);
+
+// pad left side of string.
 void lpad(char buff[], const UINT buffSize, const char pad);
+
+// pad right side of string.
 void rpad(char buff[], const UINT buffSize, const char pad);
+
+// error exit
+void errorExit(const int code, const char* format, ...);
 
 #endif //XBT_UTIL_H
