@@ -23,10 +23,12 @@
 #define XB_BLDR_H
 
 #include "type_defs.h"
+#include "util.h"
 
 const UINT KEY_SIZE = 16; // rc4 key size in bytes
 
-const UCHAR BOOT_PARAMS_SIGNATURE[4] = { 'J', 'y', 'T', 'x' }; // hash of "JyTx". MCPX checks this to verify the bldr.
+// value of "JyTx". MCPX checks this to verify the bldr.
+const UINT BOOT_PARAMS_SIGNATURE = MAKE_SIGNATURE('J', 'y', 'T', 'x');
 
 // The init table structure.
 typedef struct
@@ -75,10 +77,10 @@ typedef struct _XCODE
 // The boot parameters structure.
 typedef struct
 {
-    UINT krnlDataSize;          // size of the kernel data (uncompressed)
-    UINT inittblSize;           // size of the init table	
-    UCHAR signature[4];         // the bldr signature. mcpx checks this to verify the bldr
-    UINT krnlSize;              // size of the kernel (compressed)
+    UINT krnlDataSize;      // size of the kernel data (uncompressed)
+    UINT inittblSize;       // size of the init table	
+    UINT signature;         // the bldr signature. mcpx checks this to verify the bldr
+    UINT krnlSize;          // size of the kernel (compressed)
     UCHAR digest[DIGEST_LEN];   // the ROM digest.
 } BOOT_PARAMS;
 

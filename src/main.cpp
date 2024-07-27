@@ -40,30 +40,27 @@ Parameters&  params = xbtool.params;	// global instance of parameters.
 // Command table. [name], [switch], [param type], [required switches], [optional switches], [help string]
 const CMD_TBL cmd_tbl[] = {
 	{ "Help", "?", CMD_HELP, SW_NONE, SW_NONE, HELP_STR_HELP },
-
-	{ "List bios", "ls", CMD_LIST, (SW_BIOS_FILE), (SW_ROMSIZE | SW_LS_DATA_TBL | SW_LS_NV2A_TBL), HELP_STR_LIST },
-	
-	{ "Simulate xcodes", "xcode-sim", CMD_XCODE_SIM, SW_NONE, (SW_INITTBL_FILE | SW_BIOS_FILE | SW_OUT_FILE | SW_SIM_SIZE), HELP_STR_XCODE_SIM },
-	{ "Decode xcodes", "xcode-decode",	CMD_XCODE_DECODE, SW_NONE, (SW_INITTBL_FILE | SW_BIOS_FILE), HELP_STR_XCODE_DECODE },
-
-	{ "Extract bios", "extr", CMD_EXTR, SW_BIOS_FILE, SW_BLD_BIOS, HELP_STR_EXTR_ALL },
+	{ "List bios", "ls", CMD_LIST, SW_IN_FILE, (SW_ROMSIZE | SW_LS_DATA_TBL | SW_LS_NV2A_TBL | SW_LS_DUMP_KRNL), HELP_STR_LIST },
+	{ "Extract bios", "extr", CMD_EXTR, SW_IN_FILE, SW_BLD_BIOS, HELP_STR_EXTR_ALL },
 	{ "Build bios",	"bld", CMD_BLD_BIOS, SW_BLD_BIOS, (SW_OUT_FILE | SW_ROMSIZE | SW_BINSIZE | SW_BLD_BFM | SW_PATCH_KEYS | SW_EEPROM_KEY_FILE | SW_CERT_KEY_FILE), HELP_STR_BUILD },
-
-	{ "Decompress krnl", "decomp-krnl", CMD_KRNL_DECOMPRESS, SW_BIOS_FILE, (SW_OUT_FILE | SW_PATCH_KEYS | SW_PUB_KEY_FILE), NULL },
-
-	{ "Split bios", "split", CMD_SPLIT, SW_BIOS_FILE, (SW_ROMSIZE), HELP_STR_SPLIT },
-	{ "Combine banks", "combine", CMD_COMBINE,	SW_NONE, (SW_OUT_FILE | SW_BANK_FILES), HELP_STR_COMBINE },
+	{ "Decompress kernel", "decomp-krnl", CMD_KRNL_DECOMPRESS, SW_IN_FILE, (SW_OUT_FILE | SW_PATCH_KEYS | SW_PUB_KEY_FILE), HELP_STR_DECOMP_KRNL },
+	{ "Split bios", "split", CMD_SPLIT, SW_IN_FILE, SW_ROMSIZE, HELP_STR_SPLIT },
+	{ "Combine banks", "combine", CMD_COMBINE, SW_NONE, (SW_OUT_FILE | SW_BANK_FILES), HELP_STR_COMBINE },
+	{ "Simulate xcodes", "xcode-sim", CMD_XCODE_SIM, SW_IN_FILE, (SW_OUT_FILE | SW_SIM_SIZE), HELP_STR_XCODE_SIM },
+	{ "Decode xcodes", "xcode-decode",	CMD_XCODE_DECODE, SW_IN_FILE, SW_NONE, HELP_STR_XCODE_DECODE },
+	{ "Encode X86", "x86-encode", CMD_ENCODE_X86, SW_IN_FILE, SW_OUT_FILE, HELP_STR_X86_ENCODE },
+	{ "NT image dump", "dump-img", CMD_DUMP_NT_IMG, SW_IN_FILE, SW_NONE, HELP_STR_DUMP_NT_IMG },
 };
 
-PARAM_TBL PARAM_BLDR_KEY = { "key-bldr", SW_KEY_BLDR_FILE, &params.keyBldrFile,	PARAM_TBL::STR, NULL };
-PARAM_TBL PARAM_KRNL_KEY = { "key-krnl", SW_KEY_KRNL_FILE, &params.keyKrnlFile,	PARAM_TBL::STR, NULL };
+PARAM_TBL PARAM_BLDR_KEY = { "key-bldr", SW_KEY_BLDR_FILE, &params.bldrKeyFile, PARAM_TBL::STR, NULL };
+PARAM_TBL PARAM_KRNL_KEY = { "key-krnl", SW_KEY_KRNL_FILE, &params.krnlKeyFile, PARAM_TBL::STR, NULL };
 
 PARAM_TBL PARAM_BLDR_ENC = { "enc-bldr", SW_ENC_BLDR, NULL, PARAM_TBL::FLAG, NULL };
 PARAM_TBL PARAM_KRNL_ENC = { "enc-krnl", SW_ENC_KRNL, NULL, PARAM_TBL::FLAG, NULL };
 
 // Parameter table. switch, type, variable, variable type, help string
 PARAM_TBL param_tbl[] = {
-	{ "bios", SW_BIOS_FILE, &params.biosFile, PARAM_TBL::STR, HELP_STR_PARAM_BIOS_FILE },
+	{ "in", SW_IN_FILE, &params.inFile, PARAM_TBL::STR, HELP_STR_PARAM_IN_FILE },
 	{ "out", SW_OUT_FILE, &params.outFile, PARAM_TBL::STR, HELP_STR_PARAM_OUT_FILE },
 	{ "romsize", SW_ROMSIZE, &params.romsize, PARAM_TBL::INT, HELP_STR_PARAM_ROMSIZE },
 	{ "binsize", SW_BINSIZE, &params.binsize, PARAM_TBL::INT, HELP_STR_PARAM_BINSIZE },
@@ -81,6 +78,7 @@ PARAM_TBL param_tbl[] = {
 	// Flags for list bios command. ( -ls )
 	{ "nv2a",	SW_LS_NV2A_TBL,	&params.ls_flag, PARAM_TBL::FLAG, HELP_STR_PARAM_LS_NV2A_TBL, LS_NV2A_TBL },
 	{ "datatbl",SW_LS_DATA_TBL,	&params.ls_flag, PARAM_TBL::FLAG, HELP_STR_PARAM_LS_DATA_TBL, LS_DATA_TBL },
+	{ "dump-krnl", SW_LS_DUMP_KRNL, &params.ls_flag, PARAM_TBL::FLAG, HELP_STR_PARAM_LS_DUMP_KRNL, LS_DUMP_KRNL},
 	
 	{ "patchkeys", SW_PATCH_KEYS, NULL, PARAM_TBL::FLAG, HELP_STR_PARAM_PATCH_KEYS },
 	{ "pubkey", SW_PUB_KEY_FILE, &params.pubKeyFile, PARAM_TBL::STR, HELP_STR_PARAM_PUB_KEY },
@@ -151,7 +149,7 @@ void printHelp()
 	print_f(helpStr, sizeof(helpStr), HELP_STR_RC4_ENC, "2bl");
 	print("\n -%s %s\n", PARAM_BLDR_ENC.sw, &helpStr);
 
-	print_f(helpStr, sizeof(helpStr), HELP_STR_RC4_ENC, "Krnl");
+	print_f(helpStr, sizeof(helpStr), HELP_STR_RC4_ENC, "kernel");
 	print("\n -%s %s\n", PARAM_KRNL_ENC.sw, &helpStr);
 
 	// mcpx rom
@@ -179,7 +177,7 @@ int getFilename(char* path)
 		// file name validation
 		if (i < 0 || pathLen - i >= MAX_FILENAME)
 		{
-			error("Error: Invalid filename: %s\n", path);
+			print("Error: Invalid filename: %s\n", path);
 			return 1;
 		}
 		strcpy(xbtool.exe_filename, path + i + 1);
@@ -193,35 +191,42 @@ int getFilename(char* path)
 
 int parseArgs(int argc, char* argv[])
 {
-	// first arg is the executable name
-	if (getFilename(argv[0]) != 0)
-		return 1;
+	int result = 0;
 
-	if (argc == 1)
+	// first arg is the executable name
+	result = getFilename(argv[0]);
+	if (result != 0)
+		return result;
+
+	if (argc == 1) // no args
 	{
-		error("Error: No command specified\n");
+		print("Error: No command specified\n");
 		return 1;
 	}
 
 	// parse switches
 	char arg[MAX_SWITCH_LEN] = { 0 };
+	UINT len = 0;
+
 	bool swMatch;
 	bool swNeedValue;
 	int i, j;
 
+	len = strlen(argv[1]);
+
 	// parse cmd type
-	if (strlen(argv[1]) < 2) // cmd len must be at least 3. 1 for '-' or '/', 1 char for the cmd, 1 char for null terminator
+	if (len < 2 || len > MAX_SWITCH_LEN)
 	{
-		error("Error: Invalid command length: %s\n", argv[1]);
+		print("Error: Invalid command length: %s\n", argv[1]);
 		return 1;
 	}
 
+	// find the command
+	xbtool.cmd = NULL;
 	for (i = 0; i < sizeof(cmd_tbl) / sizeof(CMD_TBL); i++)
 	{
-		xb_zero(arg, MAX_SWITCH_LEN);
-
-		if (strlen(argv[1]) > 1)
-			strcat(arg, argv[1] + 1); // remove the '-' or '/' in the switch
+		xb_zero(arg, sizeof(arg));
+		strcpy(arg, argv[1] + 1); // skip the '-' or '/' in the switch
 
 		if (strcmp(arg, cmd_tbl[i].sw) != 0)
 			continue;
@@ -232,7 +237,7 @@ int parseArgs(int argc, char* argv[])
 
 	if (xbtool.cmd == NULL || xbtool.cmd->type == CMD_NONE)
 	{
-		error("Error: Unknown command: %s\n", argv[1]);
+		print("Error: Unknown command: %s\n", argv[1]);
 		return 1;
 	}
 
@@ -240,11 +245,11 @@ int parseArgs(int argc, char* argv[])
 	{
 		if (argv[i][0] != '-' && argv[i][0] != '/') // not a switch
 		{
-			// check if bios file is set in the req or opt params, if so then assume this is the bios file.
-			if (params.biosFile == NULL && ((xbtool.cmd->params_req & SW_BIOS_FILE) != 0 || (xbtool.cmd->params_opt & SW_BIOS_FILE) != 0))
+			// check if in file is set in the req or opt params, if so then assume this is the in file.
+			if (params.inFile == NULL && ((xbtool.cmd->params_req & SW_IN_FILE) != 0 || (xbtool.cmd->params_opt & SW_IN_FILE) != 0))
 			{
-				params.biosFile = argv[i];
-				params.sw_flag |= SW_BIOS_FILE;
+				params.inFile = argv[i];
+				params.sw_flag |= SW_IN_FILE;
 				continue;
 			}
 			
@@ -264,14 +269,15 @@ int parseArgs(int argc, char* argv[])
 				if (j < 4) // bank file found
 					continue;
 			}
+
 			
-			error("Error: Unknown argument %s\n", argv[i]);
+			print("Error: Unknown argument %s\n", argv[i]);
 			return 1;
 		}
 
 		if (strlen(argv[i]) - 1 > MAX_SWITCH_LEN)
 		{
-			error("Error: Switch %s is too long\n", argv[i]);
+			print("Error: Switch %s is too long\n", argv[i]);
 			return 1;
 		}
 
@@ -291,7 +297,7 @@ int parseArgs(int argc, char* argv[])
 
 			if (swNeedValue && i + 1 >= argc) // make sure there is a value after the switch
 			{
-				error("Error: No value specified for %s\n", param_tbl[j].sw);
+				print("Error: No value specified for %s\n", param_tbl[j].sw);
 				return 1;
 			}
 
@@ -321,7 +327,6 @@ int parseArgs(int argc, char* argv[])
 					break;
 
 				default:
-					error("Error: Type not implemented.\n");
 					return 1;
 				}
 			}
@@ -337,7 +342,7 @@ int parseArgs(int argc, char* argv[])
 
 		if (!swMatch)
 		{
-			error("Error: Unknown switch %s\n", argv[i]);
+			print("Error: Unknown switch %s\n", argv[i]);
 			return 1;
 		}
 	}
@@ -352,7 +357,7 @@ int parseArgs(int argc, char* argv[])
 
 		if ((params.sw_flag & param_tbl[i].swType) == 0) // switch not provided
 		{
-			error("Error: Required switch '-%s' was not supplied.\n", param_tbl[i].sw);
+			print("Error: Required switch '-%s' was not supplied.\n", param_tbl[i].sw);
 			isSwitchMissing = true;
 		}
 	}
@@ -373,7 +378,7 @@ int validateArgs()
 	params.romsize *= 1024; // convert to bytes
 	if (checkSize(params.romsize) != 0)
 	{
-		error("Error: Invalid rom size: %d\n", params.romsize);
+		print("Error: Invalid rom size: %d\n", params.romsize);
 		return 1;
 	}
 
@@ -385,7 +390,7 @@ int validateArgs()
 	params.binsize *= 1024; // convert to bytes
 	if (checkSize(params.binsize) != 0)
 	{
-		error("Error: Invalid bin size: %d\n", params.binsize);
+		print("Error: Invalid bin size: %d\n", params.binsize);
 		return 1;
 	}
 	
@@ -396,12 +401,12 @@ int validateArgs()
 	}
 	if (params.simSize > (128 * 1024 * 1024)) // 128mb
 	{
-		error("Error: Invalid sim size: %d\n", params.simSize);
+		print("Error: Invalid sim size: %d\n", params.simSize);
 		return 1;
 	}
 	if (params.simSize % 4 != 0)
 	{
-		error("Error: simsize must be devisible by 4.\n");
+		print("Error: simsize must be devisible by 4.\n");
 		return 1;
 	}
 
@@ -442,9 +447,14 @@ int main(int argc, char* argv[])
 
 Exit:
 
-	if (result != 0) // force exit code to be -1 if error
+	// check global proc error code
+	if (result == 0)
 	{
-		result = -1;
+		result = getErrorCode();
+		if (result != 0)
+		{
+			print("Error: %d\n", result);
+		}
 	}
 
 	return result;

@@ -29,44 +29,35 @@
 #include "util.h"
 #include "xbmem.h"
 
-typedef struct X86_INSTR_MAP
-{
-	X86_INSTR_TYPE type;
-	USHORT opcode;
-	const char* asm_instr;
-	UINT opcode_len;
-	UINT operrand_len;
-} X86_INSTR_MAP;
-
 X86_INSTR_MAP instrs[] = {
-	{ X86_INSTR_TYPE_2BYTEOP_PTR, 0x1D8B, "mov ebx", 2, 4 },
-	{ X86_INSTR_TYPE_2BYTEOP_PTR, 0x0D8B, "mov ecx", 2, 4 },
-	{ X86_INSTR_TYPE_2BYTEOP_PTR, 0x158B, "mov edx", 2, 4 },
+	{ X86_INSTR_TYPE_PTR, 0x1D8B, "mov ebx", 2, 4 },
+	{ X86_INSTR_TYPE_PTR, 0x0D8B, "mov ecx", 2, 4 },
+	{ X86_INSTR_TYPE_PTR, 0x158B, "mov edx", 2, 4 },
 
-	{ X86_INSTR_TYPE_2BYTEOP, 0xE0FF, "jmp eax", 2, 0 },
-	{ X86_INSTR_TYPE_2BYTEOP, 0xE1FF, "jmp ecx", 2, 0 },
-	{ X86_INSTR_TYPE_2BYTEOP, 0xE2FF, "jmp edx", 2, 0 },
-	{ X86_INSTR_TYPE_2BYTEOP, 0xE3FF, "jmp ebx", 2, 0 },
-	{ X86_INSTR_TYPE_2BYTEOP, 0xE4FF, "jmp esp", 2, 0 },
-	{ X86_INSTR_TYPE_2BYTEOP, 0xE5FF, "jmp ebp", 2, 0 },
-	{ X86_INSTR_TYPE_2BYTEOP, 0xE6FF, "jmp esi", 2, 0 },
-	{ X86_INSTR_TYPE_2BYTEOP, 0xE7FF, "jmp edi", 2, 0 },
+	{ X86_INSTR_TYPE_OP, 0xE0FF, "jmp eax", 2, 0 },
+	{ X86_INSTR_TYPE_OP, 0xE1FF, "jmp ecx", 2, 0 },
+	{ X86_INSTR_TYPE_OP, 0xE2FF, "jmp edx", 2, 0 },
+	{ X86_INSTR_TYPE_OP, 0xE3FF, "jmp ebx", 2, 0 },
+	{ X86_INSTR_TYPE_OP, 0xE4FF, "jmp esp", 2, 0 },
+	{ X86_INSTR_TYPE_OP, 0xE5FF, "jmp ebp", 2, 0 },
+	{ X86_INSTR_TYPE_OP, 0xE6FF, "jmp esi", 2, 0 },
+	{ X86_INSTR_TYPE_OP, 0xE7FF, "jmp edi", 2, 0 },
 
-	{ X86_INSTR_TYPE_2BYTEOP, 0xA5F3, "rep movsd", 2, 0 },
+	{ X86_INSTR_TYPE_OP, 0xA5F3, "rep movsd", 2, 0 },
 
-	{ X86_INSTR_TYPE_1BYTEOP_NUM, 0xB8, "mov eax", 1, 4 },
-	{ X86_INSTR_TYPE_1BYTEOP_NUM, 0xB9, "mov ecx", 1, 4 },
-	{ X86_INSTR_TYPE_1BYTEOP_NUM, 0xBA, "mov edx", 1, 4 },
-	{ X86_INSTR_TYPE_1BYTEOP_NUM, 0xBB, "mov ebx", 1, 4 },
-	{ X86_INSTR_TYPE_1BYTEOP_NUM, 0xBC, "mov esp", 1, 4 },
-	{ X86_INSTR_TYPE_1BYTEOP_NUM, 0xBD, "mov ebp", 1, 4 },
-	{ X86_INSTR_TYPE_1BYTEOP_NUM, 0xBE, "mov esi", 1, 4 },
-	{ X86_INSTR_TYPE_1BYTEOP_NUM, 0xBF, "mov edi", 1, 4 },
-	{ X86_INSTR_TYPE_1BYTEOP_PTR, 0xA1, "mov eax", 1, 4 },
+	{ X86_INSTR_TYPE_NUM, 0xB8, "mov eax", 1, 4 },
+	{ X86_INSTR_TYPE_NUM, 0xB9, "mov ecx", 1, 4 },
+	{ X86_INSTR_TYPE_NUM, 0xBA, "mov edx", 1, 4 },
+	{ X86_INSTR_TYPE_NUM, 0xBB, "mov ebx", 1, 4 },
+	{ X86_INSTR_TYPE_NUM, 0xBC, "mov esp", 1, 4 },
+	{ X86_INSTR_TYPE_NUM, 0xBD, "mov ebp", 1, 4 },
+	{ X86_INSTR_TYPE_NUM, 0xBE, "mov esi", 1, 4 },
+	{ X86_INSTR_TYPE_NUM, 0xBF, "mov edi", 1, 4 },
+	{ X86_INSTR_TYPE_PTR, 0xA1, "mov eax", 1, 4 },
 
 	{ X86_INSTR_TYPE_JMP_FAR, 0xEA, "jmp far", 1, 5 },
-	{ X86_INSTR_TYPE_1BYTEOP, 0x90, "nop", 1, 0 },
-	{ X86_INSTR_TYPE_1BYTEOP, 0xFC, "cld", 1, 0 },
+	{ X86_INSTR_TYPE_OP, 0x90, "nop", 1, 0 },
+	{ X86_INSTR_TYPE_OP, 0xFC, "cld", 1, 0 },
 };
 
 int decodeX86(UCHAR* data, UINT size, FILE* stream)
@@ -77,9 +68,9 @@ int decodeX86(UCHAR* data, UINT size, FILE* stream)
 
 	char str_instr[128] = { 0 };
 
-	bool unkInstrs = false;
+	int result = 0;
 
-	print("\nx86 32-bit instructions:\n");
+	print("\nx86 instructions:\n");
 
 	for (i = 0; i < size;)
 	{
@@ -91,16 +82,14 @@ int decodeX86(UCHAR* data, UINT size, FILE* stream)
 		{
 			print("Unknown x86 instruction at offset %04x, INSTR: %02X\n", i, data[i]);
 			i++;
-			unkInstrs = true;
+			result = ERROR_INVALID_DATA;
 			continue;
 		}
 
 		print(stream, "%s\n", str_instr);
 	}	
 
-	if (unkInstrs)
-		return 1;
-	return 0;
+	return result;
 }
 
 int parseInstruction(char* buf, UCHAR* data, UINT& offset)
@@ -119,21 +108,18 @@ int parseInstruction(char* buf, UCHAR* data, UINT& offset)
 
 	if (instr == NULL)
 	{
-		return 1;
+		return ERROR_INVALID_DATA;
 	}
 
 	switch (instr->type)
 	{
-		case X86_INSTR_TYPE_1BYTEOP:
-		case X86_INSTR_TYPE_2BYTEOP:
+		case X86_INSTR_TYPE_OP:
 			sprintf(buf, "%s", instr->asm_instr);
 			break;
-		case X86_INSTR_TYPE_1BYTEOP_PTR:
-		case X86_INSTR_TYPE_2BYTEOP_PTR:
+		case X86_INSTR_TYPE_PTR:
 			sprintf(buf, "%s, [0x%08x]", instr->asm_instr, *(UINT*)(data + offset + instr->opcode_len));
 			break;
-		case X86_INSTR_TYPE_1BYTEOP_NUM:
-		case X86_INSTR_TYPE_2BYTEOP_NUM:
+		case X86_INSTR_TYPE_NUM:
 			sprintf(buf, "%s, 0x%08x", instr->asm_instr, *(UINT*)(data + offset + instr->opcode_len));
 			break;			
 		case X86_INSTR_TYPE_JMP_FAR:

@@ -51,7 +51,7 @@ int MCPX_ROM::load(const char* filename)
 		print("( v1.1 )\n");
 		break;
 	default:
-		error("\nError: MCPX ROM is invalid\n");
+		print("\nError: MCPX ROM is invalid\n");
 		break;
 	}
 
@@ -91,7 +91,7 @@ int MCPX_ROM::verifyMCPX()
 	// valid mcpx rom
 
 	// mcpx v1.0 has a hardcoded signature at offset 0x187.
-	if (xb_cmp(data + 0x187, BOOT_PARAMS_SIGNATURE, 4) == 0)
+	if (xb_cmp(data + 0x187, &BOOT_PARAMS_SIGNATURE, 4) == 0)
 	{
 		version = MCPX_ROM::MCPX_V1_0;
 		sbkey = (data + 0x1A5);

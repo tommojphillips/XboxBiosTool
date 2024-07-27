@@ -1,11 +1,115 @@
-# Build bios command -bld 
-# 'enc-krnl' switch works different when building a bios.
-* if 'enc-krnl' is provided and the kernel key can be located in the 2bl and it's not all 00's or FF's, that key will be used to encrypt it.
-    - Keys are located by a pointer before the 2bl entry. if a custom bios removes this pointer or the keys, the keys will not be locatable.
-* if '-key-krnl' is passed in, that key file will be used to encrypt it.
-* if '-key-krnl' and 'enc-krnl' is NOT passed in, the kernel is NOT encrypted.
-* if '-key-krnl' and 'enc-krnl' is passed in, the kernel is NOT encrypted.
+xbios.exe 25.07.2024 - tommojphillips
 
+-------------------------------------------------------------------------------------------------------------------------------
+ /?
+# Display help
+
+ /ls
+# Dump bios info to console. boot params, sizes, signatures, keys, nv2a tbl, etc.
+ -bios <path>    - The bios file (req)
+ -romsize <size> - The rom size in Kb. valid opts: 256, 512, 1024
+ -nv2a           - List nv2a table
+ -datatbl        - List rom data table
+ -dump-krnl      - dump kernel (nt) image info to console
+
+ /xcode-sim
+# Simulate mem-write xcodes and parse x86 instructions. (visor sim)
+ -in <path>      - The input file (req)
+ -out <path>     - The output file
+ -simsize <size> - The size of the simulated memory in bytes.
+ -d              - write sim memory to a file for analysis in a disassembler.
+
+ /xcode-decode
+# Decode xcodes from a bios file or extracted init tbl. currently only supports retail opcodes.
+ -in <path>      - The input file (req)
+ -d              - Write decoded xcodes to a .txt. Use -out to set output file.
+
+ /extr
+# Extract the 2bl, compressed krnl, uncompressed krnl data, init table
+ -bios <path>       - The bios file (req)
+
+ -bldr <path>       - The boot loader file
+ -krnl <path>       - The kernel file
+ -krnldata <path>   - The kernel data section file
+ -inittbl <path>    - The init table file
+
+ /bld
+# Build a bios from a 2bl, compressed krnl, uncompressed krnl data, init table
+ -bldr <path>       - The boot loader file (req).
+ -krnl <path>       - The kernel file (req).
+ -krnldata <path>   - The kernel data section file (req).
+ -inittbl <path>    - The init table file (req).
+
+ -out <path>        - The output file.
+ -romsize <size>    - The rom size in Kb. valid opts: 256, 512, 1024.
+ -binsize <size>    - The bin size in Kb. valid opts: 256, 512, 1024.
+ -patchkeys         - Use key switches to patch keys.
+ -certkey <path>    - Path to the cert key file.
+ -eepromkey <path>  - Path to the eeprom key file.
+ -bfm               - build a boot-from-media bios.
+ -enc-krnl          - If provided, encrypts the kernel with the kernel key in the 2bl (if found).
+
+ /decomp-krnl
+# Decompress and extract a kernel image from a bios.
+ -bios <path>    - The bios file (req)
+ -out <path>     - The output file
+ -patchkeys      - Use key switches to patch keys.
+ -pubkey <path>  - Path to the pub key file.
+
+ /split
+# Split a bios into banks. Eg: bios.bin 1Mb -> bios.bin 4x 256Kb
+ -bios <path>    - The bios file (req)
+ -romsize <size> - The rom size in Kb. valid opts: 256, 512, 1024
+
+ /combine
+# Combine banks into a single bios. Eg: bios.bin x4 256Kb -> bios.bin 1Mb
+* bank arguments are inferred. eg -> -combine bank1.bin bank2.bin
+* banks are combined in the order they are specified.
+ -out <path>     - The output file
+
+ /x86-encode
+# Encode x86 instructions as xcodes. (visor)
+* input file must be a binary file containing x86 instructions.
+ -in <path>      - The input file (req)
+ -out <path>     - The output file
+
+ /dump-img
+# Dump nt image info to console. PE header etc.
+ -in <path>      - The input file (req)
+
+-------------------------------------------------------------------------------------------------------------------------------
+Switches:
+
+ -key-bldr  <path>
+# Path to the 16 byte rc4_key.bin file.
+* If key is provided, 2bl is assumed to be encrypted.
+* Required for en / decrypting the 2bl.
+
+ -mcpx  <path>
+# Path to the MCPX ROM file.
+* Can be used for decrypting the 2bl instead of the '-key-bldr' switch.
+
+ -key-krnl  <path> 
+# Path to the 16 byte rc4_key.bin file.
+* If key is provided, the kernel is assumed to be encrypted.
+* This should not be required unless it's a custom bios, as keys are located in the 2bl.
+
+ -enc-bldr
+# If flag is provided, the 2bl is assumed to be unencrypted. (in most cases.)
+
+ -enc-krnl
+# If flag is provided, the kernel is assumed to be unencrypted. (in most cases.)
+
+ -romsize
+# The size of the rom within the bios file size.
+* Usually 256KB. if debug or custom bios, this could be 512KB or 1MB.
+* A bios is replicate upto the binsize ( binsize / romsize = num_of_replications )
+
+ -binsize
+# The size of the bios file (total size. of the bios file.)
+* Cannot be less then romsize.
+
+-------------------------------------------------------------------------------------------------------------------------------
 Original bios kernel version / build timestamp
 
 # 3944:         Fri Sep 21 11:43:41 2001 UTC
@@ -23,6 +127,12 @@ Original bios kernel version / build timestamp
 # 5713:         Tue Aug 12 11:43:10 2003 UTC
 # 5838:         Tue Dec 09 12:44:11 2003 UTC
 
-# x2.5035: Sun Jun 05 15:20:55 2005 UTC
-# kernel size: 795,392 bytes
--decomp-krnl x2.5035.bin -romsize 512 -out x2_5035_krnl.img
+# x2.5035: 	Sun Jun 05 15:20:55 2005 UTC
+
+-------------------------------------------------------------------------------------------------------------------------------
+init table version
+
+< 0x40: Old DVT 3 Boxes with NV2A A02 old metal 7 (NVCLK 155, CPU 665)
+= 0x40: New DVT 3 Boxes with NV2A A02 new metal 7 (Faster)
+= 0x46: DVT4/5
+> 0x46: DVT6

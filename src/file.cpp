@@ -35,7 +35,7 @@ UCHAR* readFile(const char* filename, UINT* bytesRead, const int expectedSize)
 	file = fopen(filename, "rb");
 	if (file == NULL)
 	{
-		error("Error: Could not open file: %s\n", filename);
+		print("Error: Could not open file: %s\n", filename);
 		return NULL;
 	}
 
@@ -43,7 +43,7 @@ UCHAR* readFile(const char* filename, UINT* bytesRead, const int expectedSize)
 
 	if (expectedSize != -1 && size != expectedSize)
 	{
-		error("Error: Invalid file size. Expected %d bytes. Got %d bytes\n", expectedSize, size);
+		print("Error: Invalid file size. Expected %d bytes. Got %d bytes\n", expectedSize, size);
 		fclose(file);
 		return NULL;
 	}
@@ -73,7 +73,7 @@ int writeFile(const char* filename, void* ptr, const UINT bytesToWrite)
 	file = fopen(filename, "wb");
 	if (file == NULL)
 	{
-		error("Error: Could not open file: %s\n", filename);
+		print("Error: Could not open file: %s\n", filename);
 		return 1;
 	}
 

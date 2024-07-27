@@ -88,9 +88,13 @@ int XbTool::run()
 	case CMD_XCODE_DECODE:
 		result = decodeXcodes();
 		break;
-
+	case CMD_ENCODE_X86:
+		result = encodeX86();
+		break;
+	case CMD_DUMP_NT_IMG:
+		result = dumpImg(NULL, 0);
+		break;
 	default:
-		error("Command not implemented\n");
 		result = 1;
 		break;
 	}
@@ -153,7 +157,7 @@ int XbTool::buildBios()
 	result = bios.create(bldr, bldrSize, inittbl, inittblSize, krnl, krnlSize, krnlData, krnlDataSize);
 	if (result != 0)
 	{
-		error("Error: Failed to create bios\n");
+		print("Error: Failed to create bios\n");
 		goto Cleanup;
 	}
 
@@ -171,7 +175,7 @@ int XbTool::buildBios()
 	}
 	else
 	{
-		error(FAIL_OUT, "bios");
+		print(FAIL_OUT, "bios");
 	}
 
 Cleanup:
@@ -203,8 +207,8 @@ int XbTool::extractBios()
 {
 	int result = 0;
 
-	print("bios file: %s\n", params.biosFile);
-	result = bios.loadFromFile(params.biosFile);
+	print("bios file: %s\n", params.inFile);
+	result = bios.loadFromFile(params.inFile);
 	if (result != Bios::BIOS_LOAD_STATUS_SUCCESS) // bldr needs to be valid to extract
 	{
 		return 1;
@@ -221,7 +225,7 @@ int XbTool::extractBios()
 	result = bios.saveBldrBlockToFile(filename);
 	if (result != 0)
 	{
-		error(FAIL_OUT, "bldr");
+		print(FAIL_OUT, "bldr");
 		return 1;
 	}
 
@@ -234,7 +238,7 @@ int XbTool::extractBios()
 	result = bios.saveKernelToFile(filename);
 	if (result != 0)
 	{
-		error(FAIL_OUT, "krnl");
+		print(FAIL_OUT, "krnl");
 		return 1;
 	}
 
@@ -247,7 +251,7 @@ int XbTool::extractBios()
 	result = bios.saveKernelDataToFile(filename);
 	if (result != 0)
 	{
-		error(FAIL_OUT, "krnl data");
+		print(FAIL_OUT, "krnl data");
 		return 1;
 	}
 	
@@ -260,7 +264,7 @@ int XbTool::extractBios()
 	result = bios.saveInitTblToFile(filename);
 	if (result != 0)
 	{
-		error(FAIL_OUT, "init tbl");
+		print(FAIL_OUT, "init tbl");
 		return 1;
 	}
 
@@ -282,41 +286,41 @@ int XbTool::splitBios()
 	char* ext = NULL;
 	char* bankFn = NULL;
 
-	print("bios file: %s\n", params.biosFile);
+	print("bios file: %s\n", params.inFile);
 
 	//romsize sanity check
 	if (params.romsize < DEFAULT_ROM_SIZE * 1024)
 		return 1;
 		
-	data = readFile(params.biosFile, &size);
+	data = readFile(params.inFile, &size);
 	if (data == NULL)
 		return 1;
 
 	result = checkSize(size);
 	if (result != 0)
 	{
-		error("Error: Invalid bios file size: %d\n", size);
+		print("Error: Invalid bios file size: %d\n", size);
 		goto Cleanup;
 	}
 	
 	// check if bios size is less than or equal to rom size
 	if (size <= params.romsize)
 	{
-		error("Cannot split bios. file size is less than or equal to romsize\n");
+		print("Cannot split bios. file size is less than or equal to romsize\n");
 		result = 1;
 		goto Cleanup;
 	}
 
 	print("Splitting bios into %d banks (%dKB each)\n", (size / params.romsize), (params.romsize / 1024));
 
-	fnLen = strlen(params.biosFile);
+	fnLen = strlen(params.inFile);
 	biosFn = (char*)xb_alloc(fnLen + 1); // +1 for null terminator
 	if (biosFn == NULL)
 	{
 		result = 1;
 		goto Cleanup;
 	}
-	strcpy(biosFn, params.biosFile);
+	strcpy(biosFn, params.inFile);
 
 	// remove the extention
 	for (int i = fnLen - 1; i >= 0; i--)
@@ -338,7 +342,7 @@ int XbTool::splitBios()
 
 	if (ext == NULL)
 	{
-		error("Error: Invalid bios file name. No file extension found\n");
+		print("Error: Invalid bios file name. No file extension found\n");
 		result = 1;
 		goto Cleanup;
 	}
@@ -360,7 +364,7 @@ int XbTool::splitBios()
 		// safe guard
 		if (loopCount > 4)
 		{ 
-			error("Error: loopCount exceeded 5\n");
+			print("Error: loopCount exceeded 5\n");
 			result = 1;
 			break;
 		}
@@ -376,7 +380,7 @@ int XbTool::splitBios()
 		result = writeFile(bankFn, (data + (params.romsize * bank)), params.romsize);
 		if (result != 0)
 		{
-			error(FAIL_OUT, bankFn);
+			print(FAIL_OUT, bankFn);
 			goto Cleanup;
 		}
 
@@ -463,7 +467,7 @@ int XbTool::combineBios()
 
 			if (checkSize(bankSizes[i]) != 0)
 			{
-				error("Error: %s has invalid file size: %d\n", params.bankFiles[i], bankSizes[i]);
+				print("Error: %s has invalid file size: %d\n", params.bankFiles[i], bankSizes[i]);
 				result = 1;
 				goto Cleanup;
 			}
@@ -473,14 +477,14 @@ int XbTool::combineBios()
 
 	if (numBanks < 2)
 	{
-		error("Error: Not enough banks to combine. Expected atleast 2 banks to be provided\n");
+		print("Error: Not enough banks to combine. Expected atleast 2 banks to be provided\n");
 		result = 1;
 		goto Cleanup;
 	}
 
 	if (checkSize(totalSize) != 0)
 	{
-		error("Error: Invalid total bios size: %d\n", totalSize);
+		print("Error: Invalid total bios size: %d\n", totalSize);
 		result = 1;
 		goto Cleanup;
 	}
@@ -509,7 +513,7 @@ int XbTool::combineBios()
 	}
 	else
 	{
-		error(FAIL_OUT, "bios");
+		print(FAIL_OUT, "bios");
 	}
 
 Cleanup:
@@ -533,8 +537,8 @@ Cleanup:
 
 int XbTool::listBios()
 {
-	print("bios file: %s\n", params.biosFile);
-	int result = bios.loadFromFile(params.biosFile);
+	print("bios file: %s\n", params.inFile);
+	int result = bios.loadFromFile(params.inFile);
 	if (result > Bios::BIOS_LOAD_STATUS_INVALID_BLDR) // bldr doesn't need to be valid to list it.
 	{
 		return 1;
@@ -553,7 +557,7 @@ int XbTool::listBios()
 		bios.printBldrInfo();
 		bios.printKernelInfo();
 		bios.printInitTblInfo();
-		bios.printKeys();		
+		bios.printKeys();
 	}
 
 	if (flag & LS_NV2A_TBL)
@@ -566,42 +570,48 @@ int XbTool::listBios()
 		bios.printDataTbl();
 	}
 
+	if (flag & LS_DUMP_KRNL)
+	{
+		int result = bios.decompressKrnl();
+		if (result != 0)
+		{
+			print("Error: Failed to decompress the kernel image\n");
+			return result;
+		}
+
+		UCHAR* decompressedKrnl = bios.getDecompressedKrnl();
+
+		dumpImg(decompressedKrnl, bios.getDecompressedKrnlSize());
+		print_krnl_data_section_header((IMAGE_DOS_HEADER*)decompressedKrnl);
+	}
+
 	return 0;
 }
 
-UCHAR* XbTool::load_init_tbl_file(UINT& size) const
+UCHAR* XbTool::load_init_tbl_file(UINT& size, UINT& xcodeBase) const
 {
 	UCHAR* inittbl = NULL;
 	int result = 0;
 
-	// load the inittbl file ( -inittbl or -bios )
+	// load the inittbl file
 
-	const char* filename = params.inittblFile;
-	if (filename == NULL)
-	{
-		filename = params.biosFile;
-		if (filename == NULL)
-		{
-			error("Error: No inittbl file provided\n");
-			return NULL;
-		}
-	}
-
-	print("inittbl file: %s\n", filename);
-	inittbl = readFile(filename, &size);
+	print("inittbl file: %s\n", params.inFile);
+	inittbl = readFile(params.inFile, &size);
 	if (inittbl == NULL)
 		return NULL;
 
 	// validate the inittbl file
-	if (size < XCODE_BASE + sizeof(XCODE))
+	if (size < xcodeBase)
 	{
-		error("Error: Invalid inittbl size: %d. Expected atleast %d bytes\n", size, XCODE_BASE + sizeof(XCODE));
-		result = 1;
-		goto Cleanup;
+		xcodeBase = 0;		
+	}
+	else
+	{
+		xcodeBase = sizeof(INIT_TBL);
 	}
 	if (size > MAX_BIOS_SIZE)
 	{
-		error("Error: Invalid inittbl size: %d. Expected less than %d bytes\n", size, MAX_BIOS_SIZE);
+		print("Error: Invalid inittbl size: %d. Expected less than %d bytes\n", size, MAX_BIOS_SIZE);
 		result = 1;
 		goto Cleanup;
 	}
@@ -625,36 +635,38 @@ Cleanup:
 int XbTool::decodeXcodes() const
 {
 	XcodeInterp interp = XcodeInterp();
-	XCODE* xcode;
-	DECODE_CONTEXT context = { xcode, stdout };
+	DECODE_CONTEXT context = { stdout };
 
 	UCHAR* inittbl = NULL;
 	UINT size = 0;
+	UINT xcodeBase = 0;
 	int result = 0;
 	
-	inittbl = load_init_tbl_file(size);
+	inittbl = load_init_tbl_file(size, xcodeBase);
 	if (inittbl == NULL)
 		return 1;
 	
-	result = interp.load(inittbl + XCODE_BASE, size - XCODE_BASE);
+	result = interp.load(inittbl + xcodeBase, size - xcodeBase);
 	if (result != 0)
 		goto Cleanup;
+
+	context.base = xcodeBase;
 		
 	// decode phase 1
-	while (interp.interpretNext(xcode) == XcodeInterp::DATA_OK)
+	while (interp.interpretNext(context.xcode) == 0)
 	{
 		// go through the xcodes and fix up jmp offsets.
 
-		if (xcode->opcode != XC_JMP && xcode->opcode != XC_JNE)
+		if (context.xcode->opcode != XC_JMP && context.xcode->opcode != XC_JNE)
 			continue;
 
 		// calculate the offset and set the data to the offset.
 
 		bool isLabel = false;
-		UINT labelOffset = interp.getOffset() + xcode->data;
+		UINT labelOffset = interp.getOffset() + context.xcode->data;
 
 		// Fix up the xcode data to the offset for phase 2 decoding
-		xcode->data = labelOffset;
+		context.xcode->data = labelOffset;
 
 		// check if offset is already a label
 		for (LABEL* label : context.labels)
@@ -684,20 +696,14 @@ int XbTool::decodeXcodes() const
 		}
 	}
 
-	if (interp.getStatus() == XcodeInterp::DATA_ERROR)
-	{
-		error("Error: Failed to decode xcodes\n");
-		result = 1;
-		goto Cleanup;
-	}
-
+	
 	// load the decode settings from the ini file
-	if (interp.loadini(context.settings) != 0)
+	if (interp.loadDecodeSettings(context.settings) != 0)
 	{
 		result = 1;
 		goto Cleanup;
 	}
-
+	
 	// setup the file stream, if -d flag is set
 	if ((params.sw_flag & SW_DMP) != 0)
 	{
@@ -707,14 +713,14 @@ int XbTool::decodeXcodes() const
 			filename = "xcodes.txt";
 		}
 
-		// del file if it exists		
+		// del file if it exists
 		deleteFile(filename);
 
 		print("Writing decoded xcodes to %s (text format)\n", filename, interp.getOffset());
 		context.stream = fopen(filename, "w");
 		if (context.stream == NULL)
 		{
-			error("Error: Failed to open file %s\n", filename);
+			print(FAIL_OUT, filename);
 			result = 1;
 			goto Cleanup;
 		}
@@ -725,9 +731,14 @@ int XbTool::decodeXcodes() const
 	// decode phase 2
 
 	interp.reset();
-	while (interp.interpretNext(xcode) == XcodeInterp::DATA_OK)
+	while (interp.interpretNext(context.xcode) == 0)
 	{
-		interp.decodeXcode(context);
+		result = interp.decodeXcode(context);
+		if (result != 0)
+		{
+			print("Error: Failed to decode xcode. opcode: %X\n", context.xcode->opcode);
+			goto Cleanup;
+		}
 	}
 
 	if ((params.sw_flag & SW_DMP) != 0)
@@ -760,12 +771,13 @@ int XbTool::simulateXcodes() const
 	char* opcode_str = NULL;
 	UCHAR* mem_sim = NULL;
 	UCHAR* inittbl = NULL;
+	UINT xcodeBase = 0;
 
-	inittbl = load_init_tbl_file(size);
+	inittbl = load_init_tbl_file(size, xcodeBase);
 	if (inittbl == NULL)
 		return 1;
 
-	result = interp.load(inittbl + XCODE_BASE, size - XCODE_BASE);
+	result = interp.load(inittbl + xcodeBase, size - xcodeBase);
 	if (result != 0)
 		goto Cleanup;
 
@@ -798,22 +810,16 @@ int XbTool::simulateXcodes() const
 		xb_cpy(mem_sim + xcode->addr, (UCHAR*)&xcode->data, 4);
 
 		if (interp.getDefOpcodeStr(xcode->opcode, opcode_str) != 0)
-		{
-			error("Error: Unknown opcode %X\n", xcode->opcode);
+		{			
 			result = 1;
 			goto Cleanup;
 		}
 
 		// print the xcode
-		print("%04x: %s 0x%02x, 0x%08X\n", (XCODE_BASE + interp.getOffset() - sizeof(XCODE)), opcode_str, xcode->addr, xcode->data);
+		print("%04x: %s 0x%02x, 0x%08X\n", (xcodeBase + interp.getOffset() - sizeof(XCODE)), opcode_str, xcode->addr, xcode->data);
 	}
 
-	if (interp.getStatus() != XcodeInterp::EXIT_OP_FOUND)
-	{
-		result = 1;
-		goto Cleanup;
-	}
-
+	
 	if (!hasMemChanges_total)
 	{
 		print("No Memory changes in range 0x0 - 0x%x\n", params.simSize);
@@ -824,11 +830,9 @@ int XbTool::simulateXcodes() const
 	result = decodeX86(mem_sim, params.simSize, stdout);
 	if (result != 0)
 	{
-		error("Error: Failed to decode x86 instructions\n");
+		print("Error: Failed to decode x86 instructions\n");
 		goto Cleanup;
 	}
-
-	print("size of code: %d bytes\n", params.simSize);
 
 	// if -d flag is set, dump the memory to a file, otherwise print the memory dump
 	if ((params.sw_flag & SW_DMP) != 0)
@@ -837,8 +841,8 @@ int XbTool::simulateXcodes() const
 		if (filename == NULL)
 			filename = "mem_sim.bin";
 
-		print("\nWriting memory dump to %s (%d bytes)\n", filename, size);
-		if (writeFile(filename, mem_sim, size) != 0)
+		print("\nWriting memory dump to %s (%d bytes)\n", filename, params.simSize);
+		if (writeFile(filename, mem_sim, params.simSize) != 0)
 		{
 			result = 1;
 			goto Cleanup;
@@ -876,8 +880,8 @@ int XbTool::decompressKrnl()
 {
 	int result = 0;
 
-	print("bios file: %s\n", params.biosFile);
-	result = bios.loadFromFile(params.biosFile);
+	print("bios file: %s\n", params.inFile);
+	result = bios.loadFromFile(params.inFile);
 	if (result != Bios::BIOS_LOAD_STATUS_SUCCESS) // bldr needs to be valid to decompress kernel. 
 	{
 		return 1;
@@ -886,7 +890,7 @@ int XbTool::decompressKrnl()
 	// decompress the kernel
 	if (bios.decompressKrnl() != 0)
 	{
-		error("Error: Failed to decompress the kernel image\n");
+		print("Error: Failed to decompress the kernel image\n");
 		return 1;
 	}
 	
@@ -895,35 +899,21 @@ int XbTool::decompressKrnl()
 
 	UINT offset = ((IMAGE_DOS_HEADER*)decompressedKrnl)->e_lfanew;
 
-	if (offset < 0 || offset > decompressedSize)
+	if (offset < 0 || offset > sizeof(IMAGE_DOS_HEADER) || offset > decompressedSize)
 	{
-		error("Error: Invalid NT Header offset\n");
+		print("Error: Invalid NT Header offset\n");
 		return 1;
 	}
 
 	IMAGE_NT_HEADER* header = (IMAGE_NT_HEADER*)(decompressedKrnl + offset);
-	if (header == NULL)
+	if (header == NULL || header->signature != IMAGE_NT_SIGNATURE || IN_BOUNDS(header, decompressedKrnl, decompressedSize) == false)
 	{
-		error("Error: NT Header is NULL\n");
-		return 1;
-	}
-
-	// check header is in bounds of allocated memory
-	if ((UCHAR*)header < decompressedKrnl || (UCHAR*)header > decompressedKrnl + decompressedSize)
-	{
-		error("Error: NT Header out of bounds\n");
-		return 1;
-	}
-
-	// check if it's a valid nt header
-	if (&header->signature == NULL || header->signature != IMAGE_NT_SIGNATURE)
-	{
-		error("Error: NT Header is invalid\n");
+		print("Error: NT Header is invalid\n");
 		return 1;
 	}
 
 	print("\nNT Header:\n");
-	print_nt_header_basic(header);
+	print_nt_header(header, true);
 
 	result = extractPubKey(decompressedKrnl, decompressedSize);
 
@@ -947,7 +937,7 @@ int XbTool::decompressKrnl()
 	}
 	else
 	{
-		error(FAIL_OUT, "kernel image");
+		print(FAIL_OUT, "kernel image");
 	}
 
 	return result;
@@ -957,20 +947,20 @@ int XbTool::readKeys()
 {
 	// read in rc4 keys that have been provided on the command line
 
-	if (params.keyBldrFile != NULL)
+	if (params.bldrKeyFile != NULL)
 	{
-		print("bldr key file: %s\n", params.keyBldrFile);
-		params.keyBldr = readFile(params.keyBldrFile, NULL, KEY_SIZE);
+		print("bldr key file: %s\n", params.bldrKeyFile);
+		params.keyBldr = readFile(params.bldrKeyFile, NULL, KEY_SIZE);
 		if (params.keyBldr == NULL)
 			return 1;
 		print("bldr key: ");
 		printData(params.keyBldr, KEY_SIZE);
 	}
 
-	if (params.keyKrnlFile != NULL)
+	if (params.krnlKeyFile != NULL)
 	{
-		print("krnl key file: %s\n", params.keyKrnlFile);
-		params.keyKrnl = readFile(params.keyKrnlFile, NULL, KEY_SIZE);
+		print("krnl key file: %s\n", params.krnlKeyFile);
+		params.keyKrnl = readFile(params.krnlKeyFile, NULL, KEY_SIZE);
 		if (params.keyKrnl == NULL)
 			return 1;
 		print("krnl key: ");
@@ -1005,7 +995,7 @@ int XbTool::extractPubKey(UCHAR* data, UINT size)
 
 	if (data == NULL || size == 0)
 	{
-		error("Error: Invalid data\n");
+		print("Error: Invalid data\n");
 		return 1;
 	}
 
@@ -1037,7 +1027,7 @@ int XbTool::extractPubKey(UCHAR* data, UINT size)
 		print("Writing public key to %s (%d bytes)\n", params.pubKeyFile, sizeof(PUBLIC_KEY));
 		if (writeFile(params.pubKeyFile, pubkey, sizeof(PUBLIC_KEY)) != 0)
 		{
-			error(FAIL_OUT, "public key");
+			print(FAIL_OUT, "public key");
 			return 1;
 		}
 	}
@@ -1049,7 +1039,7 @@ int XbTool::extractPubKey(UCHAR* data, UINT size)
 		PUBLIC_KEY* patch_pubkey = (PUBLIC_KEY*)readFile(params.pubKeyFile, NULL, sizeof(PUBLIC_KEY));
 		if (patch_pubkey == NULL)
 		{
-			error("Error: Failed to patch public key\n");
+			print("Error: Failed to patch public key\n");
 			return 1;
 		}
 
@@ -1070,16 +1060,137 @@ int XbTool::extractPubKey(UCHAR* data, UINT size)
 	return 0;
 }
 
-int verifyPubKey(UCHAR* data, PUBLIC_KEY*& pubkey)
+int XbTool::encodeX86()
 {
-	// verify the public key header.
+	// encode x86 instructions to xcodes
 
+	UCHAR* data = NULL;
+	UCHAR* buffer = NULL;
+	UINT dataSize = 0;
+	UINT bufferSize = 0;
+	int result = 0;
+
+	const char* filename = NULL;
+
+	print("x86 file: %s\n", params.inFile);
+
+	data = readFile(params.inFile, &dataSize);
 	if (data == NULL)
 	{
-		error("Error: Public key is NULL\n");
 		return 1;
 	}
 
+	result = encodeX86AsMemWrites(data, dataSize, buffer, &bufferSize);
+	if (result != 0)
+	{
+		print("Error: Failed to encode x86 instructions\n");
+		goto Cleanup;
+	}
+
+	// write the xcodes to file
+	filename = params.outFile;
+	if (filename == NULL)
+	{
+		filename = "xcodes.bin";
+	}
+
+	result = writeFile(filename, buffer, bufferSize);
+	if (result == 0)
+	{
+		print(SUCCESS_OUT, filename, bufferSize / 1024);
+	}
+	else
+	{
+		print(FAIL_OUT, "xcodes");
+	}
+
+Cleanup:
+
+	if (data != NULL)
+	{
+		xb_free(data);
+	}
+
+	if (buffer != NULL)
+	{
+		xb_free(buffer);
+	}
+
+	return 0;
+}
+
+int XbTool::dumpImg(UCHAR* data, UINT size) const
+{
+	int result = 0;
+	UCHAR* allocData = NULL;
+	IMAGE_DOS_HEADER* dosHeader = NULL;
+	IMAGE_NT_HEADER* ntHeader = NULL;
+
+	if (data == NULL) // read in the kernel image if not provided
+	{		
+		print("Image file: %s\n", params.inFile);
+		allocData = readFile(params.inFile, &size);
+		if (allocData == NULL)
+		{
+			return 1;
+		}
+		data = allocData;
+	}
+
+	// dump the kernel image to the console
+	print("Image size: %d bytes\n", size);
+
+	dosHeader = (IMAGE_DOS_HEADER*)data;
+	if (dosHeader == NULL)
+	{
+		print("Error: Failed to get DOS header\n");
+		result = 1;
+		goto Cleanup;
+	}
+	if (IN_BOUNDS(dosHeader, data, size) == false)
+	{
+		print("Error: DOS headers out of bounds\n");
+		result = 1;
+		goto Cleanup;
+	}
+
+	ntHeader = (IMAGE_NT_HEADER*)(data + dosHeader->e_lfanew);
+	if (ntHeader == NULL)
+	{
+		print("Error: Failed to get NT header\n");
+		result = 1;
+		goto Cleanup;
+	}
+	if (IN_BOUNDS(ntHeader, data, size) == false)
+	{
+		print("Error: NT headers out of bounds\n");
+		result = 1;
+		goto Cleanup;
+	}
+
+	// full dump of DOS header, nt headers.
+	print("\nDOS header:\n");
+	print_image_dos_header((IMAGE_DOS_HEADER*)data);
+
+	print("\nNT header:\n");
+	print_nt_header(ntHeader, false);
+
+Cleanup:
+
+	if (allocData != NULL)
+	{
+		xb_free(allocData);
+		allocData = NULL;
+		data = NULL;
+	}
+
+	return result;
+}
+
+int verifyPubKey(UCHAR* data, PUBLIC_KEY*& pubkey)
+{
+	// verify the public key header.
+	
 	const RSA_HEADER RSA1_HEADER = { { 'R', 'S', 'A', '1' }, 264, 2048, 255, 65537 };
 
 	if (xb_cmp(data, &RSA1_HEADER, sizeof(RSA_HEADER)) != 0)

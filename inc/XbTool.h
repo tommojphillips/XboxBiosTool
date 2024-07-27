@@ -43,7 +43,8 @@ struct Parameters
 	UCHAR* keyBldr;
 	UCHAR* keyKrnl;
 
-	const char* biosFile;
+	//const char* biosFile;
+	const char* inFile;
 	const char* outFile;
 	const char* bankFiles[4];
 
@@ -54,8 +55,8 @@ struct Parameters
 
 	const char* mcpxFile;
 
-	const char* keyBldrFile;
-	const char* keyKrnlFile;
+	const char* bldrKeyFile;
+	const char* krnlKeyFile;
 
 	MCPX_ROM mcpx;
 
@@ -63,18 +64,15 @@ struct Parameters
 	const char* certKeyFile;
 	const char* eepromKeyFile;
 
-	Parameters() : sw_flag(0), ls_flag(0), romsize(0), binsize(0), simSize(0),
-		biosFile(NULL), outFile(NULL), inittblFile(NULL), bldrFile(NULL), krnlFile(NULL), krnlDataFile(NULL),
-		keyBldrFile(NULL), keyKrnlFile(NULL),
-		keyBldr(NULL), keyKrnl(NULL),
-		mcpxFile(NULL), mcpx(), 
-		pubKeyFile(NULL), certKeyFile(NULL), eepromKeyFile(NULL)
-	{
-		for (int i = 0; i < 4; i++)
-		{
-			bankFiles[i] = NULL;
-		}
-	}
+	Parameters() : sw_flag(0), ls_flag(0),
+		romsize(0), binsize(0), simSize(0),
+		//biosFile(NULL),
+		inFile(NULL), outFile(NULL), 
+		inittblFile(NULL), bldrFile(NULL), krnlFile(NULL), krnlDataFile(NULL),
+		bldrKeyFile(NULL), krnlKeyFile(NULL),
+		keyBldr(NULL), keyKrnl(NULL), pubKeyFile(NULL), certKeyFile(NULL), eepromKeyFile(NULL),
+		mcpxFile(NULL), mcpx(),
+		bankFiles{NULL, NULL, NULL, NULL } { };
 
 	void deconstruct()
 	{
@@ -102,8 +100,8 @@ class XbTool
 		Bios bios;
 
 		Parameters params;
-		
-		XbTool() : exe_filename(), cmd(NULL), bios(), params() { };
+				
+		XbTool() : exe_filename(), cmd(NULL), bios(), params()  { };
 
 		void deconstruct();
 
@@ -142,9 +140,14 @@ class XbTool
 		// attempt to find the public key in the ptr.
 		int extractPubKey(UCHAR* data, UINT size);
 
+		// encode x86 code as xcode mem write instructions.
+		int encodeX86();
+
+		// dump nt image info to the console.
+		int dumpImg(UCHAR* data, UINT size) const;
 private:
 	// load the inittbl file.
-	UCHAR* load_init_tbl_file(UINT& size) const;
+	UCHAR* load_init_tbl_file(UINT& size, UINT& xcodeBase) const;
 };
 
 int verifyPubKey(UCHAR* data, PUBLIC_KEY*& pubkey);

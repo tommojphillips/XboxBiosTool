@@ -28,11 +28,25 @@
 // user incl
 #include "type_defs.h"
 
-// check if a struct is within bounds of a buffer. the struct needs to live within the buffer.
-#define IN_BOUNDS(_struct, _buff, _buff_size) ((UCHAR*)_struct >= (UCHAR*)_buff && (UCHAR*)_struct + sizeof(*_struct) < (UCHAR*)_buff + _buff_size)
+#define IN_BOUNDS(struc, buff, size) ((UCHAR*)struc >= (UCHAR*)buff && (UCHAR*)struc + sizeof(*struc) < (UCHAR*)buff + size)
+
+// make 4 byte signature
+#define MAKE_SIGNATURE(a,b,c,d) (a + (b<<8) + (c<<16) + (d<<24))
+
+enum XB_ERROR_CODES : int {
+	ERROR_SUCCESS =			0,
+	ERROR_FAILED =			1,
+
+	ERROR_BUFFER_OVERFLOW = 4,
+	ERROR_OUT_OF_MEMORY =	5,
+	ERROR_INVALID_DATA =	6,
+};
 
 // console colors
 enum CON_COL : int { ERR = 0, OK = 1, MSG = 3, BLACK = 30, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE };
+
+int getErrorCode();
+void setErrorCode(const int code);
 
 // set console color
 void setConsoleColor(const int col = -1);
@@ -54,9 +68,6 @@ void print_f(char* buffer, const int bufferSize, const char* format, ...);
 
 // print a char array
 void printData(UCHAR* data, int len, bool newLine = true);
-
-// stderr print
-void error(const char* format, ...);
 
 // check rom size.
 int checkSize(const UINT& size);						

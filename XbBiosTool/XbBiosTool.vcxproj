@@ -139,6 +139,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\src\file.cpp" />
+    <ClCompile Include="..\src\loadini.cpp" />
     <ClCompile Include="..\src\lzx.cpp" />
     <ClCompile Include="..\src\main.cpp" />
     <ClCompile Include="..\src\Mcpx.cpp" />
@@ -155,6 +156,7 @@
   <ItemGroup>
     <ClInclude Include="..\inc\cli_tbl.h" />
     <ClInclude Include="..\inc\file.h" />
+    <ClInclude Include="..\inc\loadini.h" />
     <ClInclude Include="..\inc\lzx.h" />
     <ClInclude Include="..\inc\main.h" />
     <ClInclude Include="..\inc\Mcpx.h" />

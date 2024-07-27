@@ -29,15 +29,17 @@
 #include "type_defs.h"
 
 enum X86_INSTR_TYPE {
-	X86_INSTR_TYPE_1BYTEOP,
-	X86_INSTR_TYPE_1BYTEOP_NUM,
-	X86_INSTR_TYPE_1BYTEOP_PTR,
-
-	X86_INSTR_TYPE_2BYTEOP,
-	X86_INSTR_TYPE_2BYTEOP_NUM,
-	X86_INSTR_TYPE_2BYTEOP_PTR,
-
+	X86_INSTR_TYPE_OP,
+	X86_INSTR_TYPE_NUM,
+	X86_INSTR_TYPE_PTR,
 	X86_INSTR_TYPE_JMP_FAR,
+};
+struct X86_INSTR_MAP {
+	X86_INSTR_TYPE type;
+	USHORT opcode;
+	const char* asm_instr;
+	UINT opcode_len;
+	UINT operrand_len;
 };
 
 int parseInstruction(char* buf, UCHAR* data, UINT& offset);

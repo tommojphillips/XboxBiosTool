@@ -101,13 +101,17 @@ typedef struct {
     USHORT numLineNumbers;
     UINT characteristics;
 } IMAGE_SECTION_HEADER;
+typedef struct {
+    UINT uninitializedDataSize;
+    UINT initializedDataSize;
+    UINT rawDataPtr;
+    UINT virtualAddr;
+} DATA_SECTION_HEADER;
+static_assert(sizeof(DATA_SECTION_HEADER) <= (sizeof(USHORT) * 10), "DATA_SECTION_HEADER size is greater than 10 USHORTs");
 
 void print_image_dos_header(IMAGE_DOS_HEADER* dos_header);
-void print_image_file_header_basic(IMAGE_FILE_HEADER* file_header);
-void print_image_file_header(IMAGE_FILE_HEADER* file_header);
-void print_optional_header_basic(IMAGE_OPTIONAL_HEADER* optional_header);
-void print_optional_header(IMAGE_OPTIONAL_HEADER* optional_header);
-void print_nt_header_basic(IMAGE_NT_HEADER* nt_header);
-void print_nt_header(IMAGE_NT_HEADER* nt_header);
+void print_krnl_data_section_header(IMAGE_DOS_HEADER* dos_header);
+
+void print_nt_header(IMAGE_NT_HEADER* nt_header, bool basic);
 
 #endif

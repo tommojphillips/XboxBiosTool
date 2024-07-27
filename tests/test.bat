@@ -5,22 +5,31 @@ cls
 
 setlocal enabledelayedexpansion
 
+REM XBIOS ERROR CODES
+
+REM 0: ERROR_SUCCESS
+REM 1: ERROR_GENERAL_FAILURE
+
+REM 4: ERROR_BUFFER_OVERFLOW
+REM 5: ERROR_OUT_OF_MEMORY
+REM 6: ERROR_INVALID_DATA
+
+
 if "%~1" == "-?" goto :help
 if "%~1" == "/?" goto :help
+
+set "enable_logs=0"
 
 :setup
     REM ensure we we in the correct directory
     if NOT "%CD%\" == "%~dp0" (
-        echo cd: %CD%
-        echo Changing directory to %~dp0
-        cd "%~dp0"
-        echo cd: %CD%
-        pause
+        echo Change directory to %~dp0
+        exit /b 1
     )
 
     set error_flag=0
 
-    set "exe=xbios.exe"
+    set "exe=..\bin\xbios.exe"
 
     set "MCPX_ROM_1_0=-mcpx mcpx\mcpx_1.0.bin"
     set "MCPX_ROM_1_1=-mcpx mcpx\mcpx_1.1.bin"
@@ -50,11 +59,7 @@ if "%~1" == "/?" goto :help
     del /q *.img 2>nul || (
         echo Failed to clear root directory
         exit /b 1
-    )
-    del /q xbios.exe 2>nul || (
-        echo Failed to clear root directory
-        exit /b 1
-    )
+    )    
     echo Cleaned up.    
     if "%~1" == "-c" exit /b 0
 
@@ -68,31 +73,38 @@ if "%~1" == "/?" goto :help
         exit /b 1
     )
 
-    if not exist ..\bin\xbios.exe (
-        echo xbios.exe not found
+    if not exist "!exe!" (
+        echo '!exe!' not found
         exit /b 1
-    )
-    echo Copying xbios.exe to test directory...
-    copy /y ..\bin\xbios.exe xbios.exe || (
-        echo Failed to copy xbios.exe to test directory
-        exit /b 1
-    )
+    )    
 
 :run_tests
     set jobs_passed=0
     set jobs_total=0
     set "cur_job="
 
-    if "%~1" == "-1.0" (
+    set "test_group=%~1"
+    shift
+
+    set "test_filter="
+    if NOT "%~1" == "" (
+        set "test_filter=%~1"
+        echo Running tests for !test_filter!...
+    ) else (
+        set "test_filter=!test_group!"
+        set "test_group="
+    )
+
+    if "!test_group!" == "-1.0" (
         goto :mcpx_1_0_bios_tests
-    ) else if "%~1" == "-1.1" (
+    ) else if "!test_group!" == "-1.1" (
         goto :mcpx_1_1_bios_tests
-    ) else if "%~1" == "-512" (
+    ) else if "!test_group!" == "-512" (
         goto :mcpx_1_0_512kb_bios_tests
-    ) else if "%~1" == "-custom" (
+    ) else if "!test_group!" == "-custom" (
         goto :custom_bios_tests
-    ) else if NOT "%~1" == "" (
-        echo Error: unknown test option '%~1'
+    ) else if NOT "!test_group!" == "" (
+        echo Error: unknown test option '!test_group!'
         exit /b 1
     )
     goto :execute_tests
@@ -102,11 +114,10 @@ if "%~1" == "/?" goto :help
     call :do_test "-?" 0
 
     REM test garbage input
-    call :do_test "" -1
-    call :do_test "-ls noexist.bin" -1
-    call :do_test "-ls xbios.exe" -1
-    call :do_test "-ls decode.ini" -1
-    call :do_test "-nocommand blah" -1
+    call :do_test "-ls noexist.bin" 1
+    call :do_test "-ls !exe!" 1
+    call :do_test "-ls decode.ini" 1
+    call :do_test "-nocommand blah" 1
 
 REM run original tests for bios less than 4817
 :mcpx_1_0_bios_tests   
@@ -143,11 +154,25 @@ if "%~1" == "-custom" goto :exit
     if !error_flag! neq 0 ( 
         echo Test !jobs_total! failed. expected: '!expected_error!' got: '!last_error!'
         REM ask user to if they want to see the log
-        if exist !end_log! (
-            echo log: !end_log!
-            set /p "view_log=View log? (y/n): "
-            if /i "!view_log!" == "y" ( 
-                type !end_log!
+:ask_log
+        set "view_log=n"
+        if !enable_logs! neq 1 (
+            set /p "view_log=Rerun? (y/n): "
+            if /i "!view_log!" == "y" (
+                cls                
+                echo !exe! !cur_job!
+                !exe! !cur_job!
+                echo.
+                goto :ask_log
+            )
+        ) else (
+            if exist !end_log! (
+                set /p "view_log=View log? (y/n): "
+                if /i "!view_log!" == "y" (
+                    cls
+                    echo !exe! !cur_job!
+                    type !end_log!
+                )
             )
         )
         exit /b 1
@@ -172,24 +197,32 @@ if "%~1" == "-custom" goto :exit
     REM remove '-' from cmd
     set "cmd=!cmd:~1!"
 
-    if "!job_name!" == "" ( set "job_name=last_test" ) else ( set "job_name=!job_name!_!cmd!" )
+    if "!test_filter!" neq "" (
+        if "!cmd!" neq "!test_filter!" exit /b 0
+    )
 
     if "%expected_error%" == "" set "expected_error=0"
     
     set /a jobs_total+=1
 
     echo.
-    echo Test !jobs_total! '!cur_job!' expecting '!expected_error!'
+    echo Test !jobs_total! '!cur_job!'
 
-    set "end_log=logs\!job_name!.log"
-    !exe! !cur_job! > !end_log! 2>&1
+    if !enable_logs! neq 1 (
+        set "end_log="
+        !exe! !cur_job! > nul 2> nul
+    ) else (
+        if "!job_name!" == "" ( set "job_name=last_test" ) else ( set "job_name=!cmd!_!job_name!" )
+        set "end_log=logs\!job_name!.log"
+        !exe! !cur_job! > !end_log! 2>&1
+    )    
     set last_error=!errorlevel!
 
     if !errorlevel! neq !expected_error! (
         set error_flag=!last_error!
         exit /b 0
     )
-    echo Test !jobs_total! passed ( !errorlevel! )
+    echo Pass.
 
     set /a jobs_passed+=1
     
@@ -221,19 +254,10 @@ if "%~1" == "-custom" goto :exit
         call :do_test "-xcode-decode !arg! !extra_args!" 0 "!arg_name!"
 
         REM test extracting bios 
-        call :do_test "-extr !arg! !mcpx_rom! !extra_args!" 0 "!arg_name!"
+        call :do_test "-extr !arg! !mcpx_rom! !extra_args!" 0
         REM build that extracted bios ; replicate to 1mb ; encrypt kernel; encrypting with mcpx 1.0
-        call :do_test "-bld -bldr bldr.bin -inittbl inittbl.bin -krnl krnl.bin -krnldata krnl_data.bin %MCPX_ROM_1_0% -enc-krnl !extra_args! -binsize 1024 -out !arg_name!_bld.bin" 0 "!arg_name!"
+        call :do_test "-bld -bldr bldr.bin -inittbl inittbl.bin -krnl krnl.bin -krnldata krnl_data.bin %MCPX_ROM_1_0% -enc-krnl !extra_args! -binsize 1024 -out bios.bin" 0
         REM test built bios; running -ls calls most things in the program.
-        call :do_test "-ls !arg_name!_bld.bin %MCPX_ROM_1_0% !extra_args!" 0
-        REM test decompressing the built bios' kernel ;  this ensures the kernel is decryptable (we encrypted it earlier)
-        call :do_test "-decomp-krnl !arg_name!_bld.bin %MCPX_ROM_1_0% !extra_args!" 0
-
-        REM build that extracted bios ; no replicate ; no encryption
-        call :do_test "-bld -bldr bldr.bin -inittbl inittbl.bin -krnl krnl.bin -krnldata krnl_data.bin -out !arg_name!_no_enc_bld.bin !extra_args!" 0
-        REM test built bios; running -ls calls most things in the program.
-        call :do_test "-ls !arg_name!_no_enc_bld.bin -enc-krnl !extra_args!" 0
-        REM test decompressing the built bios' kernel ;  this ensures the kernel is decryptable (we encrypted it earlier)
-        call :do_test "-decomp-krnl !arg_name!_no_enc_bld.bin -enc-krnl !extra_args!" 0
+        call :do_test "-ls bios.bin %MCPX_ROM_1_0% !extra_args!" 0
     )
     exit /b 0

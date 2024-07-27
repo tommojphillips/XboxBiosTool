@@ -1414,7 +1414,6 @@ int createDecompression(UINT& bufferMin, LDI_CONTEXT*& context)
     }
 
     context->decoder_context = (DEC_CONTEXT*)lzx_alloc(sizeof(DEC_CONTEXT));
-
     if (context->decoder_context == NULL)
     {
         lzx_free(context);
@@ -1514,17 +1513,16 @@ int decompress(const UCHAR* data, const UINT size, UCHAR*& buff, UINT& buffSize,
     UINT destSize = 0;
     UINT totalUncompressedSize = 0;
 
+    int result = 0;
+    int i = 0;
+
     if (createDecompression(destSize, context) != 0)
     {
-        error("LDICreateDecompression failed\n");
         return 1;
     }
 
     src = data;
     dest = buff;
-
-    int result = 0;
-    int i = 0;
 
     for (;;i++)
     {
@@ -1539,16 +1537,14 @@ int decompress(const UCHAR* data, const UINT size, UCHAR*& buff, UINT& buffSize,
         if (dest + bytesDecompressed > buff + buffSize)
 		{
             // resize the buffer
-            buff = (UCHAR*)lzx_realloc(buff, buffSize + LZX_CHUNK_SIZE);
-            if (buff == NULL)
+            UCHAR* new_buff = (UCHAR*)lzx_realloc(buff, buffSize + LZX_CHUNK_SIZE);
+            if (new_buff == NULL)
 			{
-				error("Error: Not enough space in the output buffer\n");
 				result = 1;
 				goto Cleanup;
 			}
+            buff = new_buff;
             buffSize += LZX_CHUNK_SIZE;
-
-            // update the destination pointer
             dest = (buff + totalUncompressedSize);
 		}
 
@@ -1557,7 +1553,7 @@ int decompress(const UCHAR* data, const UINT size, UCHAR*& buff, UINT& buffSize,
         result = decompressBlock(*context, src, bytesCompressed, dest, bytesDecompressed);
         if (result != 0)
         {
-            error("Error: Block decompress failed. Error code: %d\n", result);
+            print("Error: Block decompress failed. Error code: %d\n", result);
             goto Cleanup;
         }
 
@@ -1577,8 +1573,7 @@ int decompress(const UCHAR* data, const UINT size, UCHAR*& buff, UINT& buffSize,
     print("Decompressed %ld bytes (%d blocks)\n", totalUncompressedSize, i+1);
 
 Cleanup:
-    
-    
+        
     destroyDecompression(*context);
 
     return result;

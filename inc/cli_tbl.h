@@ -25,15 +25,16 @@
 // the max length of a switch
 const int MAX_SWITCH_LEN = 20;
 
-enum COMMAND {	
-	CMD_NONE, CMD_HELP, CMD_EXTR, CMD_LIST, CMD_SPLIT, CMD_COMBINE, CMD_BLD_BIOS, CMD_XCODE_SIM, CMD_KRNL_DECOMPRESS, CMD_XCODE_DECODE
+enum COMMAND {
+	CMD_NONE, CMD_HELP, CMD_EXTR, CMD_LIST, CMD_SPLIT, CMD_COMBINE,
+	CMD_BLD_BIOS, CMD_XCODE_SIM, CMD_KRNL_DECOMPRESS, CMD_XCODE_DECODE, CMD_ENCODE_X86, CMD_DUMP_NT_IMG
 };
 
 enum SWITCH : int {
 	SW_NONE =			1 << 0, 
 	SW_HELP =			1 << 1,
 	
-	SW_BIOS_FILE =		1 << 2,
+	// ?? =				1 << 2,
 	
 	SW_ROMSIZE =		1 << 3,
 
@@ -43,7 +44,8 @@ enum SWITCH : int {
 
 	SW_BANK_FILES =		1 << 7,
 
-	// ?? =				1 << 8,
+	SW_IN_FILE =		1 << 8,
+
 	// ?? =				1 << 9,
 	// ?? =				1 << 10,
 
@@ -59,6 +61,7 @@ enum SWITCH : int {
 
 	SW_LS_NV2A_TBL =	1 << 18,
 	SW_LS_DATA_TBL =	1 << 19,
+	SW_LS_DUMP_KRNL =	1 << 20,
 	
 	// ?? =				1 << 20,
 	// ?? =				1 << 21,
@@ -89,6 +92,7 @@ enum SW_LS : int {
 	LS_DATA_TBL = 1 << 5,
 	LS_NV2A_TBL = 1 << 6,
 	LS_KEYS = 1 << 7,
+	LS_DUMP_KRNL = 1 << 8,
 
 	LS_OPT = LS_BIOS | LS_KRNL | LS_INITTBL | LS_KEYS
 };

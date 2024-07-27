@@ -32,6 +32,16 @@
 #include "xbmem.h"
 
 static int console_util_color = 0;
+static int xb_error_code = XB_ERROR_CODES::ERROR_SUCCESS;
+
+int getErrorCode()
+{
+	return xb_error_code;
+}
+void setErrorCode(const int code)
+{
+	xb_error_code = code;
+}
 
 void setConsoleColor(const int col)
 {
@@ -127,6 +137,7 @@ void print_f(char* const buffer, const int bufferSize, const char* format, ...)
 
 			if (tokenLen + 1 > sizeof(tokenStr))
 			{
+				setErrorCode(ERROR_BUFFER_OVERFLOW);
 				break;
 			}
 			strncpy(tokenStr, startToken + 1, tokenLen);
@@ -153,14 +164,15 @@ void print_f(char* const buffer, const int bufferSize, const char* format, ...)
 				}
 				argLen = strlen(arg);
 			}
-			va_end(ap);			
+			va_end(ap);
 
 			if (argLen > 0)
 			{
 				if (bufferPtr + argLen >= buffer + bufferSize)
 				{
+					setErrorCode(ERROR_BUFFER_OVERFLOW);
 					break;
-				}				
+				}
 				xb_cpy(bufferPtr, arg, argLen);
 				bufferPtr += argLen;
 			}
@@ -184,6 +196,7 @@ void print_f(char* const buffer, const int bufferSize, const char* format, ...)
 			{
 				if (bufferPtr + argLen >= buffer + bufferSize)
 				{
+					setErrorCode(ERROR_BUFFER_OVERFLOW);
 					break;
 				}
 				xb_cpy(bufferPtr, startToken, argLen);
@@ -239,14 +252,6 @@ void print(const CON_COL col, const char* format, ...)
 	va_end(args);
 
 	setConsoleColor(0);
-}
-void error(const char* format, ...)
-{
-	va_list args;
-
-	va_start(args, format);
-	vfprintf(stderr, format, args);
-	va_end(args);
 }
 
 int checkSize(const UINT& size)

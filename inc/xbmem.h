@@ -63,7 +63,7 @@ private:
 
 // allocate memory
 void* xb_alloc(UINT size);
-// reallocate memory. if ptr canot be reallocated, the original ptr is returned.
+// reallocate memory. if ptr canot be reallocated, NULL is returned
 void* xb_realloc(void* ptr, UINT size);
 // free memory allocated by xb_alloc
 void xb_free(void* ptr);

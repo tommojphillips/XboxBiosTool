@@ -3,7 +3,6 @@
 ################################################################################
 
 /.vs/XboxBiosTools
-/bin
 *.exe
 *.pdb
 *.bin
@@ -13,5 +12,9 @@
 /XbBiosTool/obj
 /xbios.exe.lastcodeanalysissucceeded
 *.log
-/tests/decode.ini
 /.vscode
+/XbBiosTool/XbBiosTool.vcxproj.user
+/tests/decode.ini
+/decode.ini
+/XbBiosTool/XbBiosTool.vcxproj.filters
+/XbBiosTool/XbBiosTool.vcxproj.user

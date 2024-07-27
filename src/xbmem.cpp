@@ -52,10 +52,9 @@ int XbMem::getAllocations() const { return _curAllocations; };
 void* XbMem::xb_alloc(UINT size)
 {
 	void* ptr = malloc(size);
-
 	if (ptr == NULL)
 	{
-		error("Error: Could not allocate %d bytes\n", size);
+		print("Error: Could not allocate %d bytes\n", size);
 		return NULL;
 	}
 
@@ -72,19 +71,13 @@ if (_isPrinting)
 }
 void* XbMem::xb_realloc(void* ptr, UINT size)
 {
-	if (ptr == NULL)
-	{
-		error("Error: ptr is NULL\n");
-		return NULL;
-	}
-
 	UINT oldSize = _msize(ptr);
 
 	void* newPtr = realloc(ptr, size);
 	if (newPtr == NULL)
 	{
-		error("Error: Could not reallocate %d bytes\n", size);
-		return ptr;
+		print("Error: Could not reallocate %d bytes\n", size);
+		return NULL;
 	}
 
 	_curAllocatedBytes -= oldSize;
@@ -97,12 +90,6 @@ if (_isPrinting)
 }
 void XbMem::xb_free(void* ptr)
 {
-	if (ptr == NULL)
-	{
-		error("Error: ptr is NULL\n");
-		return;
-	}
-
 	UINT size = _msize(ptr);
 
 	free(ptr);

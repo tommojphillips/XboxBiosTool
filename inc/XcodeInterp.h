@@ -42,10 +42,9 @@ const UINT MEMTEST_PATTERN1 = 0xAAAAAAAA;
 const UINT MEMTEST_PATTERN2 = 0x5A5A5A5A;
 const UINT MEMTEST_PATTERN3 = 0x55555555;
 
-const UINT XCODE_BASE = sizeof(INIT_TBL);
-
-enum OPCODE : UCHAR
+typedef enum : UCHAR
 {
+    XC_NOP =         0X00,
     XC_MEM_READ =    0X02,
     XC_MEM_WRITE =   0X03,
     XC_PCI_WRITE =   0X04,
@@ -57,12 +56,10 @@ enum OPCODE : UCHAR
     XC_ACCUM =       0X10,
     XC_IO_WRITE =    0X11,
     XC_IO_READ =     0X12,
+    XC_NOP_80 =      0X80,
     XC_EXIT =        0XEE,
-
-    XC_NOP =         0X00,
     XC_NOP_F5 =      0XF5,
-    XC_NOP_80 =      0X80
-};
+} OPCODE;
 
 typedef struct _OPCODE_VERSION_INFO
 {
@@ -88,10 +85,6 @@ typedef struct _OPCODE_VERSION_INFO
         this->opcode = opcode;
 	}
 
-    ~_OPCODE_VERSION_INFO() {
-        deconstruct();
-	}
-
     void deconstruct()
     {
         if (str != NULL)
@@ -103,8 +96,12 @@ typedef struct _OPCODE_VERSION_INFO
 
 } OPCODE_VERSION_INFO;
 
-struct DECODE_SETTINGS
-{
+typedef struct {
+    const char* field;
+    const char* value;
+} DECODE_SETTING_MAP;
+
+typedef struct _DECODE_SETTINGS {
     char* format_str;
     char* jmp_str;
     char* no_operand_str;
@@ -115,9 +112,10 @@ struct DECODE_SETTINGS
     
     OPCODE_VERSION_INFO opcodes[15];
 
-    DECODE_SETTINGS() : opcodes{}, format_str(NULL), jmp_str(NULL), no_operand_str(NULL), num_str(NULL), num_str_format(NULL), label_on_new_line(false) { }
+    _DECODE_SETTINGS() : opcodes{}, format_str(NULL), jmp_str(NULL), no_operand_str(NULL),
+        num_str(NULL), num_str_format(NULL), label_on_new_line(false) { }
 
-    ~DECODE_SETTINGS() {
+    ~_DECODE_SETTINGS() {
         deconstruct();
     }
 
@@ -154,7 +152,20 @@ struct DECODE_SETTINGS
             opcodes[i].deconstruct();
         }
     }
-};
+
+    int getOpcodeStr(const UCHAR opcode, char*& opcode_str) const
+    {
+        for (int i = 0; i < (sizeof(opcodes) / sizeof(OPCODE_VERSION_INFO)); i++)
+        {
+            if (opcodes[i].opcode == opcode)
+            {
+				opcode_str = opcodes[i].str;
+				return 0;
+			}
+		}
+		return 1;
+	}
+} DECODE_SETTINGS;
 
 typedef struct _LABEL {
     UINT offset = 0;
@@ -179,16 +190,16 @@ typedef struct _LABEL {
 
 } LABEL;
 
-struct DECODE_CONTEXT
-{
-    XCODE*& xcode;
+typedef struct _DECODE_CONTEXT {
+    XCODE* xcode;
     FILE* stream;
     DECODE_SETTINGS settings;
     std::list<LABEL*> labels;
+    UINT base;
 
-    DECODE_CONTEXT(XCODE*& xcode, FILE* stream) : xcode(xcode), stream(stream), settings(), labels() { }
+    _DECODE_CONTEXT(FILE* stream) : xcode(NULL), stream(stream), settings(), labels(), base(0) { }
 
-    ~DECODE_CONTEXT() { 
+    ~_DECODE_CONTEXT() {
         deconstruct();
     }
 
@@ -208,7 +219,12 @@ struct DECODE_CONTEXT
         // free settings
         settings.deconstruct();
 	}
-};
+
+    int getOpcodeStr(char*& opcode_str) const
+    {
+		return settings.getOpcodeStr(xcode->opcode, opcode_str);
+	}
+} DECODE_CONTEXT;
 
 // XcodeInterp class
 class XcodeInterp
@@ -219,9 +235,6 @@ public:
         reset();
         _data = NULL;
     };
-    ~XcodeInterp() {
-        deconstruct();
-	};
 
     // xcode interpreter status
     enum INTERP_STATUS : int {
@@ -245,17 +258,15 @@ public:
     XCODE* getPtr() const { return _ptr; };                 // get the current position in the XCODE data.
     UINT getOffset() const { return _offset; };             // get the offset from the start of the data to the end of the current XCODE (offset to the next XCODE)
     INTERP_STATUS getStatus() const { return _status; };    // get the status of the xcode interpreter.
-
+        
     // get default xcode opcode str from the provided opcode, stores it in opcode_str. returns 0 if success.
     int getDefOpcodeStr(const UCHAR opcode, char*& opcode_str) const;
-
-    int simulateXcodes();
 
     // decode the xcode, writes it to the stream. returns 0 if success.
     int decodeXcode(DECODE_CONTEXT& context);
 
     // load settings from the settings file.
-    int loadini(DECODE_SETTINGS& settings) const;
+    int loadDecodeSettings(DECODE_SETTINGS& settings) const;
 
 private:
     UCHAR* _data;           // XCODE data
@@ -266,23 +277,25 @@ private:
     
     // opcode map
     OPCODE_VERSION_INFO opcodeMap[15] = {
-        { "nop",        XC_NOP },
-        { "mem_read",	XC_MEM_READ },
-		{ "mem_write",	XC_MEM_WRITE },
-		{ "pci_write",	XC_PCI_WRITE },
-		{ "pci_read",	XC_PCI_READ },
-		{ "and_or",		XC_AND_OR },
-		{ "use_rslt",	XC_USE_RESULT },
-		{ "jne",		XC_JNE },
-		{ "jmp",		XC_JMP },
-		{ "accum",		XC_ACCUM },
-		{ "io_write",	XC_IO_WRITE },
-		{ "io_read",	XC_IO_READ },
-		{ "nop_80",		XC_NOP_80 },
-		{ "exit",		XC_EXIT },
-		{ "nop_f5",		XC_NOP_F5 }
+        { "xc_nop", XC_NOP },
+        { "xc_mem_read", XC_MEM_READ },
+		{ "xc_mem_write", XC_MEM_WRITE },
+		{ "xc_pci_write", XC_PCI_WRITE },
+		{ "xc_pci_read", XC_PCI_READ },
+		{ "xc_and_or", XC_AND_OR },
+		{ "xc_use_result", XC_USE_RESULT },
+		{ "xc_jne", XC_JNE },
+		{ "xc_jmp",	 XC_JMP },
+		{ "xc_accum", XC_ACCUM },
+		{ "xc_io_write", XC_IO_WRITE },
+		{ "xc_io_read",	XC_IO_READ },
+		{ "xc_nop_80", XC_NOP_80 },
+		{ "xc_exit", XC_EXIT },
+		{ "xc_nop_f5", XC_NOP_F5 }
     };
-
 };
+
+// encode x86 code as xcode mem writes
+int encodeX86AsMemWrites(UCHAR* data, UINT size, UCHAR*& buffer, UINT* bufferSize);
 
 #endif // !XB_BIOS_XCODE_INTERP_H

@@ -22,6 +22,8 @@
 // user incl
 #include "XcodeInterp.h"
 #include "file.h"
+#include "type_defs.h"
+#include "loadini.h"
 #include "util.h"
 
 #define IS_NEG_TRUE(x, y) (y < 0 ? true : x == y)
@@ -96,18 +98,24 @@
 			return 0; \
 		}
 
+// load ini file helper function
+// returns values:
+// '0' if success
+// '1' if '{' is not the first character
+//'ERROR_INVALID_DATA' if key is not found
+int ll(char* output, char* str, UINT i, UINT & j, UINT len);
+
 int XcodeInterp::load(UCHAR* data, UINT size)
 {
 	if (_data != NULL)
 	{
-		error("Error: XCODE data is already loaded\n");
 		return 1;
 	}
 
 	_data = (UCHAR*)xb_alloc(size);
 	if (_data == NULL)
 	{
-		return 1;
+		return ERROR_OUT_OF_MEMORY;
 	}
 
 	xb_cpy(_data, data, size);
@@ -148,7 +156,7 @@ int XcodeInterp::interpretNext(XCODE*& xcode)
 	if (_data == NULL)
 	{
 		_status = INTERP_STATUS::DATA_ERROR;
-		return 1;
+		return ERROR_INVALID_DATA;
 	}
 
 	if (_status == INTERP_STATUS::EXIT_OP_FOUND) // last xcode was an exit. dont interpret anymore xcodes after this
@@ -157,7 +165,7 @@ int XcodeInterp::interpretNext(XCODE*& xcode)
 	if (_offset + sizeof(XCODE) > _size) // check if offset is within bounds
 	{
 		_status = INTERP_STATUS::DATA_ERROR;
-		error("Error: EXIT opcode '%X' not found. End of data reached\n", XC_EXIT);
+		print("Error: End of data reached. EXIT opcode '%X' not found.\n", XC_EXIT);
 		return 1;
 	}
 
@@ -195,12 +203,6 @@ int XcodeInterp::getDefOpcodeStr(const UCHAR opcode, char*& opcode_str) const
 
 int XcodeInterp::getAddressStr(char* str, const char* format_str)
 {
-	if (_ptr == NULL)
-	{
-		_status = INTERP_STATUS::DATA_ERROR;
-		return 1;
-	}
-
 	const UCHAR opcode = _ptr->opcode;
 	char* opcode_str;
 
@@ -227,12 +229,6 @@ int XcodeInterp::getAddressStr(char* str, const char* format_str)
 }
 int XcodeInterp::getDataStr(char* str, const char* format_str)
 {
-	if (_ptr == NULL)
-	{
-		_status = INTERP_STATUS::DATA_ERROR;
-		return 1;
-	}
-
 	switch (_ptr->opcode)
 	{
 		// opcodes that dont use data field
@@ -257,12 +253,6 @@ int XcodeInterp::getDataStr(char* str, const char* format_str)
 
 int XcodeInterp::getCommentStr(char* str)
 {
-	if (_ptr == NULL)
-	{
-		_status = INTERP_STATUS::DATA_ERROR;
-		return 1;
-	}
-
 	// -1 = dont care about field
 
 	XC_WRITE_COMMENT(XC_IO_READ, SMB_BASE + 0x00, -1, "smbus read status");
@@ -348,251 +338,92 @@ int XcodeInterp::getCommentStr(char* str)
 	return 0;
 }
 
-// load ini file helper function
-static int ll(char* output, char* str, UINT i, UINT& j, UINT len)
+int XcodeInterp::loadDecodeSettings(DECODE_SETTINGS& settings) const
 {
-	if (len < 1)
-		return -1;
-
- 	if (str[i] != '{')
-		return 1;
-
-	// go find matching '}'
-	j = i + 1;
-	while (j < len && str[j] != '}')
-	{
-		j++;
-	}
-	if (str[j] != '}')
-	{
-		error("Error: missing closing bracket\n");
-		return -1;
-	}
-	// found matching '}'
-
-	// cpy str to output ; null terminate
-	xb_cpy(output, str + i, j - i + 1);
-	output[j - i + 1] = '\0';
-	xb_mov(str + i + 3, str + j + 1, len - j);
-
-	return 0;
-}
-// set setting value helper function
-static void setSettingValue(char** setting, const char* value, UINT len)
-{
-	if (*setting != NULL)  // setting already set, skip
-		return;
-
-	*setting = (char*)xb_alloc(len + 1);
-	if (*setting == NULL)
-		return;
-
-	strcpy(*setting, value);
-}
-
-int XcodeInterp::loadini(DECODE_SETTINGS& settings) const
-{
-	const char* filename = "decode.ini";
-	FILE* stream = fopen(filename, "r");
-	if (stream == NULL)
-	{
-		error("Error: Failed to open %s\n", filename);
-		return 1;
-	}
-
-	const char delim[] = "=";
-
-	char buf[128] = { 0 }; // buffer for reading the file
-	char* line_ptr = NULL;
-	char* key = NULL;
 	char* value = NULL;
 
 	UINT len = 0;
-	UINT i, j;
-	UCHAR k;
+	UINT i = 0;
+	UINT j = 0;
+	UCHAR k = 0;
 
 	int result = 0;
 
-	const int ERROR_INVALID_KEY = 3;
-	const int ERROR_INVALID_VALUE = 4;
-	const int ERROR_OUT_OF_MEMORY = 5;
+	FILE* stream = NULL;
 
-	// parse next line
-	while (fgets(buf, sizeof(buf), stream) != NULL)
-	{		
-		line_ptr = buf;
-		ltrim(line_ptr);
+	char buf[128] = {};
 
-		// line-format: key=value
+	// 240 bytes
+	LOADINI_SETTING_MAP settings_map[] = {
+		{ "format_str", LOADINI_SETTING_TYPE::STR, &settings.format_str },
+		{ "jmp_str", LOADINI_SETTING_TYPE::STR, &settings.jmp_str },
+		{ "no_operand_str", LOADINI_SETTING_TYPE::STR, &settings.no_operand_str },
+		{ "num_str", LOADINI_SETTING_TYPE::STR, &settings.num_str },
+		{ "label_on_new_line", LOADINI_SETTING_TYPE::BOOL, &settings.label_on_new_line },
+		
+		{ "xc_nop", LOADINI_SETTING_TYPE::STR, &settings.opcodes[0] },
+		{ "xc_mem_read", LOADINI_SETTING_TYPE::STR, &settings.opcodes[1] },
+		{ "xc_mem_write", LOADINI_SETTING_TYPE::STR, &settings.opcodes[2] },
+		{ "xc_pci_write", LOADINI_SETTING_TYPE::STR, &settings.opcodes[3] },
+		{ "xc_pci_read", LOADINI_SETTING_TYPE::STR, &settings.opcodes[4] },
+		{ "xc_and_or", LOADINI_SETTING_TYPE::STR, &settings.opcodes[5] },
+		{ "xc_use_result", LOADINI_SETTING_TYPE::STR, &settings.opcodes[6] },
+		{ "xc_jne", LOADINI_SETTING_TYPE::STR, &settings.opcodes[7] },
+		{ "xc_jmp", LOADINI_SETTING_TYPE::STR, &settings.opcodes[8] },
+		{ "xc_accum", LOADINI_SETTING_TYPE::STR, &settings.opcodes[9] },
+		{ "xc_io_write", LOADINI_SETTING_TYPE::STR, &settings.opcodes[10] },
+		{ "xc_io_read", LOADINI_SETTING_TYPE::STR, &settings.opcodes[11] },
+		{ "xc_nop_f5", LOADINI_SETTING_TYPE::STR, &settings.opcodes[12] },
+		{ "xc_exit", LOADINI_SETTING_TYPE::STR, &settings.opcodes[13] },
+		{ "xc_nop_80", LOADINI_SETTING_TYPE::STR, &settings.opcodes[14] }
+	};
 
-		// ignore invalid characters
-		if (line_ptr[0] == ';')
-				continue;
+	// 60 bytes
+	DECODE_SETTING_MAP format_str_fields[] = {
+		{ "{offset}", "{1}" },
+		{ "{op}", "{2}" },
+		{ "{addr}", "{3}" },
+		{ "{data}", "{4}" },
+		{ "{comment}", "{5}" }
+	};
 
-		// get the key.
-		key = strtok(line_ptr, delim);
-		if (key == NULL)
-			continue;
-
-		// get the value
-		value = strtok(NULL, delim);
-		if (value == NULL)
-			continue;
-		len = strlen(value);
-		ltrim(value);
-		if (value[len - 1] == '\n')
-			value[len - 1] = '\0';
-		rtrim(value);
-
-		// cmp key and set values.
-
-		strcpy(buf, key);
-
-		if (strcmp(buf, "format_str") == 0)
+	// 16 bytes
+	DECODE_SETTING_MAP num_str_fields[] = {
+		{ "{num}", "%d" },
+		{ "{hex}", "%08x" }
+	};
+		
+	stream = fopen("decode.ini", "r");
+	if (stream != NULL) // only load ini file if it exists
+	{
+		print("settings: decode.ini\n");
+		result = loadini(stream, settings_map, sizeof(settings_map));
+		fclose(stream);
+		if (result != 0) // convert to error code
 		{
-			setSettingValue(&settings.format_str, value, len);
-		}
-		else if (strcmp(buf, "jmp_str") == 0)
-		{
-			setSettingValue(&settings.jmp_str, value, len);
-		}
-		else if (strcmp(buf, "no_operand_str") == 0)
-		{
-			setSettingValue(&settings.no_operand_str, value, len);
-		}
-		else if (strcmp(buf, "num_str") == 0)
-		{
-			setSettingValue(&settings.num_str, value, len);
-		}
-		else if (strcmp(buf, "xc_nop") == 0)
-		{
-			// nop opcode
-			settings.opcodes[0].opcode = XC_NOP;
-			setSettingValue(&settings.opcodes[0].str, value, len);
-		}
-		else if (strcmp(buf, "xc_mem_read") == 0)
-		{
-			// mem_read opcode
-			settings.opcodes[1].opcode = XC_MEM_READ;
-			setSettingValue(&settings.opcodes[1].str, value, len);
-		}
-		else if (strcmp(buf, "xc_mem_write") == 0)
-		{
-			// mem_write opcode
-			settings.opcodes[2].opcode = XC_MEM_WRITE;
-			setSettingValue(&settings.opcodes[2].str, value, len);
-		}
-		else if (strcmp(buf, "xc_pci_write") == 0)
-		{
-			// pci_write opcode
-			settings.opcodes[3].opcode = XC_PCI_WRITE;
-			setSettingValue(&settings.opcodes[3].str, value, len);
-		}
-		else if (strcmp(buf, "xc_pci_read") == 0)
-		{
-			// pci_read opcode
-			settings.opcodes[4].opcode = XC_PCI_READ;
-			setSettingValue(&settings.opcodes[4].str, value, len);
-		}
-		else if (strcmp(buf, "xc_and_or") == 0)
-		{
-			// and_or opcode
-			settings.opcodes[5].opcode = XC_AND_OR;
-			setSettingValue(&settings.opcodes[5].str, value, len);
-		}
-		else if (strcmp(buf, "xc_use_result") == 0)
-		{
-			// use_result opcode
-			settings.opcodes[6].opcode = XC_USE_RESULT;
-			setSettingValue(&settings.opcodes[6].str, value, len);
-		}
-		else if (strcmp(buf, "xc_jne") == 0)
-		{
-			// jne opcode
-			settings.opcodes[7].opcode = XC_JNE;
-			setSettingValue(&settings.opcodes[7].str, value, len);
-		}
-		else if (strcmp(buf, "xc_jmp") == 0)
-		{
-			// jmp opcode
-			settings.opcodes[8].opcode = XC_JMP;
-			setSettingValue(&settings.opcodes[8].str, value, len);
-		}
-		else if (strcmp(buf, "xc_accum") == 0)
-		{
-			// accum opcode
-			settings.opcodes[9].opcode = XC_ACCUM;
-			setSettingValue(&settings.opcodes[9].str, value, len);
-		}
-		else if (strcmp(buf, "xc_io_write") == 0)
-		{
-			// io_write opcode
-			settings.opcodes[10].opcode = XC_IO_WRITE;
-			setSettingValue(&settings.opcodes[10].str, value, len);
-		}
-		else if (strcmp(buf, "xc_io_read") == 0)
-		{
-			// io_read opcode
-			settings.opcodes[11].opcode = XC_IO_READ;
-			setSettingValue(&settings.opcodes[11].str, value, len);
-		}
-		else if (strcmp(buf, "xc_nop_f5") == 0)
-		{
-			// nop_f5 opcode
-			settings.opcodes[12].opcode = XC_NOP_F5;
-			setSettingValue(&settings.opcodes[12].str, value, len);
-		}
-		else if (strcmp(buf, "xc_exit") == 0)
-		{
-			// exit opcode
-			settings.opcodes[13].opcode = XC_EXIT;
-			setSettingValue(&settings.opcodes[13].str, value, len);
-		}		 
-		else if (strcmp(buf, "xc_nop_80") == 0)
-		{
-			// nop_80 opcode
-			settings.opcodes[14].opcode = XC_NOP_80;
-			setSettingValue(&settings.opcodes[14].str, value, len);
-		}		
-		else if (strcmp(buf, "label_on_new_line") == 0)
-		{
-			// set the label_on_new_line flag
-			if (strcmp(value, "true") == 0)
-			{
-				settings.label_on_new_line = true;
-			}
-			else if (strcmp(value, "false") == 0)
-			{
-				settings.label_on_new_line = false;
-			}
-			else
-			{				
-				result = ERROR_INVALID_VALUE;
-				goto Cleanup;
-			}
-		}
-		else
-		{
-			result = ERROR_INVALID_KEY;
+			result = ERROR_INVALID_DATA;
 			goto Cleanup;
 		}
 	}
+	else
+	{
+		print("settings: default\n");
+	}
 
-	// verify settings
+	// verify and parse settings / set defaults
 
 	// format_str 
 	if (settings.format_str != NULL)
 	{
 		// format_str may contain '{offset}' '{op}' '{addr}' '{data}' '{comment}'
 		
-		const char* repl = NULL;
+		k = 0;
 		len = strlen(settings.format_str);
 		for (i = 0; i < len; i++)
 		{
 			result = ll(buf, settings.format_str, i, j, len);
-			if (result == -1) // parse error
+			if (result == ERROR_INVALID_DATA) // parse error
 			{
-				result = 1;
 				goto Cleanup;
 			}
 			else if (result != 0) // no '{' found, skip
@@ -600,35 +431,22 @@ int XcodeInterp::loadini(DECODE_SETTINGS& settings) const
 				result = 0;
 				continue;
 			}
+			
+			for (j = 0; j < sizeof(format_str_fields) / sizeof(DECODE_SETTING_MAP); j++)
+			{
+				if (strcmp(buf, format_str_fields[j].field) == 0)
+				{
+					xb_cpy(settings.format_str + i, format_str_fields[j].value, strlen(format_str_fields[j].value));
+					break;
+				}
+			}
 
-			if (strcmp(buf, "{op}") == 0)
+			if (j == sizeof(format_str_fields) / sizeof(DECODE_SETTING_MAP))
 			{
-				repl = "{2}";
-			}
-			else if (strcmp(buf, "{addr}") == 0)
-			{
-				repl = "{3}";
-			}
-			else if (strcmp(buf, "{data}") == 0)
-			{
-				repl = "{4}";
-			}
-			else if (strcmp(buf, "{comment}") == 0)
-			{
-				repl = "{5}";
-			}
-			else if (strcmp(buf, "{offset}") == 0)
-			{
-				repl = "{1}";
-			}
-			else
-			{
-				result = ERROR_INVALID_KEY;
+				result = ERROR_INVALID_DATA;
 				goto Cleanup;
 			}
-
-			xb_cpy(settings.format_str + i, repl, 3);
-		}		
+		}
 	}
 	else
 	{
@@ -647,13 +465,11 @@ int XcodeInterp::loadini(DECODE_SETTINGS& settings) const
 		// jmp_str may contain '{label}' or '{offset}'
 
 		len = strlen(settings.jmp_str);
-
 		for (i = 0; i < len; i++)
 		{	
 			result = ll(buf, settings.jmp_str, i, j, len);
-			if (result == -1) // parse error
+			if (result == ERROR_INVALID_DATA) // parse error
 			{
-				result = 1;
 				goto Cleanup;
 			}
 			else if (result != 0) // no '{' found, skip
@@ -662,13 +478,13 @@ int XcodeInterp::loadini(DECODE_SETTINGS& settings) const
 				continue;
 			}
 
-			if (strcmp(buf, "{label}") == 0 || strcmp(buf, "{offset}") == 0)
+			if (strcmp(buf, "{label}") == 0)
 			{
 				xb_cpy(settings.jmp_str + i, "{1}", 3);
 			}
 			else
 			{
-				result = ERROR_INVALID_KEY;
+				result = ERROR_INVALID_DATA;
 				goto Cleanup;
 			}
 		}
@@ -688,14 +504,13 @@ int XcodeInterp::loadini(DECODE_SETTINGS& settings) const
 	if (settings.num_str != NULL)
 	{
 		// num_str may contain '{num}'
-
+		
 		len = strlen(settings.num_str);
 		for (i = 0; i < len; i++)
 		{
 			result = ll(buf, settings.num_str, i, j, len);
-			if (result == -1) // parse error
+			if (result == ERROR_INVALID_DATA) // parse error
 			{
-				result = 1;
 				goto Cleanup;
 			}
 			else if (result != 0) // no '{' found
@@ -704,40 +519,24 @@ int XcodeInterp::loadini(DECODE_SETTINGS& settings) const
 				continue;
 			}
 
-			if (strcmp(buf, "{num}") == 0)
+			for (j = 0; j < sizeof(num_str_fields) / sizeof(DECODE_SETTING_MAP); j++)
 			{
-				settings.num_str_format = (char*)xb_alloc(3);
-				if (settings.num_str_format == NULL)
+				if (strcmp(buf, num_str_fields[j].field) == 0)
 				{
-					result = ERROR_OUT_OF_MEMORY;
-					goto Cleanup;
+					settings.num_str_format = (char*)xb_alloc(strlen(num_str_fields[j].value) + 1);
+					if (settings.num_str_format == NULL)
+					{
+						result = ERROR_OUT_OF_MEMORY;
+						goto Cleanup;
+					}
+					strcpy(settings.num_str_format, num_str_fields[j].value);
+					break;
 				}
-				xb_cpy(settings.num_str_format, "%d", 2);
-			} 
-			else if (strcmp(buf, "{hex}") == 0)
-			{
-				// replace {num}, {hex} with {1}
-				settings.num_str_format = (char*)xb_alloc(5);
-				if (settings.num_str_format == NULL)
-				{
-					result = ERROR_OUT_OF_MEMORY;
-					goto Cleanup;
-				}
-				xb_cpy(settings.num_str_format, "%08X", 4);
 			}
-			else if (buf[1] == '%')
+
+			if (j == sizeof(num_str_fields) / sizeof(DECODE_SETTING_MAP))
 			{
-				settings.num_str_format = (char*)xb_alloc(j);
-				if (settings.num_str_format == NULL)
-				{
-					result = ERROR_OUT_OF_MEMORY;
-					goto Cleanup;
-				}
-				xb_cpy(settings.num_str_format, buf+1, j-2); // cpy chars between '{' and '}'
-			}
-			else
-			{
-				result = ERROR_INVALID_KEY;
+				result = ERROR_INVALID_DATA;
 				goto Cleanup;
 			}
 
@@ -767,25 +566,24 @@ int XcodeInterp::loadini(DECODE_SETTINGS& settings) const
 		strcpy(settings.num_str_format, "%08X");
 	}
 
-	// default opcodes
+	// fill in default opcodes
 	k = 0;
 	for (i = 0; i < (sizeof(settings.opcodes) / sizeof(OPCODE_VERSION_INFO)); i++)
 	{
-		if (settings.opcodes[i].str == NULL)
+		// find next valid opcode
+		UCHAR opcode;
+		char* str = NULL;
+
+		while ((opcode = k) < 255 && getDefOpcodeStr(k++, str) != 0); // find next valid opcode (range 0-255)
+
+		if (str == NULL)
 		{
-			// find next valid opcode
-			UCHAR opcode;
-			char* str = NULL;
+			result = 1;
+			goto Cleanup;
+		}
 
-			while ((opcode = k) < 255 && getDefOpcodeStr(k++, str) != 0); // find next valid opcode (range 0-255)
-
-			if (str == NULL)
-			{
-				error("Error: failed to find default opcode\n");
-				result = 1;
-				goto Cleanup;
-			}
-
+		if (settings.opcodes[i].str == NULL) // set default opcode string
+		{
 			settings.opcodes[i].str = (char*)xb_alloc(strlen(str) + 1);
 			if (settings.opcodes[i].str == NULL)
 			{
@@ -793,26 +591,17 @@ int XcodeInterp::loadini(DECODE_SETTINGS& settings) const
 				goto Cleanup;
 			}
 			strcpy(settings.opcodes[i].str, str);
-			xb_cpy(&settings.opcodes[i].opcode, &opcode, sizeof(OPCODE));
 		}
+
+		xb_cpy(&settings.opcodes[i].opcode, &opcode, sizeof(OPCODE));
 	}
 
 Cleanup:
-	switch (result)
-	{
-		case ERROR_INVALID_KEY:
-			error("Error: Invalid key '%s'\n", buf);
-			break;
-		case ERROR_OUT_OF_MEMORY:
-			error("Error: Out of memory\n");
-			break;
-		case ERROR_INVALID_VALUE:
-			error("Error: Invalid value '%s'\n", value);
-			break;
-	}
 
-	// close the file
-	fclose(stream);
+	if (result == ERROR_INVALID_DATA)
+	{
+		print("Error: Key '%s' has invalid value '%s'\n", buf, value);
+	}
 
 	return result;
 }
@@ -825,7 +614,7 @@ int XcodeInterp::decodeXcode(DECODE_CONTEXT& context)
 	char* str_opcode = NULL;
 
 	char str_label[16] = { 0 };
-	char str_addr[15 + 1] = { 0 };
+	char str_addr[32] = { 0 };
 	char str_data[15 + 1] = { 0 };
 	char str_comment[64] = { 0 };
 	char str_offset[6 + 1] = { 0 };
@@ -856,13 +645,9 @@ int XcodeInterp::decodeXcode(DECODE_CONTEXT& context)
 	print_f(str_num, sizeof(str_num), context.settings.num_str, context.settings.num_str_format);
 
 	// get the opcode string
-	for (int i = 0; i < (sizeof(context.settings.opcodes) / sizeof(OPCODE_VERSION_INFO)); i++)
+	if (context.getOpcodeStr(str_opcode) != 0)
 	{
-		if (context.settings.opcodes[i].opcode == context.xcode->opcode)
-		{
-			str_opcode = context.settings.opcodes[i].str; // point to the opcode string
-			break;
-		}
+		return 1;
 	}
 
 	// get the address string
@@ -916,13 +701,89 @@ int XcodeInterp::decodeXcode(DECODE_CONTEXT& context)
 		xb_cpy(str_comment, "; ", 2);
 	}
 
-	if (context.stream == NULL)
-		return 1;
-
 	// format the decode string
-	format(str_offset, "%04x", (XCODE_BASE + offset));
+	format(str_offset, "%04x", (context.base + offset));
 	print_f(str_decode, sizeof(str_decode), context.settings.format_str, &str_offset, str_opcode, &str_addr, &str_data, &str_comment);
 	print(context.stream, "%s%s\n", &str_label, &str_decode);
+
+	return 0;
+}
+
+int encodeX86AsMemWrites(UCHAR* data, UINT size, UCHAR*& buffer, UINT* xcodeSize)
+{
+	const UINT allocSize = sizeof(XCODE) * 10;
+
+	buffer = (UCHAR*)xb_alloc(allocSize);
+	if (buffer == NULL)
+	{
+		return ERROR_OUT_OF_MEMORY;
+	}
+	UINT nSize = allocSize;
+	UINT offset = 0;
+
+	XCODE xcode = {0};
+	xcode.opcode = XC_MEM_WRITE;
+
+	// encode x86 as mem writes
+	UINT j = 0;
+	for (UINT i = 0; i < size; i+=4)
+	{
+		xcode.addr = i;
+		xcode.data = *(UINT*)(data + i);
+
+		// realloc if needed
+		if (j + sizeof(XCODE) > nSize)
+		{
+			UCHAR* new_buffer = (UCHAR*)xb_realloc(buffer, nSize + sizeof(XCODE) + allocSize);
+			if (new_buffer == NULL)
+			{
+				return ERROR_OUT_OF_MEMORY;
+			}
+			buffer = new_buffer;
+			nSize += allocSize;
+		}
+
+		xb_cpy(buffer+j, &xcode, sizeof(XCODE));
+		j += sizeof(XCODE);
+	}
+
+	// create exit opcode
+	xcode.opcode = XC_EXIT;
+	xcode.addr = 0x806;
+	xcode.data = 0;
+	xb_cpy(buffer+j, &xcode, sizeof(XCODE));
+	j += sizeof(XCODE);
+
+	if (xcodeSize != NULL) // update buffer size
+	{
+		*xcodeSize = j;
+	}
+
+	return 0;
+}
+
+int ll(char* output, char* str, UINT i, UINT& j, UINT len)
+{
+	if (str[i] != '{')
+		return 1;
+
+	// go find matching '}'
+	j = i + 1;
+	while (j < len && str[j] != '}')
+	{
+		j++;
+	}
+	if (str[j] != '}')
+	{
+		print("Error: missing closing bracket\n");
+		return ERROR_INVALID_DATA;
+	}
+	// found matching '}'
+
+	// cpy str to output ; null terminate
+	xb_cpy(output, str + i, j - i + 1);
+	output[j - i + 1] = '\0';
+	xb_mov(str + i + 3, str + j + 1, len - j);
 
 	return 0;
 }
