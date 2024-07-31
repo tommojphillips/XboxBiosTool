@@ -244,10 +244,11 @@ public:
         DATA_ERROR =    2  // data error. end of data reached.
     };
 
-    void deconstruct();                 // deconstruct the XCODE interpreter, free memory etc.
-
-    int load(UCHAR* data, UINT size);   // load the XCODE data ( inittbl ) from data. returns 0 if success.    
-    void reset();                       // reset the XCODE interpreter, set the status to UNK, set the offset to 0, set the ptr to NULL.
+    void deconstruct();
+    int load(UCHAR* data, UINT size);
+    
+    // reset interpreter STATE.
+    void reset();                       
     
     int interpretNext(XCODE*& xcode);   // interpret the next XCODE. Stores it in xcode and cosumes it returns 0 if success.
 
@@ -273,29 +274,11 @@ private:
     UINT _size;		        // size of the XCODE data  
     XCODE* _ptr;            // current position in the XCODE data
     UINT _offset;           // offset from the start of the data to the end of the current XCODE (offset to the next XCODE)
-    INTERP_STATUS _status;  // status of the xcode interpreter
-    
-    // opcode map
-    OPCODE_VERSION_INFO opcodeMap[15] = {
-        { "xc_nop", XC_NOP },
-        { "xc_mem_read", XC_MEM_READ },
-		{ "xc_mem_write", XC_MEM_WRITE },
-		{ "xc_pci_write", XC_PCI_WRITE },
-		{ "xc_pci_read", XC_PCI_READ },
-		{ "xc_and_or", XC_AND_OR },
-		{ "xc_use_result", XC_USE_RESULT },
-		{ "xc_jne", XC_JNE },
-		{ "xc_jmp",	 XC_JMP },
-		{ "xc_accum", XC_ACCUM },
-		{ "xc_io_write", XC_IO_WRITE },
-		{ "xc_io_read",	XC_IO_READ },
-		{ "xc_nop_80", XC_NOP_80 },
-		{ "xc_exit", XC_EXIT },
-		{ "xc_nop_f5", XC_NOP_F5 }
-    };
+    INTERP_STATUS _status;  // status of the xcode interpreter       
+    OPCODE_VERSION_INFO opcodeMap[15]; // opcode map
 };
 
 // encode x86 code as xcode mem writes
-int encodeX86AsMemWrites(UCHAR* data, UINT size, UCHAR*& buffer, UINT* bufferSize);
+int encodeX86AsMemWrites(UCHAR* data, UINT size, UCHAR*& buffer, UINT* xcodeSize);
 
 #endif // !XB_BIOS_XCODE_INTERP_H

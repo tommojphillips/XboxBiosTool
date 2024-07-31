@@ -19,113 +19,71 @@
 // Author: tommojphillips
 // GitHub: https:\\github.com\tommojphillips
 
-#ifndef XB_CLI_TBL_H
-#define XB_CLI_TBL_H
+// How to use:
+// define a command table (CMD_TBL) and parameter table (PARAM_TBL) in your source file.
+// define enums, CLI_COMMAND and CLI_SWITCH, for the command and switch types in your source file.
+// first element in the enum should represent no command or switch.
+// call parseCli() passing in the command line arguments, and tables.
+// set the command and parameter values based on the command line arguments.
+// update the switch flags based and cmd ptr based on the command line arguments.
 
-// the max length of a switch
-const int MAX_SWITCH_LEN = 20;
+#ifndef CLI_TBL_H
+#define CLI_TBL_H
 
-enum COMMAND {
-	CMD_NONE, CMD_HELP, CMD_EXTR, CMD_LIST, CMD_SPLIT, CMD_COMBINE,
-	CMD_BLD_BIOS, CMD_XCODE_SIM, CMD_KRNL_DECOMPRESS, CMD_XCODE_DECODE, CMD_ENCODE_X86, CMD_DUMP_NT_IMG
+#define CLI_MAX_SWITCH_LEN 20
+#define CLI_MAX_SWITCHES 32
+
+#define CLI_SIZE 32
+#define CLI_ARRAY_SIZE ((CLI_MAX_SWITCHES + CLI_SIZE - 1) / CLI_SIZE)
+
+enum CLI_COMMAND : char;
+enum CLI_SWITCH : char;
+
+enum CLI_CMD_ERROR : int {
+	CLI_SUCCESS,
+	CLI_ERROR_NO_CMD,
+	CLI_ERROR_INVALID_CMD,
+	CLI_ERROR_INVALID_SW,
+	CLI_ERROR_INVALID_ARG,
+	CLI_ERROR_MISSING_SW,
+	CLI_ERROR_MISSING_ARG,
 };
 
-enum SWITCH : int {
-	SW_NONE =			1 << 0, 
-	SW_HELP =			1 << 1,
-	
-	// ?? =				1 << 2,
-	
-	SW_ROMSIZE =		1 << 3,
-
-	SW_KEY_KRNL_FILE =	1 << 4,
-	SW_KEY_BLDR_FILE =	1 << 5,
-	SW_OUT_FILE =		1 << 6,
-
-	SW_BANK_FILES =		1 << 7,
-
-	SW_IN_FILE =		1 << 8,
-
-	// ?? =				1 << 9,
-	// ?? =				1 << 10,
-
-	SW_BLDR_FILE =		1 << 11,
-	SW_KRNL_FILE =		1 << 12,
-	SW_INITTBL_FILE =	1 << 13,
-	SW_KRNL_DATA_FILE =	1 << 14,
-
-	SW_ENC_BLDR =		1 << 15,
-	SW_ENC_KRNL =		1 << 16,
-	
-	SW_BINSIZE =		1 << 17,
-
-	SW_LS_NV2A_TBL =	1 << 18,
-	SW_LS_DATA_TBL =	1 << 19,
-	SW_LS_DUMP_KRNL =	1 << 20,
-	
-	// ?? =				1 << 20,
-	// ?? =				1 << 21,
-	// ?? =				1 << 22,
-	// ?? =				1 << 23,
-	
-	SW_MCPX_FILE =		1 << 24,
-
-	SW_PUB_KEY_FILE =	1 << 25,
-	SW_CERT_KEY_FILE =	1 << 26,
-	SW_EEPROM_KEY_FILE = 1 << 27,
-
-	SW_PATCH_KEYS =		1 << 28,
-
-	SW_BLD_BFM =		1 << 29,
-
-	SW_DMP =			1 << 30,
-
-	SW_SIM_SIZE =		1 << 31,
-
-	SW_BLD_BIOS = SW_BLDR_FILE | SW_KRNL_FILE | SW_KRNL_DATA_FILE | SW_INITTBL_FILE,
-};
-enum SW_LS : int {
-	LS_NONE = 0,
-	LS_BIOS = 1 << 1,
-	LS_KRNL = 1 << 2,
-	LS_INITTBL = 1 << 4,	
-	LS_DATA_TBL = 1 << 5,
-	LS_NV2A_TBL = 1 << 6,
-	LS_KEYS = 1 << 7,
-	LS_DUMP_KRNL = 1 << 8,
-
-	LS_OPT = LS_BIOS | LS_KRNL | LS_INITTBL | LS_KEYS
-};
-
-struct CMD_TBL
-{
-	const char* name;
+struct CMD_TBL {
 	const char* sw;
-	const COMMAND type;
-	const int params_req;
-	const int params_opt;
-	const char* help;
-
-	CMD_TBL() : name(NULL), sw(NULL), type(CMD_NONE), params_req(SW_NONE), params_opt(SW_NONE), help(NULL) { };
-
-	CMD_TBL(char const n[MAX_SWITCH_LEN], const char s[MAX_SWITCH_LEN], const COMMAND c, const int req, const int opt, const char* h) :
-		name(n), sw(s), type(c), params_req(req), params_opt(opt), help(h) { };
+	CLI_COMMAND type;
+	CLI_SWITCH requiredSwitches[7];
+	CLI_SWITCH inferredSwitches[4];
 };
 
-struct PARAM_TBL
-{
-	enum PARAM_TYPE { NONE, STR, INT, BOOL, FLAG };
-
+struct PARAM_TBL {
+	enum PARAM_TYPE : char { NONE, STR, INT, BOOL, FLAG };
 	const char* sw;
-	const SWITCH swType;
 	void* var;
+	CLI_SWITCH swType;
 	PARAM_TYPE cmdType;
-	const char* help;
-	const int val;
-
-	PARAM_TBL() : sw(NULL), swType(SW_NONE), var(NULL), cmdType(NONE), help(NULL), val(0) { };
-	PARAM_TBL(const char s[MAX_SWITCH_LEN], const SWITCH t, void* v, PARAM_TYPE c, const char* h, const int val = NULL) :
-		sw(s), swType(t), var(v), cmdType(c), help(h), val(val) { };
 };
+
+// parse the command line arguments
+// argc: the number of arguments
+// argv: the arguments
+// cmd: the selected/current command
+// cmd_tbl: the command table
+// cmd_tbl_size: the size of the command table
+// param_tbl: the parameter table
+// param_tbl_size: the size of the parameter table
+// returns: CLI_CMD_ERROR.
+int parseCli(int argc, char* argv[], const CMD_TBL*& cmd, int* flags, const CMD_TBL* cmd_tbl, const int cmd_tbl_size, const PARAM_TBL* param_tbl, const int param_tbl_size);
+
+void setFlag(const CLI_SWITCH sw, int* flags);
+void clearFlag(const CLI_SWITCH sw, int* flags);
+bool isFlagSet(const CLI_SWITCH sw, const int* flags);
+bool isFlagClear(const CLI_SWITCH sw, const int* flags);
+
+// check if any of the flags are set in the switch array
+// sw: the SET switches. eg (1 << 19) | (1 << 20)
+// flags: the flags array
+// returns: true if any of the flags are set.
+bool isFlagSetAny(const int sw, const int* flags);
 
 #endif // XB_CLI_TBL_H

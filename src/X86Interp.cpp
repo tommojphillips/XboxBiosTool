@@ -29,7 +29,7 @@
 #include "util.h"
 #include "xbmem.h"
 
-X86_INSTR_MAP instrs[] = {
+const X86_INSTR_MAP instrs[] = {
 	{ X86_INSTR_TYPE_PTR, 0x1D8B, "mov ebx", 2, 4 },
 	{ X86_INSTR_TYPE_PTR, 0x0D8B, "mov ecx", 2, 4 },
 	{ X86_INSTR_TYPE_PTR, 0x158B, "mov edx", 2, 4 },
@@ -94,7 +94,7 @@ int decodeX86(UCHAR* data, UINT size, FILE* stream)
 
 int parseInstruction(char* buf, UCHAR* data, UINT& offset)
 {
-	X86_INSTR_MAP* instr = NULL;
+	const X86_INSTR_MAP* instr = NULL;
 
 	// iterate through the x86 instructions
 	for (int i = 0; i < sizeof(instrs) / sizeof(X86_INSTR_MAP); i++)

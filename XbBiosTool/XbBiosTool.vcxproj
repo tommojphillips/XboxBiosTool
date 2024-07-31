@@ -138,6 +138,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\cli_tbl.cpp" />
     <ClCompile Include="..\src\file.cpp" />
     <ClCompile Include="..\src\loadini.cpp" />
     <ClCompile Include="..\src\lzx.cpp" />

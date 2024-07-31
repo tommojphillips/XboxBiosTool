@@ -42,6 +42,7 @@ set "enable_logs=0"
     if not exist "bios\og_1_0" mkdir bios\og_1_0
     if not exist "bios\og_1_1" mkdir bios\og_1_1
     if not exist "bios\512kb" mkdir bios\512kb
+    if not exist "bios\img" mkdir bios\img
 
     if not exist "decode.ini" echo. > decode.ini
     if not exist "logs\" mkdir logs
@@ -84,25 +85,25 @@ set "enable_logs=0"
     set "cur_job="
 
     set "test_group=%~1"
-    shift
 
-    set "test_filter="
-    if NOT "%~1" == "" (
-        set "test_filter=%~1"
-        echo Running tests for !test_filter!...
-    ) else (
-        set "test_filter=!test_group!"
-        set "test_group="
-    )
+    echo !test_group!
+    pause
 
     if "!test_group!" == "-1.0" (
+        echo Running tests for 1.0 bios...
         goto :mcpx_1_0_bios_tests
     ) else if "!test_group!" == "-1.1" (
+        echo Running tests for 1.1 bios...
         goto :mcpx_1_1_bios_tests
     ) else if "!test_group!" == "-512" (
+        echo Running tests for 512kb bios...
         goto :mcpx_1_0_512kb_bios_tests
     ) else if "!test_group!" == "-custom" (
+        echo Running custom bios tests...
         goto :custom_bios_tests
+    ) else if "!test_group!" == "-img" (
+        echo Running tests for xb img files...
+        goto :img_tests
     ) else if NOT "!test_group!" == "" (
         echo Error: unknown test option '!test_group!'
         exit /b 1
@@ -122,17 +123,17 @@ set "enable_logs=0"
 REM run original tests for bios less than 4817
 :mcpx_1_0_bios_tests   
     call :run_og_test "bios\og_1_0" "%MCPX_ROM_1_0%"
-if "%~1" == "-1.0" goto :exit
+if "!test_group!" == "-1.0" goto :exit
 
 REM run original tests for bios greater than or equal to 4817
 :mcpx_1_1_bios_tests
     call :run_og_test "bios\og_1_1" "%MCPX_ROM_1_1%"
-if "%~1" == "-1.1" goto :exit
+if "!test_group!" == "-1.1" goto :exit
 
 REM run original tests for 512kb bios (less than 4817)
 :mcpx_1_0_512kb_bios_tests
     call :run_og_test "bios\512kb" "%MCPX_ROM_1_0%" "-binsize 512 -romsize 512"
-if "%~1" == "-512" goto :exit
+if "!test_group!" == "-512" goto :exit
 
 :custom_bios_tests
     REM test custom bios
@@ -144,7 +145,17 @@ if "%~1" == "-512" goto :exit
         call :do_test "-xcode-decode !arg!" 0 "!arg_name!"
         call :do_test "-xcode-sim !arg!" 0 "!arg_name!"
     )
-if "%~1" == "-custom" goto :exit
+if "!test_group!" == "-custom" goto :exit
+
+:img_tests
+    REM test xb img files
+    for %%f in (bios\img\*.img) do (
+        set "arg=%%f"
+        set arg_name=%%~nf
+
+        call :do_test "-dump-img !arg!" 0 "!arg_name!"
+    )
+if "!test_group!" == "-img" goto :exit
 
 :exit
 :error
@@ -194,12 +205,7 @@ if "%~1" == "-custom" goto :exit
 
     REM get cmd from cur_job
     for /f "tokens=1 delims= " %%a in ("!cur_job!") do set "cmd=%%a"
-    REM remove '-' from cmd
     set "cmd=!cmd:~1!"
-
-    if "!test_filter!" neq "" (
-        if "!cmd!" neq "!test_filter!" exit /b 0
-    )
 
     if "%expected_error%" == "" set "expected_error=0"
     
@@ -249,7 +255,7 @@ if "%~1" == "-custom" goto :exit
         set arg_name=%%~nf
         REM test all original bios are decryptable using specified mcpx rom
 
-        call :do_test "-decomp-krnl !arg! !mcpx_rom! !extra_args!" 0 "!arg_name!"
+        call :do_test "-decomp-krnl !arg! !mcpx_rom! !extra_args! -out !arg_name!_krnl.img" 0 "!arg_name!"
         call :do_test "-ls !arg! !mcpx_rom! !extra_args!" 0 "!arg_name!"
         call :do_test "-xcode-decode !arg! !extra_args!" 0 "!arg_name!"
 

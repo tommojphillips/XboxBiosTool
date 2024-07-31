@@ -36,10 +36,9 @@ public:
 	UCHAR* data;				// allocated mcpx data.
 	UCHAR* sbkey;				// ptr to the sb key.
 
-	MCPX_ROM() : version(MCPX_UNK), data(NULL), sbkey(NULL) { };
-
 	int load(const char* filename);
 
+	void construct();
 	void deconstruct();
 
 	int verifyMCPX();

@@ -57,6 +57,12 @@ int MCPX_ROM::load(const char* filename)
 
 	return result;
 }
+void MCPX_ROM::construct()
+{
+	version = MCPX_UNK;
+	data = NULL;
+	sbkey = NULL;
+}
 void MCPX_ROM::deconstruct()
 {
 	sbkey = NULL;

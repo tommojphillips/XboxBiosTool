@@ -39,42 +39,31 @@ const UINT BLDR_BASE = 0x00090000; 	    // base address for the bldr
 class Bios
 {
 public:
-	Bios()
-	{
-		// allocated memory
-		_bios = NULL;
-		decompressedKrnl = NULL;
-		preldr_key = NULL;
-
-		// pointers, offsets
-		reset();
-	};
-	
-	enum BIOS_LOAD_STATUS : int
-	{
-		BIOS_LOAD_STATUS_SUCCESS = 0,		// The bios was loaded successfully and the bldr is valid.
-		BIOS_LOAD_STATUS_INVALID_BLDR = 1,	// The bios was loaded successfully but the bldr is invalid.
+	enum BIOS_LOAD_STATUS : int {
+		BIOS_LOAD_STATUS_SUCCESS = 0, // The bios was loaded successfully and the bldr is valid.
+		BIOS_LOAD_STATUS_INVALID_BLDR = 1, // The bios was loaded successfully but the bldr is invalid.
 		
 		// errors after here are fatal. and process should stop working with bios
 		
-		BIOS_LOAD_STATUS_FAILED = 2,		// The bios failed to load. catastrophic error.
+		BIOS_LOAD_STATUS_FAILED = 2, // The bios failed to load. catastrophic error.
 		BIOS_LOAD_STATUS_FAILED_ALREADY_LOADED = 3, // The bios failed to load. It is already loaded.
 		BIOS_LOAD_STATUS_FAILED_INVALID_ROMSIZE = 4, // The bios failed to load. The rom size is invalid.
 		BIOS_LOAD_STATUS_FAILED_INVALID_BINSIZE = 5, // The bios failed to load. The bin size is invalid.
 	};
 	enum PRELDR_STATUS : int
 	{
-		PRELDR_STATUS_FOUND = 2,		// bios contains a preldr
-		PRELDR_STATUS_NOT_FOUND = 0,	// bios does not contain a preldr
-		PRELDR_STATUS_ERROR = 1			// preldr error; cannot continue.
+		PRELDR_STATUS_FOUND = 2, // bios contains a preldr
+		PRELDR_STATUS_NOT_FOUND = 0, // bios does not contain a preldr
+		PRELDR_STATUS_ERROR = 1 // preldr error; cannot continue.
 	};
 
+	void construct();
 	void deconstruct();
-
-	int create(UCHAR* in_bl, UINT in_blSize, UCHAR* in_tbl, UINT in_tblSize, UCHAR* in_k, UINT in_kSize, UCHAR* in_kData, UINT in_kDataSize);
 
 	int loadFromFile(const char* filename);
 	int loadFromData(const UCHAR* data, const UINT size);
+
+	int build(UCHAR* in_bl, UINT in_blSize, UCHAR* in_tbl, UINT in_tblSize, UCHAR* in_k, UINT in_kSize, UCHAR* in_kData, UINT in_kDataSize);
 
 	int saveBiosToFile(const char* filename);
 	int saveBldrBlockToFile(const char* filename);
@@ -99,24 +88,24 @@ public:
 
 	int replicateBios();
 
-	UCHAR* getBiosData() const { return _bios; };
-	UINT getBiosSize() const { return _size; };
+	UCHAR* getBiosData() const { return data; };
+	UINT getBiosSize() const { return size; };
 
 	UCHAR* getDecompressedKrnl() const { return decompressedKrnl; };
-	UINT getDecompressedKrnlSize() const { return _decompressedKrnlSize; };
+	UINT getDecompressedKrnlSize() const { return decompressedKrnlSize; };
 
-	UINT getAvailableSpace() const { return _availableSpace; };
-	UINT getTotalSpaceAvailable() const { return _totalSpaceAvailable; };
+	UINT getAvailableSpace() const { return availableSpace; };
+	UINT getTotalSpaceAvailable() const { return totalSpaceAvailable; };
 
-	bool isBootParamsValid() const { return _isBootParamsValid; };
+	bool isBootParamsValid() const { return bldrBootParamsValid; };
 
-	bool isLoaded() const { return _bios != NULL; };
+	bool isLoaded() const { return data != NULL; };
 	
-	bool isBldrEncrypted() const { return _isBldrEncrypted; };
-	bool isKernelEncrypted() const { return _isKernelEncrypted; };
+	bool isBldrEncrypted() const { return bldrEncryptionState; };
+	bool isKernelEncrypted() const { return kernelEncryptionState; };
 	
 private:	
-	UCHAR* _bios;				// The allocated bios data	
+	UCHAR* data;				// The allocated bios data	
 
 	UCHAR* decompressedKrnl;	// The allocated decompressed kernel
 
@@ -137,19 +126,18 @@ private:
 	UCHAR* preldr;				// pointer to the preldr in _bios
 	PRELDR_PARAMS* preldrParams;// pointer to the preldr parameters in _bios
 	PRELDR_ENTRY* preldrEntry;	// pointer to the preldr entry in _bios
-	UCHAR* preldr_key;			// allocated preldr key
+	UCHAR* preldrKey;			// allocated preldr key
 
-	UINT _size;					// the size of the bios.	
-	UINT _buffersize;			// the size of the allocated BUF for the bios.
-	UINT _decompressedKrnlSize;	// The size of the decompressed kernel
-	UINT _totalSpaceAvailable;	// the total space available in the bios. this is the size of the bios minus the bldr BLOCK
-	UINT _availableSpace;		// the available space in the bios. 
+	UINT size;					// the size of the data.
+	UINT buffersize;			// the size of the allocated BUF for the bios.
+	UINT decompressedKrnlSize;	// The size of the decompressed kernel
+	UINT totalSpaceAvailable;	// the total space available in the bios. this is the size of the bios minus the bldr BLOCK
+	UINT availableSpace;		// the available space in the bios. 
 
-	bool _isBldrEncrypted;		// true if the bldr is encrypted.
-	bool _isKernelEncrypted;	// true if the kernel is encrypted.
-
-	bool _isBldrSignatureValid;	// true if the bldr signature is valid.
-	bool _isBootParamsValid;	// true if the bldr is valid.
+	bool bldrEncryptionState;
+	bool kernelEncryptionState;
+	bool bldrSignatureValid;
+	bool bldrBootParamsValid;
 		
 	int load(UCHAR* data, const UINT size);	// load the bios data
 

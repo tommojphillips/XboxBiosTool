@@ -22,7 +22,9 @@
 #ifndef  XB_TYPE_DEFS_H
 #define XB_TYPE_DEFS_H
 
+#ifndef NULL
 #define NULL 0
+#endif
 
 typedef unsigned long ULONG;
 typedef unsigned int UINT;
@@ -32,8 +34,5 @@ typedef unsigned short USHORT;
 static_assert(sizeof(USHORT) == 2, "USHORT is not 2 bytes");
 static_assert(sizeof(UINT) == 4, "UINT is not 4 bytes");
 static_assert(sizeof(ULONG) == 4, "ULONG is not 4 bytes");
-
-const int MAX_FILENAME = 40; 
-const UINT DIGEST_LEN = 20; // sha1 digest length in bytes
 
 #endif // ! XB_BIOS_TYPE_DEFS_H

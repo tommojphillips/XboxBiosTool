@@ -19,7 +19,6 @@
 
 void printHelp();
 int getFilename(char* path);
-int parseArgs(int argc, char* argv[]);
 int validateArgs();
 void cleanup();
 

@@ -119,8 +119,24 @@ int XcodeInterp::load(UCHAR* data, UINT size)
 	}
 
 	xb_cpy(_data, data, size);
-
 	_size = size;
+
+	// opcode map	
+	opcodeMap[0] = OPCODE_VERSION_INFO("xc_nop", XC_NOP);
+	opcodeMap[1] = OPCODE_VERSION_INFO("xc_mem_read", XC_MEM_READ);
+	opcodeMap[2] = OPCODE_VERSION_INFO("xc_mem_write", XC_MEM_WRITE);
+	opcodeMap[3] = OPCODE_VERSION_INFO("xc_pci_write", XC_PCI_WRITE);
+	opcodeMap[4] = OPCODE_VERSION_INFO("xc_pci_read", XC_PCI_READ);
+	opcodeMap[5] = OPCODE_VERSION_INFO("xc_and_or", XC_AND_OR);
+	opcodeMap[6] = OPCODE_VERSION_INFO("xc_use_result", XC_USE_RESULT);
+	opcodeMap[7] = OPCODE_VERSION_INFO("xc_jne", XC_JNE);
+	opcodeMap[8] = OPCODE_VERSION_INFO("xc_jmp", XC_JMP);
+	opcodeMap[9] = OPCODE_VERSION_INFO("xc_accum", XC_ACCUM);
+	opcodeMap[10] = OPCODE_VERSION_INFO("xc_io_write", XC_IO_WRITE);
+	opcodeMap[11] = OPCODE_VERSION_INFO("xc_io_read", XC_IO_READ);
+	opcodeMap[12] = OPCODE_VERSION_INFO("xc_nop_f5", XC_NOP_F5);
+	opcodeMap[13] = OPCODE_VERSION_INFO("xc_exit", XC_EXIT);
+	opcodeMap[14] = OPCODE_VERSION_INFO("xc_nop_80", XC_NOP_80);
 
 	reset();
 
@@ -734,7 +750,7 @@ int encodeX86AsMemWrites(UCHAR* data, UINT size, UCHAR*& buffer, UINT* xcodeSize
 		// realloc if needed
 		if (j + sizeof(XCODE) > nSize)
 		{
-			UCHAR* new_buffer = (UCHAR*)xb_realloc(buffer, nSize + sizeof(XCODE) + allocSize);
+			UCHAR* new_buffer = (UCHAR*)xb_realloc(buffer, nSize + allocSize);
 			if (new_buffer == NULL)
 			{
 				return ERROR_OUT_OF_MEMORY;
@@ -745,14 +761,7 @@ int encodeX86AsMemWrites(UCHAR* data, UINT size, UCHAR*& buffer, UINT* xcodeSize
 
 		xb_cpy(buffer+j, &xcode, sizeof(XCODE));
 		j += sizeof(XCODE);
-	}
-
-	// create exit opcode
-	xcode.opcode = XC_EXIT;
-	xcode.addr = 0x806;
-	xcode.data = 0;
-	xb_cpy(buffer+j, &xcode, sizeof(XCODE));
-	j += sizeof(XCODE);
+	}	
 
 	if (xcodeSize != NULL) // update buffer size
 	{

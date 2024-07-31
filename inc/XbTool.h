@@ -22,28 +22,76 @@
 #ifndef XB_BIOS_TOOL_H
 #define XB_BIOS_TOOL_H
 
+// user incl
 #include "Bios.h"
 #include "Mcpx.h"
-
 #include "cli_tbl.h"
 #include "type_defs.h"
-
 #include "version.h"
+
+enum CLI_COMMAND : char {
+	CMD_NONE,
+	CMD_HELP,
+	CMD_EXTR,
+	CMD_LIST,
+	CMD_SPLIT,
+	CMD_COMBINE,
+	CMD_BLD_BIOS,
+	CMD_XCODE_SIM,
+	CMD_KRNL_DECOMPRESS,
+	CMD_XCODE_DECODE,
+	CMD_ENCODE_X86,
+	CMD_DUMP_NT_IMG
+};
+
+enum CLI_SWITCH : char {
+	SW_NONE = 0,
+	SW_HELP,		
+	SW_ROMSIZE,
+	SW_KEY_KRNL_FILE,
+	SW_KEY_BLDR_FILE,
+	SW_OUT_FILE,
+	SW_IN_FILE,
+	SW_BLDR_FILE,
+	SW_KRNL_FILE,
+	SW_INITTBL_FILE,
+	SW_KRNL_DATA_FILE,
+	SW_ENC_BLDR,
+	SW_ENC_KRNL,
+	SW_BINSIZE,
+	SW_LS_NV2A_TBL,
+	SW_LS_DATA_TBL,
+	SW_LS_DUMP_KRNL,
+	SW_XCODE_BASE,
+	SW_NO_MAX_SIZE,
+	SW_MCPX_FILE,
+	SW_PUB_KEY_FILE,
+	SW_CERT_KEY_FILE,
+	SW_EEPROM_KEY_FILE,
+	SW_PATCH_KEYS,
+	SW_BLD_BFM,
+	SW_DMP,
+	SW_SIM_SIZE,
+	SW_BANK1_FILE,
+	SW_BANK2_FILE,
+	SW_BANK3_FILE,
+	SW_BANK4_FILE,
+};
+const int CLI_LS_FLAGS = (1 << SW_LS_DATA_TBL) | (1 << SW_LS_NV2A_TBL) | (1 << SW_LS_DUMP_KRNL);
 
 struct Parameters
 {
-	int sw_flag; // contains all flags that have been set on the command line.
-	int ls_flag;
+	int sw_flags[CLI_ARRAY_SIZE];
 
 	UINT romsize;
 	UINT binsize;
 
 	UINT simSize;
+	UINT xcodeBase;
 
 	UCHAR* keyBldr;
 	UCHAR* keyKrnl;
 
-	//const char* biosFile;
 	const char* inFile;
 	const char* outFile;
 	const char* bankFiles[4];
@@ -64,15 +112,34 @@ struct Parameters
 	const char* certKeyFile;
 	const char* eepromKeyFile;
 
-	Parameters() : sw_flag(0), ls_flag(0),
-		romsize(0), binsize(0), simSize(0),
-		//biosFile(NULL),
-		inFile(NULL), outFile(NULL), 
-		inittblFile(NULL), bldrFile(NULL), krnlFile(NULL), krnlDataFile(NULL),
-		bldrKeyFile(NULL), krnlKeyFile(NULL),
-		keyBldr(NULL), keyKrnl(NULL), pubKeyFile(NULL), certKeyFile(NULL), eepromKeyFile(NULL),
-		mcpxFile(NULL), mcpx(),
-		bankFiles{NULL, NULL, NULL, NULL } { };
+	void construct()
+	{
+		for (int i = 0; i < CLI_ARRAY_SIZE; i++)
+		{
+			sw_flags[i] = 0;
+		}
+		romsize = 0;
+		binsize = 0;
+		simSize = 0;
+		xcodeBase = 0;
+
+		keyBldr = NULL;
+		keyKrnl = NULL;
+		inFile = NULL;
+		outFile = NULL;
+		inittblFile = NULL;
+		bldrFile = NULL;
+		krnlFile = NULL;
+		krnlDataFile = NULL;
+		mcpxFile = NULL;
+		bldrKeyFile = NULL;
+		krnlKeyFile = NULL;
+		pubKeyFile = NULL;
+		certKeyFile = NULL;
+		eepromKeyFile = NULL;
+
+		mcpx.construct();
+	};
 
 	void deconstruct()
 	{
@@ -89,20 +156,17 @@ struct Parameters
 		}
 
 		mcpx.deconstruct();
-	}
+	};
 };
 
 class XbTool
 {
 	public:
 		const CMD_TBL* cmd;
-		char exe_filename[MAX_FILENAME];		
-		Bios bios;
-
 		Parameters params;
+		Bios bios;
 				
-		XbTool() : exe_filename(), cmd(NULL), bios(), params()  { };
-
+		void construct();
 		void deconstruct();
 
 		int run();

@@ -37,27 +37,30 @@
 const char SUCCESS_OUT[] = "Success! -> OUT: %s %d Kb\n";
 const char FAIL_OUT[] = "Error: Failed to write %s\n";
 
+void XbTool::construct()
+{
+	cmd = NULL;
+	params.construct();
+	bios.construct();
+}
 void XbTool::deconstruct()
 {
 	params.deconstruct();
 	bios.deconstruct();
-};
+}
 
 int XbTool::run()
 {
-	print("%s\n\n", cmd->name);
+	print("%s\n\n", cmd->sw);
 
-	// read in keys if provided.
 	if (readKeys() != 0)
 		return 1;
 
-	// read in mcpx rom if provided
 	if (readMCPX() != 0)
 		return 1;
 
 	int result = 0;
 
-	// run command
 	switch (cmd->type)
 	{
 	case CMD_LIST:
@@ -153,11 +156,11 @@ int XbTool::buildBios()
 	}
 	// required files were read successfully
 	
-	// create the bios in memory
-	result = bios.create(bldr, bldrSize, inittbl, inittblSize, krnl, krnlSize, krnlData, krnlDataSize);
+	// build the bios in memory
+	result = bios.build(bldr, bldrSize, inittbl, inittblSize, krnl, krnlSize, krnlData, krnlDataSize);
 	if (result != 0)
 	{
-		print("Error: Failed to create bios\n");
+		print("Error: Failed to build bios\n");
 		goto Cleanup;
 	}
 
@@ -285,6 +288,8 @@ int XbTool::splitBios()
 	char* biosFn = NULL;
 	char* ext = NULL;
 	char* bankFn = NULL;
+	int i;
+	int j;
 
 	print("bios file: %s\n", params.inFile);
 
@@ -320,10 +325,19 @@ int XbTool::splitBios()
 		result = 1;
 		goto Cleanup;
 	}
-	strcpy(biosFn, params.inFile);
+	for (j = fnLen - 1; j > 0; j--)
+	{
+		if (params.inFile[j] == '\\')
+		{
+			j += 1;
+			break;
+		}
+	}
+	strcpy(biosFn, params.inFile+j);
+	fnLen -= j;
 
 	// remove the extention
-	for (int i = fnLen - 1; i >= 0; i--)
+	for (i = fnLen - 1; i >= 0; i--)
 	{
 		if (biosFn[i] == '.')
 		{
@@ -544,9 +558,7 @@ int XbTool::listBios()
 		return 1;
 	}
 
-	int flag = params.ls_flag;
-
-	if (flag == 0)
+	if (!isFlagSetAny(CLI_LS_FLAGS, params.sw_flags))
 	{
 		print("\nbios size:\t\t%ld KB\n", bios.getBiosSize() / 1024UL);
 		print("rom size:\t\t%ld KB\n", params.romsize / 1024UL);
@@ -557,20 +569,20 @@ int XbTool::listBios()
 		bios.printBldrInfo();
 		bios.printKernelInfo();
 		bios.printInitTblInfo();
-		bios.printKeys();
+		bios.printKeys();	
 	}
 
-	if (flag & LS_NV2A_TBL)
+	if (isFlagSet(SW_LS_NV2A_TBL, params.sw_flags))
 	{
 		bios.printNv2aInfo();
 	}
 
-	if (flag & LS_DATA_TBL)
+	if (isFlagSet(SW_LS_DATA_TBL, params.sw_flags))
 	{
 		bios.printDataTbl();
 	}
 
-	if (flag & LS_DUMP_KRNL)
+	if (isFlagSet(SW_LS_DUMP_KRNL, params.sw_flags))
 	{
 		int result = bios.decompressKrnl();
 		if (result != 0)
@@ -593,23 +605,36 @@ UCHAR* XbTool::load_init_tbl_file(UINT& size, UINT& xcodeBase) const
 	UCHAR* inittbl = NULL;
 	int result = 0;
 
-	// load the inittbl file
-
 	print("inittbl file: %s\n", params.inFile);
+
 	inittbl = readFile(params.inFile, &size);
 	if (inittbl == NULL)
 		return NULL;
 
-	// validate the inittbl file
-	if (size < xcodeBase)
+	if (isFlagSet(SW_XCODE_BASE, params.sw_flags))
 	{
-		xcodeBase = 0;		
+		xcodeBase = params.xcodeBase;
 	}
 	else
 	{
-		xcodeBase = sizeof(INIT_TBL);
+		if (size < sizeof(INIT_TBL))
+		{
+			xcodeBase = 0;
+		}
+		else
+		{
+			xcodeBase = sizeof(INIT_TBL);
+		}
 	}
-	if (size > MAX_BIOS_SIZE)
+
+	if (xcodeBase >= size)
+	{
+		print("Error: Invalid xcode base: %d. Expected less than %d bytes\n", xcodeBase, size);
+		result = 1;
+		goto Cleanup;
+	}
+
+	if (isFlagClear(SW_NO_MAX_SIZE, params.sw_flags) && size > MAX_BIOS_SIZE)
 	{
 		print("Error: Invalid inittbl size: %d. Expected less than %d bytes\n", size, MAX_BIOS_SIZE);
 		result = 1;
@@ -639,19 +664,24 @@ int XbTool::decodeXcodes() const
 
 	UCHAR* inittbl = NULL;
 	UINT size = 0;
-	UINT xcodeBase = 0;
+	UINT xcodeNum = 0;
 	int result = 0;
 	
-	inittbl = load_init_tbl_file(size, xcodeBase);
+	inittbl = load_init_tbl_file(size, context.base);
 	if (inittbl == NULL)
 		return 1;
-	
-	result = interp.load(inittbl + xcodeBase, size - xcodeBase);
+
+	result = interp.load(inittbl + context.base, size - context.base);
 	if (result != 0)
 		goto Cleanup;
 
-	context.base = xcodeBase;
-		
+	print("xcode base: 0x%x\n", context.base);
+
+	// load the decode settings from the ini file
+	result = interp.loadDecodeSettings(context.settings);
+	if (result != 0)
+		goto Cleanup;
+
 	// decode phase 1
 	while (interp.interpretNext(context.xcode) == 0)
 	{
@@ -696,16 +726,12 @@ int XbTool::decodeXcodes() const
 		}
 	}
 
-	
-	// load the decode settings from the ini file
-	if (interp.loadDecodeSettings(context.settings) != 0)
-	{
-		result = 1;
-		goto Cleanup;
-	}
+	xcodeNum = interp.getOffset() / sizeof(XCODE);
+
+	print("xcodes: %d ( %ld bytes )\n", xcodeNum, interp.getOffset());
 	
 	// setup the file stream, if -d flag is set
-	if ((params.sw_flag & SW_DMP) != 0)
+	if (isFlagSet(SW_DMP, params.sw_flags))
 	{
 		const char* filename = params.outFile;
 		if (filename == NULL)
@@ -716,7 +742,7 @@ int XbTool::decodeXcodes() const
 		// del file if it exists
 		deleteFile(filename);
 
-		print("Writing decoded xcodes to %s (text format)\n", filename, interp.getOffset());
+		print("Writing decoded xcodes to %s\n", filename);
 		context.stream = fopen(filename, "w");
 		if (context.stream == NULL)
 		{
@@ -725,8 +751,15 @@ int XbTool::decodeXcodes() const
 			goto Cleanup;
 		}
 	}
-
-	print("xcodes: %d ( %ld bytes )\n", interp.getOffset() / sizeof(XCODE), interp.getOffset());
+	else
+	{
+		if (xcodeNum > 4096)
+		{
+			print("Error: Too many xcodes. Use -d flag to dump to file\n");
+			result = 1;
+			goto Cleanup;
+		}
+	}
 
 	// decode phase 2
 
@@ -741,7 +774,7 @@ int XbTool::decodeXcodes() const
 		}
 	}
 
-	if ((params.sw_flag & SW_DMP) != 0)
+	if (isFlagSet(SW_DMP, params.sw_flags))
 	{
 		fclose(context.stream);
 		print("Done\n");
@@ -781,6 +814,7 @@ int XbTool::simulateXcodes() const
 	if (result != 0)
 		goto Cleanup;
 
+	print("xcode base: 0x%x\n", xcodeBase);
 	print("mem space: %d bytes\n\n", params.simSize);
 
 	mem_sim = (UCHAR*)xb_alloc(params.simSize);
@@ -835,7 +869,7 @@ int XbTool::simulateXcodes() const
 	}
 
 	// if -d flag is set, dump the memory to a file, otherwise print the memory dump
-	if ((params.sw_flag & SW_DMP) != 0)
+	if (isFlagSet(SW_DMP, params.sw_flags))
 	{
 		const char* filename = params.outFile;
 		if (filename == NULL)
@@ -899,9 +933,9 @@ int XbTool::decompressKrnl()
 
 	UINT offset = ((IMAGE_DOS_HEADER*)decompressedKrnl)->e_lfanew;
 
-	if (offset < 0 || offset > sizeof(IMAGE_DOS_HEADER) || offset > decompressedSize)
+	if (offset < 0 || offset > decompressedSize)
 	{
-		print("Error: Invalid NT Header offset\n");
+		print("Error: Invalid NT Header offset, 0x%x\n", offset);
 		return 1;
 	}
 
@@ -1022,7 +1056,8 @@ int XbTool::extractPubKey(UCHAR* data, UINT size)
 
 	// if the '-patchkeys' flag is set, then use that key file to patch the pubkey.
 	// otherwise, if the '-patchkeys' flag is not set then save the found pubkey to that file (unmodified).
-	if ((params.sw_flag & SW_PATCH_KEYS) == 0)
+	
+	if (isFlagClear(SW_PATCH_KEYS, params.sw_flags))
 	{
 		print("Writing public key to %s (%d bytes)\n", params.pubKeyFile, sizeof(PUBLIC_KEY));
 		if (writeFile(params.pubKeyFile, pubkey, sizeof(PUBLIC_KEY)) != 0)
@@ -1067,7 +1102,7 @@ int XbTool::encodeX86()
 	UCHAR* data = NULL;
 	UCHAR* buffer = NULL;
 	UINT dataSize = 0;
-	UINT bufferSize = 0;
+	UINT xcodeSize = 0;
 	int result = 0;
 
 	const char* filename = NULL;
@@ -1080,12 +1115,14 @@ int XbTool::encodeX86()
 		return 1;
 	}
 
-	result = encodeX86AsMemWrites(data, dataSize, buffer, &bufferSize);
+	result = encodeX86AsMemWrites(data, dataSize, buffer, &xcodeSize);
 	if (result != 0)
 	{
 		print("Error: Failed to encode x86 instructions\n");
 		goto Cleanup;
 	}
+
+	print("xcodes: %d\n", xcodeSize / sizeof(XCODE));
 
 	// write the xcodes to file
 	filename = params.outFile;
@@ -1094,10 +1131,10 @@ int XbTool::encodeX86()
 		filename = "xcodes.bin";
 	}
 
-	result = writeFile(filename, buffer, bufferSize);
+	result = writeFile(filename, buffer, xcodeSize);
 	if (result == 0)
 	{
-		print(SUCCESS_OUT, filename, bufferSize / 1024);
+		print(SUCCESS_OUT, filename, xcodeSize / 1024);
 	}
 	else
 	{

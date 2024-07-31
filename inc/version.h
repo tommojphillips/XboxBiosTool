@@ -26,9 +26,9 @@
 #define STR(x) STRIFY(x)
 
 #define XB_BIOS_TOOL_VER_MAJOR 0
-#define XB_BIOS_TOOL_VER_MINOR 1
+#define XB_BIOS_TOOL_VER_MINOR 2
 #define XB_BIOS_TOOL_VER_PATCH 0
-#define XB_BIOS_TOOL_VER_BUILD 7
+#define XB_BIOS_TOOL_VER_BUILD 0
 
 #define XB_BIOS_TOOL_AUTHOR_STR "tommojphillips"
 #define XB_BIOS_TOOL_NAME_STR "XbTool"
