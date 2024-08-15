@@ -38,7 +38,7 @@ void rc4_key(UCHAR* s, const UCHAR* key, const UINT len)
 
     for (i = 0; i < 256; i++)
     {
-        s[i] = i;
+        s[i] = (UCHAR)i;
         k[i] = key[i % len];
     }
     for (i = 0; i < 256; i++)

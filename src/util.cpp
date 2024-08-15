@@ -25,38 +25,37 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <memory.h>
 
 // user incl
 #include "util.h"
 #include "type_defs.h"
-#include "xbmem.h"
 
 static int console_util_color = 0;
-static int xb_error_code = XB_ERROR_CODES::ERROR_SUCCESS;
+static int _g_error_code = XB_ERROR_CODES::ERROR_SUCCESS;
 
 int getErrorCode()
 {
-	return xb_error_code;
+	return _g_error_code;
 }
 void setErrorCode(const int code)
 {
-	xb_error_code = code;
+	_g_error_code = code;
 }
 
 void setConsoleColor(const int col)
 {
-	if (col != 0) // reset col.
+	if (col != 0)
 	{
 		console_util_color = 0;
 		printf("\033[0m");
 	}
 
-	if (col < 0) // don't set col if less than 0.
+	if (col < 0)
 	{
 		return;
 	}
 
-	// set col.
 	console_util_color = col;
 	printf("\x1B[%dm", col);
 }
@@ -79,12 +78,12 @@ void printData(UCHAR* data, const int len, bool newLine)
 
     for (int i = 0; i < len; i++)
     {
-		print("%02X ", data[i]);
+		printf("%02X ", data[i]);
 	}
 
     if (newLine)
     {
-		print("\n");
+		printf("\n");
 	}
 }
 
@@ -133,8 +132,7 @@ void print_f(char* const buffer, const int bufferSize, const char* format, ...)
 			int num = 0;
 			int tokenLen = (endToken - startToken + 1) - 2; // -2 to remove the '{' and '}'
 			char tokenStr[10] = {0};
-			xb_set(tokenStr, 0xCC, sizeof(tokenStr));
-
+			
 			if (tokenLen + 1 > sizeof(tokenStr))
 			{
 				setErrorCode(ERROR_BUFFER_OVERFLOW);
@@ -173,7 +171,7 @@ void print_f(char* const buffer, const int bufferSize, const char* format, ...)
 					setErrorCode(ERROR_BUFFER_OVERFLOW);
 					break;
 				}
-				xb_cpy(bufferPtr, arg, argLen);
+				memcpy(bufferPtr, arg, argLen);
 				bufferPtr += argLen;
 			}
 		}
@@ -199,7 +197,7 @@ void print_f(char* const buffer, const int bufferSize, const char* format, ...)
 					setErrorCode(ERROR_BUFFER_OVERFLOW);
 					break;
 				}
-				xb_cpy(bufferPtr, startToken, argLen);
+				memcpy(bufferPtr, startToken, argLen);
 				bufferPtr += argLen;
 			}
 
@@ -214,34 +212,9 @@ void print_f(char* const buffer, const int bufferSize, const char* format, ...)
 			formatPtr++;
 	}
 
-	// null terminate the buffer
 	bufferPtr[0] = '\0';
 }
-void format(char* buffer, const char* format, ...)
-{
-	va_list args;
 
-	va_start(args, format);
-	vsprintf(buffer, format, args);
-	va_end(args);
-}
-
-void print(FILE* stream, const char* format, ...)
-{
-	va_list args;
-
-	va_start(args, format);
-	vfprintf(stream, format, args);
-	va_end(args);
-}
-void print(const char* format, ...)
-{
-	va_list args;
-
-	va_start(args, format);
-	vfprintf(stdout, format, args);
-	va_end(args);
-}
 void print(const CON_COL col, const char* format, ...)
 {
 	setForegroundColor(col);
@@ -252,18 +225,6 @@ void print(const CON_COL col, const char* format, ...)
 	va_end(args);
 
 	setConsoleColor(0);
-}
-
-int checkSize(const UINT& size)
-{
-	switch (size)
-	{
-		case 0x40000U:
-		case 0x80000U:
-		case 0x100000U:
-			return 0;
-	}
-	return 1;
 }
 
 void getTimestamp(UINT timestamp, char* timestamp_str)
@@ -291,7 +252,7 @@ void ltrim(char*& str)
 	if (str == NULL)
 		return;
 
-	while (*str == ' ' || *str == '\t')
+	while (*str == ' ' || *str == '\t' || *str == '\n')
 	{
 		str++;
 	}
@@ -306,49 +267,19 @@ void rtrim(char*& str)
 		return;
 
 	char* end = str + len - 1;
-	while (end > str && (*end == ' ' || *end == '\t'))
+	while (end > str && (*end == ' ' || *end == '\t' || *end == '\n'))
 	{
 		end--;
 	}
 	*(end + 1) = '\0';
 }
-void lpad(char buff[], const UINT buffSize, const char pad)
+
+void rpad(char* str, const int buffSize, const char pad)
 {
-	if (buff == NULL)
+	if (str == NULL)
 		return;
 
-	// pad left
-	UINT slen = strlen(buff);
-	if (slen >= buffSize)
-		return;
-
-	// shift right
-	for (UINT i = buffSize - 1; i >= slen; i--)
-	{
-		buff[i] = buff[i - buffSize + slen];
-	}
-
-	// pad left
-	for (UINT i = 0; i < buffSize - slen; i++)
-	{
-		buff[i] = pad;
-	}
-}
-void rpad(char buff[], const UINT buffSize, const char pad)
-{
-	if (buff == NULL)
-		return;
-
-	UINT slen = strlen(buff);
-	xb_set(buff + slen, ' ', buffSize - slen - 1);
-}
-
-void errorExit(const int code, const char* format, ...)
-{
-	va_list args;
-	va_start(args, format);
-	vfprintf(stderr, format, args);
-	va_end(args);
-
-	exit(code);
+	int slen = strlen(str);
+	memset(str + slen, pad, buffSize - slen - 1);
+	str[buffSize - 1] = '\0';
 }

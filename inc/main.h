@@ -18,7 +18,6 @@
 */
 
 void printHelp();
-int getFilename(char* path);
 int validateArgs();
 void cleanup();
 

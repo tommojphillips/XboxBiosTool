@@ -1,4 +1,4 @@
-// X86Interp.h
+// rsa.cpp:
 
 /* Copyright(C) 2024 tommojphillips
  *
@@ -19,31 +19,43 @@
 // Author: tommojphillips
 // GitHub: https:\\github.com\tommojphillips
 
-#ifndef XB_X86_INTERP_H
-#define XB_X86_INTERP_H
-
 // std incl
 #include <cstdio>
+#include <memory.h>
 
 // user incl
+#include "rsa.h"
 #include "type_defs.h"
 
-enum X86_INSTR_TYPE : UCHAR {
-	X86_INSTR_OP,
-	X86_INSTR_REG_NUM,
-	X86_INSTR_REG_PTR,
-	X86_INSTR_JMP_FAR,
-	X86_INSTR_JMP_REL,
-};
-struct X86_INSTR_MAP {
-	X86_INSTR_TYPE type;
-	USHORT opcode;
-	const char* asm_instr;
-	USHORT opcode_len;
-	USHORT operrand_len;
-};
+PUBLIC_KEY* rsaVerifyPublicKey(UCHAR* data)
+{
+	// verify the public key header.
 
-int parseInstruction(char* buf, UCHAR* data, UINT& offset);
-int decodeX86(UCHAR* data, UINT size, FILE* stream);
+	static const RSA_HEADER RSA1_HEADER = { { 'R', 'S', 'A', '1' }, 264, 2048, 255, 65537 };
 
-#endif // XB_X86_INTERP_H
+	if (memcmp(data, &RSA1_HEADER, sizeof(RSA_HEADER)) != 0)
+	{
+		return NULL;
+	}
+
+	return (PUBLIC_KEY*)data;
+}
+
+int rsaPrintPublicKey(PUBLIC_KEY* pubkey)
+{
+	const int bytesPerLine = 16;
+	char line[bytesPerLine * 3 + 1] = { 0 };
+
+	for (int i = 0; i < sizeof(pubkey->modulus); i += bytesPerLine)
+	{
+		for (UINT j = 0; j < bytesPerLine; j++)
+		{
+			if (i + j >= sizeof(pubkey->modulus))
+				break;
+			sprintf(line + (j * 3), "%02X ", pubkey->modulus[i + j]);
+		}
+		printf("%s\n", line);
+	}
+
+	return 0;
+}

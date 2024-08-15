@@ -136,3 +136,17 @@ init table version
 = 0x40: New DVT 3 Boxes with NV2A A02 new metal 7 (Faster)
 = 0x46: DVT4/5
 > 0x46: DVT6
+
+--------------------------------------------------------------------------------------------------------------------------------
+Machine code:  --->  Xcodes:              --->              Assembly:
+  0000: B8 ED 0B F0    0000: xc_mem_write 0x00, 0xF00BEDB8    mov eax, 0xfff00bed
+  0004: FF FF E0 90    0009: xc_mem_write 0x04, 0x90E0FFFF    jmp eax
+                                                              nop
+Byte code:
+    0000: 03 00 00 00                                                                                   
+    0004: 00 B8 ED 0B
+    0008: F0 03 04 00
+    000C: 00 00 FF FF
+    0010: E0 90
+
+ 8 bytes -> 18 bytes.

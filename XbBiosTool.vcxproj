@@ -24,6 +24,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <PreferredToolArchitecture>x86</PreferredToolArchitecture>
+    <EnableASAN>true</EnableASAN>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -70,30 +71,36 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)\bin\</OutDir>
-    <IntDir>objd\</IntDir>
+    <IntDir>bin\objd\</IntDir>
     <TargetName>xbios</TargetName>
     <LinkIncremental>false</LinkIncremental>
     <RunCodeAnalysis>false</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)\bin\</OutDir>
-    <IntDir>obj\</IntDir>
+    <IntDir>bin\obj\</IntDir>
     <TargetName>xbios</TargetName>
     <RunCodeAnalysis>false</RunCodeAnalysis>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
+      <ConformanceMode>
+      </ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AssemblerOutput>NoListing</AssemblerOutput>
-      <StringPooling>false</StringPooling>
-      <SmallerTypeCheck>false</SmallerTypeCheck>
-      <ShowIncludes>false</ShowIncludes>
+      <AssemblerOutput>
+      </AssemblerOutput>
+      <StringPooling>
+      </StringPooling>
+      <SmallerTypeCheck>
+      </SmallerTypeCheck>
+      <ShowIncludes>
+      </ShowIncludes>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <MultiProcessorCompilation>
+      </MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -101,9 +108,11 @@
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
       <Version>
       </Version>
-      <LinkStatus>false</LinkStatus>
+      <LinkStatus>
+      </LinkStatus>
       <OptimizeReferences>true</OptimizeReferences>
-      <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
+      <LinkTimeCodeGeneration>
+      </LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -116,7 +125,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerOutput>NoListing</AssemblerOutput>
-      <Optimization>MinSpace</Optimization>
+      <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
       <OmitFramePointers>false</OmitFramePointers>
@@ -135,49 +144,52 @@
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <ShowProgress>NotSet</ShowProgress>
       <LinkStatus>false</LinkStatus>
+      <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\cli_tbl.cpp" />
-    <ClCompile Include="..\src\file.cpp" />
-    <ClCompile Include="..\src\loadini.cpp" />
-    <ClCompile Include="..\src\lzx.cpp" />
-    <ClCompile Include="..\src\main.cpp" />
-    <ClCompile Include="..\src\Mcpx.cpp" />
-    <ClCompile Include="..\src\nt_headers.cpp" />
-    <ClCompile Include="..\src\rc4.cpp" />
-    <ClCompile Include="..\src\sha1.cpp" />
-    <ClCompile Include="..\src\util.cpp" />
-    <ClCompile Include="..\src\X86Interp.cpp" />
-    <ClCompile Include="..\src\xbmem.cpp" />
-    <ClCompile Include="..\src\Bios.cpp" />
-    <ClCompile Include="..\src\XbTool.cpp" />
-    <ClCompile Include="..\src\XcodeInterp.cpp" />
+    <ClCompile Include="src\cli_tbl.cpp" />
+    <ClCompile Include="src\file.cpp" />
+    <ClCompile Include="src\loadini.cpp" />
+    <ClCompile Include="src\lzx.cpp" />
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\Mcpx.cpp" />
+    <ClCompile Include="src\nt_headers.cpp" />
+    <ClCompile Include="src\rc4.cpp" />
+    <ClCompile Include="src\rsa.cpp" />
+    <ClCompile Include="src\sha1.cpp" />
+    <ClCompile Include="src\util.cpp" />
+    <ClCompile Include="src\X86Interp.cpp" />
+    <ClCompile Include="src\xbmem.cpp" />
+    <ClCompile Include="src\Bios.cpp" />
+    <ClCompile Include="src\XbTool.cpp" />
+    <ClCompile Include="src\XcodeInterp.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\inc\cli_tbl.h" />
-    <ClInclude Include="..\inc\file.h" />
-    <ClInclude Include="..\inc\loadini.h" />
-    <ClInclude Include="..\inc\lzx.h" />
-    <ClInclude Include="..\inc\main.h" />
-    <ClInclude Include="..\inc\Mcpx.h" />
-    <ClInclude Include="..\inc\rc4.h" />
-    <ClInclude Include="..\inc\sha1.h" />
-    <ClInclude Include="..\inc\type_defs.h" />
-    <ClInclude Include="..\inc\util.h" />
-    <ClInclude Include="..\inc\version.h" />
-    <ClInclude Include="..\inc\X86Interp.h" />
-    <ClInclude Include="..\inc\xbmem.h" />
-    <ClInclude Include="..\inc\bldr.h" />
-    <ClInclude Include="..\inc\help_strings.h" />
-    <ClInclude Include="..\inc\Bios.h" />
-    <ClInclude Include="..\inc\XbTool.h" />
-    <ClInclude Include="..\inc\XcodeInterp.h" />
-    <ClInclude Include="resource.h" />
-    <ClInclude Include="..\inc\nt_headers.h" />
+    <ClInclude Include="inc\cli_tbl.h" />
+    <ClInclude Include="inc\file.h" />
+    <ClInclude Include="inc\loadini.h" />
+    <ClInclude Include="inc\lzx.h" />
+    <ClInclude Include="inc\main.h" />
+    <ClInclude Include="inc\Mcpx.h" />
+    <ClInclude Include="inc\rc4.h" />
+    <ClInclude Include="inc\rsa.h" />
+    <ClInclude Include="inc\sha1.h" />
+    <ClInclude Include="inc\type_defs.h" />
+    <ClInclude Include="inc\util.h" />
+    <ClInclude Include="inc\version.h" />
+    <ClInclude Include="inc\X86Interp.h" />
+    <ClInclude Include="inc\xbmem.h" />
+    <ClInclude Include="inc\bldr.h" />
+    <ClInclude Include="inc\help_strings.h" />
+    <ClInclude Include="inc\Bios.h" />
+    <ClInclude Include="inc\XbTool.h" />
+    <ClInclude Include="inc\XcodeInterp.h" />
+    <ClInclude Include="inc\resource.h" />
+    <ClInclude Include="inc\nt_headers.h" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="XbBiosTool.rc" />
+    <ResourceCompile Include="inc\XbBiosTool.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

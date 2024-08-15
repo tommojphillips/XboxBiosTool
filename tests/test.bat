@@ -45,6 +45,7 @@ set "enable_logs=0"
     if not exist "bios\img" mkdir bios\img
 
     if not exist "decode.ini" echo. > decode.ini
+    if not exist "decode2.ini" echo. > decode2.ini
     if not exist "logs\" mkdir logs
 
 :cleanup_test_files
@@ -86,9 +87,6 @@ set "enable_logs=0"
 
     set "test_group=%~1"
 
-    echo !test_group!
-    pause
-
     if "!test_group!" == "-1.0" (
         echo Running tests for 1.0 bios...
         goto :mcpx_1_0_bios_tests
@@ -117,12 +115,25 @@ set "enable_logs=0"
     REM test garbage input
     call :do_test "-ls noexist.bin" 1
     call :do_test "-ls !exe!" 1
-    call :do_test "-ls decode.ini" 1
     call :do_test "-nocommand blah" 1
 
 REM run original tests for bios less than 4817
 :mcpx_1_0_bios_tests   
     call :run_og_test "bios\og_1_0" "%MCPX_ROM_1_0%"
+
+    for %%f in (bios\og_1_0\*.bin) do (
+        set "arg=%%f"
+        set arg_name=%%~nf
+
+        call :do_test "-split !arg!" 0 "!arg_name!"
+        REM note this test expects bios to be 1MB
+        call :do_test "-combine !arg_name!_bank1.bin !arg_name!_bank2.bin !arg_name!_bank3.bin !arg_name!_bank4.bin" 0 "!arg_name!"
+        call :do_test "-split bios.bin" 0 "!arg_name!"
+        call :do_test "-decomp-krnl bios_bank1.bin %MCPX_ROM_1_0%" 0 "!arg_name!"
+        call :do_test "-decomp-krnl bios_bank2.bin %MCPX_ROM_1_0%" 0 "!arg_name!"
+        call :do_test "-decomp-krnl bios_bank3.bin %MCPX_ROM_1_0%" 0 "!arg_name!"
+        call :do_test "-decomp-krnl bios_bank4.bin %MCPX_ROM_1_0%" 0 "!arg_name!"
+    )
 if "!test_group!" == "-1.0" goto :exit
 
 REM run original tests for bios greater than or equal to 4817
@@ -133,6 +144,17 @@ if "!test_group!" == "-1.1" goto :exit
 REM run original tests for 512kb bios (less than 4817)
 :mcpx_1_0_512kb_bios_tests
     call :run_og_test "bios\512kb" "%MCPX_ROM_1_0%" "-binsize 512 -romsize 512"
+
+    for %%f in (bios\512kb\*.bin) do (
+        set "arg=%%f"
+        set arg_name=%%~nf
+
+        call :do_test "-split !arg! -romsize 512" 0 "!arg_name!"
+        call :do_test "-combine !arg_name!_bank1.bin !arg_name!_bank2.bin" 0 "!arg_name!"
+        call :do_test "-split bios.bin -romsize 512" 0 "!arg_name!"
+        call :do_test "-decomp-krnl bios_bank1.bin %MCPX_ROM_1_0% -romsize 512" 0 "!arg_name!"
+        call :do_test "-decomp-krnl bios_bank2.bin %MCPX_ROM_1_0% -romsize 512" 0 "!arg_name!"        
+    )
 if "!test_group!" == "-512" goto :exit
 
 :custom_bios_tests
@@ -143,6 +165,8 @@ if "!test_group!" == "-512" goto :exit
         REM test custom bios decoding and visor simulation
 
         call :do_test "-xcode-decode !arg!" 0 "!arg_name!"
+        call :do_test "-xcode-decode -ini decode.ini !arg!" 0 "!arg_name!"
+        call :do_test "-xcode-decode -ini decode2.ini !arg!" 0 "!arg_name!"
         call :do_test "-xcode-sim !arg!" 0 "!arg_name!"
     )
 if "!test_group!" == "-custom" goto :exit
@@ -257,7 +281,10 @@ if "!test_group!" == "-img" goto :exit
 
         call :do_test "-decomp-krnl !arg! !mcpx_rom! !extra_args! -out !arg_name!_krnl.img" 0 "!arg_name!"
         call :do_test "-ls !arg! !mcpx_rom! !extra_args!" 0 "!arg_name!"
+        call :do_test "-ls !arg! -nv2a -datatbl -dump-krnl !mcpx_rom! !extra_args!" 0 "!arg_name!"
         call :do_test "-xcode-decode !arg! !extra_args!" 0 "!arg_name!"
+        call :do_test "-xcode-decode -ini decode.ini !arg!" 0 "!arg_name!"
+        call :do_test "-xcode-decode -ini decode2.ini !arg!" 0 "!arg_name!"
 
         REM test extracting bios 
         call :do_test "-extr !arg! !mcpx_rom! !extra_args!" 0

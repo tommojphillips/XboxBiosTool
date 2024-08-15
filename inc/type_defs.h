@@ -31,8 +31,6 @@ typedef unsigned int UINT;
 typedef unsigned char UCHAR;
 typedef unsigned short USHORT;
 
-static_assert(sizeof(USHORT) == 2, "USHORT is not 2 bytes");
-static_assert(sizeof(UINT) == 4, "UINT is not 4 bytes");
-static_assert(sizeof(ULONG) == 4, "ULONG is not 4 bytes");
+#define MAKE_4BYTE_SIGNATURE(a,b,c,d) (a + (b<<8) + (c<<16) + (d<<24))
 
 #endif // ! XB_BIOS_TYPE_DEFS_H

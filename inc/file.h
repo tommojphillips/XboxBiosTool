@@ -23,7 +23,7 @@
 #define XB_FILE_H
 
 // std incl
-#include <stdio.h>
+#include <cstdio>
 
 // user incl
 #include "type_defs.h"
@@ -33,7 +33,7 @@
 // bytesRead: if not NULL, will store the number of bytes read.
 // expectedSize: if not -1, will check the file size against this value and return NULL if they don't match.
 // returns the buffer if successful, NULL otherwise.
-UCHAR* readFile(const char* filename, UINT* bytesRead, const int expectedSize = -1);
+UCHAR* readFile(const char* filename, UINT* bytesRead, const UINT expectedSize = 0);
 
 // write to a file.
 // filename: the absolute path to the file.

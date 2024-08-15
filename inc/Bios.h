@@ -39,6 +39,33 @@ const UINT BLDR_BASE = 0x00090000; 	    // base address for the bldr
 class Bios
 {
 public:
+	Bios() {
+		data = NULL;
+		decompressedKrnl = NULL;
+		preldrKey = NULL;
+
+		reset();
+	};
+	~Bios() {
+		if (data != NULL)
+		{
+			xb_free(data);
+			data = NULL;
+		}
+		if (decompressedKrnl != NULL)
+		{
+			xb_free(decompressedKrnl);
+			decompressedKrnl = NULL;
+		}
+		if (preldrKey != NULL)
+		{
+			xb_free(preldrKey);
+			preldrKey = NULL;
+		}
+
+		reset();
+	};
+	
 	enum BIOS_LOAD_STATUS : int {
 		BIOS_LOAD_STATUS_SUCCESS = 0, // The bios was loaded successfully and the bldr is valid.
 		BIOS_LOAD_STATUS_INVALID_BLDR = 1, // The bios was loaded successfully but the bldr is invalid.
@@ -56,9 +83,6 @@ public:
 		PRELDR_STATUS_NOT_FOUND = 0, // bios does not contain a preldr
 		PRELDR_STATUS_ERROR = 1 // preldr error; cannot continue.
 	};
-
-	void construct();
-	void deconstruct();
 
 	int loadFromFile(const char* filename);
 	int loadFromData(const UCHAR* data, const UINT size);

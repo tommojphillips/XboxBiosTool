@@ -21,8 +21,8 @@
 // Project start date: 25.05.2024
 
 // std incl
-#include <stdlib.h>
-#include <cstring>
+#include <cstdlib>
+#include <cstdio>
 
 // user incl
 #include "XbTool.h"
@@ -37,7 +37,7 @@
 XbTool xbtool;							// global instance of xbtool
 Parameters&  params = xbtool.params;	// global instance of parameters.
 
-const CMD_TBL cmd_tbl[] = {
+static const CMD_TBL cmd_tbl[] = {
 	{ "?", CMD_HELP, {SW_NONE}, {SW_NONE} },	
 	{ "ls", CMD_LIST, {SW_IN_FILE}, {SW_IN_FILE} },
 	{ "extr", CMD_EXTR, {SW_IN_FILE}, {SW_IN_FILE} },
@@ -51,7 +51,7 @@ const CMD_TBL cmd_tbl[] = {
 	{ "dump-img", CMD_DUMP_NT_IMG, {SW_IN_FILE}, {SW_IN_FILE} },
 };
 
-PARAM_TBL param_tbl[] = {
+static const PARAM_TBL param_tbl[] = {
 	{ "in", &params.inFile, SW_IN_FILE, PARAM_TBL::STR },
 	{ "out", &params.outFile, SW_OUT_FILE, PARAM_TBL::STR },
 	{ "romsize", &params.romsize, SW_ROMSIZE, PARAM_TBL::INT },
@@ -86,63 +86,63 @@ PARAM_TBL param_tbl[] = {
 	{ "bank2", &params.bankFiles[1], SW_BANK2_FILE, PARAM_TBL::STR },
 	{ "bank3", &params.bankFiles[2], SW_BANK3_FILE, PARAM_TBL::STR },
 	{ "bank4", &params.bankFiles[3], SW_BANK4_FILE, PARAM_TBL::STR },
+	{ "ini", &params.settingsFile, SW_INI_FILE, PARAM_TBL::STR },
 };
 
 void printHelp()
 {
-	print("Usage: xbios.exe <command> [switches]\n");
-	print("\nCommands:\n");
+	printf("Usage: xbios <command> [switches]\n\nCommands:\n");
 
-	print(" /ls\n# %s\n %s (req)\n %s %s\n %s\n %s\n %s\n\n",
+	printf(" /ls\n# %s\n %s (req)\n %s %s\n %s\n %s\n %s\n\n",
 		HELP_STR_LIST, HELP_STR_PARAM_BIOS_FILE, HELP_STR_PARAM_ROMSIZE, HELP_STR_VALID_ROM_SIZES, HELP_STR_PARAM_LS_DATA_TBL,
 		HELP_STR_PARAM_LS_NV2A_TBL, HELP_STR_PARAM_LS_DUMP_KRNL);
 
-	print(" /extr\n# %s\n %s (req)\n %s %s\n\n", HELP_STR_EXTR_ALL, HELP_STR_PARAM_BIOS_FILE, HELP_STR_PARAM_ROMSIZE, HELP_STR_VALID_ROM_SIZES);
+	printf(" /extr\n# %s\n %s (req)\n %s %s\n\n", HELP_STR_EXTR_ALL, HELP_STR_PARAM_BIOS_FILE, HELP_STR_PARAM_ROMSIZE, HELP_STR_VALID_ROM_SIZES);
 
-	print(" /bld\n# %s\n %s (req)\n %s (req)\n %s (req)\n %s (req)\n %s\n %s %s\n %s %s\n %s\n %s\n %s\n %s\n\n",
+	printf(" /bld\n# %s\n %s (req)\n %s (req)\n %s (req)\n %s (req)\n %s\n %s %s\n %s %s\n %s\n %s\n %s\n %s\n\n",
 		HELP_STR_BUILD, HELP_STR_PARAM_BLDR, HELP_STR_PARAM_KRNL, HELP_STR_PARAM_KRNL_DATA, HELP_STR_PARAM_INITTBL, HELP_STR_PARAM_OUT_FILE, 
 		HELP_STR_PARAM_ROMSIZE, HELP_STR_VALID_ROM_SIZES, HELP_STR_PARAM_BINSIZE, HELP_STR_VALID_ROM_SIZES, HELP_STR_PARAM_PATCH_KEYS,
 		HELP_STR_PARAM_CERT_KEY, HELP_STR_PARAM_EEPROM_KEY, HELP_STR_PARAM_BFM);
 
-	print(" /decomp-krnl\n# %s\n %s (req)\n %s\n %s\n %s\n\n",
+	printf(" /decomp-krnl\n# %s\n %s (req)\n %s\n %s\n %s\n\n",
 		HELP_STR_DECOMP_KRNL, HELP_STR_PARAM_BIOS_FILE, HELP_STR_PARAM_OUT_FILE, HELP_STR_PARAM_PATCH_KEYS, HELP_STR_PARAM_PUB_KEY);
 
-	print(" /split\n# %s\n %s (req)\n %s %s\n\n", HELP_STR_SPLIT, HELP_STR_PARAM_BIOS_FILE, HELP_STR_PARAM_ROMSIZE, HELP_STR_VALID_ROM_SIZES);
+	printf(" /split\n# %s\n %s (req)\n %s %s\n\n", HELP_STR_SPLIT, HELP_STR_PARAM_BIOS_FILE, HELP_STR_PARAM_ROMSIZE, HELP_STR_VALID_ROM_SIZES);
 
-	print(" /combine\n# %s\n -bank[1-4] <path> - bank file (req)\n %s\n\n", HELP_STR_COMBINE, HELP_STR_PARAM_OUT_FILE);
+	printf(" /combine\n# %s\n -bank[1-4] <path> - bank file (req)\n %s\n\n", HELP_STR_COMBINE, HELP_STR_PARAM_OUT_FILE);
 
-	print(" /xcode-sim\n# %s\n %s (req)\n %s\n %s\n %s\n\n", HELP_STR_XCODE_SIM, HELP_STR_PARAM_IN_FILE, HELP_STR_PARAM_SIM_SIZE,
+	printf(" /xcode-sim\n# %s\n %s (req)\n %s\n %s\n %s\n\n", HELP_STR_XCODE_SIM, HELP_STR_PARAM_IN_FILE, HELP_STR_PARAM_SIM_SIZE,
 		HELP_STR_PARAM_XCODE_BASE, HELP_STR_PARAM_NO_MAX_SIZE);
 
-	print(" /xcode-decode\n# %s\n %s (req)\n %s\n %s\n\n", HELP_STR_XCODE_DECODE, HELP_STR_PARAM_IN_FILE,
+	printf(" /xcode-decode\n# %s\n %s (req)\n %s\n %s\n\n", HELP_STR_XCODE_DECODE, HELP_STR_PARAM_IN_FILE,
 		HELP_STR_PARAM_XCODE_BASE, HELP_STR_PARAM_NO_MAX_SIZE);
 
-	print(" /x86-encode\n# %s\n %s (req)\n %s\n\n", HELP_STR_X86_ENCODE, HELP_STR_PARAM_IN_FILE, HELP_STR_PARAM_OUT_FILE);
+	printf(" /x86-encode\n# %s\n %s (req)\n %s\n\n", HELP_STR_X86_ENCODE, HELP_STR_PARAM_IN_FILE, HELP_STR_PARAM_OUT_FILE);
 
-	print(" /dump-img\n# %s\n %s\n\n", HELP_STR_DUMP_NT_IMG, HELP_STR_PARAM_IN_FILE);
+	printf(" /dump-img\n# %s\n %s\n\n", HELP_STR_DUMP_NT_IMG, HELP_STR_PARAM_IN_FILE);
 	
 	char helpStr[256] = { 0 };
 
 	// print help for key switches
-	print("Switches:\n");
+	printf("Switches:\n");
 
 	// bldr key
 	print_f(helpStr, sizeof(helpStr), HELP_STR_RC4_KEY, "2bl");
-	print(" -key-bldr %s\n", &helpStr);
+	printf(" -key-bldr %s\n", &helpStr);
 
 	// krnl key
 	print_f(helpStr, sizeof(helpStr), HELP_STR_KEY_KRNL);
-	print("\n -key-krnl %s\n", &helpStr);
+	printf("\n -key-krnl %s\n", &helpStr);
 	
 	// mcpx rom
-	print("\n %s\n", &HELP_STR_MCPX_ROM);
+	printf("\n %s\n", &HELP_STR_MCPX_ROM);
 
 	// enc switches
 	print_f(helpStr, sizeof(helpStr), HELP_STR_RC4_ENC, "2bl");
-	print("\n -enc-bldr %s\n", &helpStr);
+	printf("\n -enc-bldr %s\n", &helpStr);
 
 	print_f(helpStr, sizeof(helpStr), HELP_STR_RC4_ENC, "kernel");
-	print("\n -enc-krnl %s\n", &helpStr);
+	printf("\n -enc-krnl %s\n", &helpStr);
 
 }
 
@@ -156,7 +156,7 @@ int validateArgs()
 	params.romsize *= 1024;
 	if (checkSize(params.romsize) != 0)
 	{
-		print("Error: Invalid rom size: %d\n", params.romsize);
+		printf("Error: Invalid rom size: %d\n", params.romsize);
 		return 1;
 	}
 
@@ -168,7 +168,7 @@ int validateArgs()
 	params.binsize *= 1024;
 	if (checkSize(params.binsize) != 0)
 	{
-		print("Error: Invalid bin size: %d\n", params.binsize);
+		printf("Error: Invalid bin size: %d\n", params.binsize);
 		return 1;
 	}
 	
@@ -179,12 +179,12 @@ int validateArgs()
 	}
 	if (params.simSize < 32 || params.simSize > (128 * 1024 * 1024)) // 32bytes - 128mb
 	{
-		print("Error: Invalid sim size: %d\n", params.simSize);
+		printf("Error: Invalid sim size: %d\n", params.simSize);
 		return 1;
 	}
 	if (params.simSize % 4 != 0)
 	{
-		print("Error: simsize must be devisible by 4.\n");
+		printf("Error: simsize must be devisible by 4.\n");
 		return 1;
 	}
 
@@ -193,7 +193,6 @@ int validateArgs()
 
 void cleanup()
 {
-	xbtool.deconstruct();
 	xb_leaks();
 }
 
@@ -203,42 +202,31 @@ int main(int argc, char* argv[])
 
 	atexit(cleanup);
 
-#ifndef _DEBUG
-	print(XB_BIOS_TOOL_HEADER_STR);
+#ifdef _DEBUG
+	printf("%s DBG", XB_BIOS_TOOL_NAME_STR);
+#ifdef __SANITIZE_ADDRESS__
+	printf(" /fsanitize");
 #endif
+#else
+	printf(XB_BIOS_TOOL_NAME_STR);
+#endif
+	printf("\n");
 
-	xbtool.construct();
-
-	result = parseCli(argc, argv, xbtool.cmd, params.sw_flags, cmd_tbl, (sizeof(cmd_tbl) / sizeof(CMD_TBL)), param_tbl, (sizeof(param_tbl) / sizeof(PARAM_TBL)));
+	result = parseCli(argc, argv, xbtool.cmd, params.sw_flags, cmd_tbl, sizeof(cmd_tbl), param_tbl, sizeof(param_tbl));
 	if (result != 0)
 	{
 		switch (result)
 		{
 			case CLI_ERROR_NO_CMD:
-				print("Error: No command provided\n");
-				break;
 			case CLI_ERROR_INVALID_CMD:
-				print("Error: Invalid command\n");
-				break;
-			case CLI_ERROR_INVALID_SW:
-				print("Error: Invalid switch\n");
-				break;
-			case CLI_ERROR_MISSING_SW:
-				print("Error: Missing required switch\n");
-				break;
-			case CLI_ERROR_MISSING_ARG:
-				print("Error: Switch is missing argument\n");
-				break;
-				case CLI_ERROR_INVALID_ARG:
-				print("Error: Invalid argument\n");
-				break;
-			default:
-				print("Error: Unknown error\n");
+			case CLI_ERROR_UNKNOWN_CMD:
+				printf("\nUsage: xbios <command> [switches]\nRun \"xbios -?\" for more info.\n");
 				break;
 		}
 		result = ERROR_FAILED;
 		goto Exit;
 	}
+
 	result = validateArgs();
 	if (result != 0)
 		goto Exit;
@@ -253,13 +241,12 @@ int main(int argc, char* argv[])
 
 Exit:
 
-	// check global error code
 	if (result == 0)
 	{
 		result = getErrorCode();
 		if (result != 0)
 		{
-			print("Error: %d\n", result);
+			printf("Error: %d\n", result);
 		}
 	}
 	return result;

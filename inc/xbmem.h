@@ -67,16 +67,6 @@ void* xb_alloc(UINT size);
 void* xb_realloc(void* ptr, UINT size);
 // free memory allocated by xb_alloc
 void xb_free(void* ptr);
-// Zero out memory 
-void xb_zero(void* ptr, UINT size);
-// set memory
-void xb_set(void* ptr, int val, UINT size);
-// copy memory
-void xb_cpy(void* dest, const void* src, UINT size);
-// move memory 
-void xb_mov(void* dest, const void* src, UINT size);
-// compare memory
-int xb_cmp(const void* ptr1, const void* ptr2, UINT size);
 
 // check for memory leaks
 int xb_leaks();

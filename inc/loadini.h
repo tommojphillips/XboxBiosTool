@@ -23,10 +23,10 @@
 #define XB_LOADINI_H
 
 // std incl
-#include <stdio.h>
+#include <cstdio>
 
+// user incl
 #include "type_defs.h"
-
 
 enum LOADINI_SETTING_TYPE : int { STR, BOOL };
 
@@ -47,6 +47,6 @@ typedef struct {
 // settings_map: map of settings
 // map_size: size of the map
 // returns LOADINI_ERROR_CODE
-int loadini(FILE* stream, LOADINI_SETTING_MAP* settings_map, UINT map_size);
+int loadini(FILE* stream, const LOADINI_SETTING_MAP* settings_map, UINT map_size);
 
 #endif // !XB_LOADINI_H

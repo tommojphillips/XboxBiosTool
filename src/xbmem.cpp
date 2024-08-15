@@ -20,6 +20,7 @@
 // GitHub: https:\\github.com\tommojphillips
 
 // std incl
+#include <cstdio>
 #include <malloc.h>
 #include <memory.h>
 
@@ -41,7 +42,7 @@ int XbMem::checkForLeaks()
 	}
 	else if (_isPrinting)
 	{
-		print("No leaks detected\n");
+		printf("No leaks detected\n");
 	}
 	return 0;
 }
@@ -54,18 +55,17 @@ void* XbMem::xb_alloc(UINT size)
 	void* ptr = malloc(size);
 	if (ptr == NULL)
 	{
-		print("Error: Could not allocate %d bytes\n", size);
+		printf("Error: Could not allocate %d bytes\n", size);
 		return NULL;
 	}
 
-	// Zero out the memory
-	xb_zero(ptr, size);
+	memset(ptr, 0, size);
 
 	_curAllocations++;
 	_curAllocatedBytes += size;
 
 if (_isPrinting)
-	print("Allocated %d bytes. total alloc: %ld bytes\n", size, _curAllocatedBytes);
+	printf("Allocated %d bytes. total alloc: %ld bytes\n", size, _curAllocatedBytes);
 
 	return ptr;
 }
@@ -76,7 +76,7 @@ void* XbMem::xb_realloc(void* ptr, UINT size)
 	void* newPtr = realloc(ptr, size);
 	if (newPtr == NULL)
 	{
-		print("Error: Could not reallocate %d bytes\n", size);
+		printf("Error: Could not reallocate %d bytes\n", size);
 		return NULL;
 	}
 
@@ -84,7 +84,7 @@ void* XbMem::xb_realloc(void* ptr, UINT size)
 	_curAllocatedBytes += size;
 
 if (_isPrinting)
-	print("Reallocated %d bytes. total alloc: %ld bytes\n", size, _curAllocatedBytes);
+	printf("Reallocated %d bytes. total alloc: %ld bytes\n", size, _curAllocatedBytes);
 
 	return newPtr;
 }
@@ -99,7 +99,7 @@ void XbMem::xb_free(void* ptr)
 	_curAllocatedBytes -= size;
 
 if (_isPrinting)
-	print("Freed %d bytes. total alloc: %ld bytes\n", size, _curAllocatedBytes);
+	printf("Freed %d bytes. total alloc: %ld bytes\n", size, _curAllocatedBytes);
 }
 
 // static functions for memory allocation. wraps global xbmem instance
@@ -115,26 +115,7 @@ void xb_free(void* ptr)
 {
 	XbMem::getInstance().xb_free(ptr);
 }
-void xb_zero(void* ptr, UINT size)
-{
-	memset(ptr, 0, size);
-}
-void xb_set(void* ptr, int val, UINT size)
-{
-	memset(ptr, val, size);
-}
-void xb_cpy(void* dest, const void* src, UINT size)
-{
-	memcpy(dest, src, size);
-}
-void xb_mov(void* dest, const void* src, UINT size)
-{
-	memmove(dest, src, size);
-}
-int xb_cmp(const void* ptr1, const void* ptr2, UINT size)
-{
-	return memcmp(ptr1, ptr2, size);
-}
+
 int xb_leaks()
 {
 	return XbMem::getInstance().checkForLeaks();

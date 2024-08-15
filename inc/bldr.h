@@ -1,4 +1,4 @@
-// bldr.h
+// bldr.h: Implements Original Xbox Bootloader structures and constants.
 
 /* Copyright(C) 2024 tommojphillips
  *
@@ -23,78 +23,61 @@
 #define XB_BLDR_H
 
 #include "type_defs.h"
-#include "util.h"
 
-// rc4 key size in bytes
 const UINT KEY_SIZE = 16;
-
-// 2bl boot params hash/signature
-const UINT BOOT_PARAMS_SIGNATURE = MAKE_SIGNATURE('J', 'y', 'T', 'x');
+const UINT BOOT_PARAMS_SIGNATURE = MAKE_4BYTE_SIGNATURE('J', 'y', 'T', 'x');
 
 // The init table structure.
-typedef struct
-{
-    // Northbridge data for NV2A starts at offset+0
-    UINT ptr1;          // 0:0. nv2a init table ptr 1. ptr to the ROM tbl
-    UINT ptr2;          // 0:4. nv2a init table ptr 2. ptr to the ROM tbl
-    UINT header;        // 0:8. northbridge boot header
-
-    UINT val1;          // 0:12.
-    UINT val2;          // 0:16.
-    UINT val3;          // 0:20.
-    UINT val4;          // 0:24.
-    UINT val5;          // 0:28.
-    UINT val6;          // 0:32.
-    UINT val7;          // 0:36.
-    UINT val8;          // 0:40.
-    UINT val9;          // 0:44.
-    UINT val10;         // 0:48.
-
-    UINT vals[14];      // 0:52 - 0:104.
-
-    USHORT revision;   // 0:108.
-    USHORT val11;      // 0:110.
-
-    UINT val12;        // 0:112.
-    UINT val13;        // 0:116. changes depending if dvt4, retail, or dvt6
-
-    USHORT init_tbl_identifier; // 0:120. init table identifier code
-    USHORT kernel_ver;          // 0:122. kernel version
-
-    UINT data_tbl_offset;       // 0:124. offset from ROM base to the data tbl
-
+typedef struct {
+    UINT ptr1;
+    UINT ptr2;
+    UINT header;
+    UINT val1;
+    UINT val2;
+    UINT val3;
+    UINT val4;
+    UINT val5;
+    UINT val6;
+    UINT val7;
+    UINT val8;
+    UINT val9;
+    UINT val10;
+    UINT vals[14];
+    USHORT revision;
+    USHORT val11;
+    UINT val12;
+    UINT val13;
+    USHORT init_tbl_identifier;
+    USHORT kernel_ver;
+    UINT data_tbl_offset;
 } INIT_TBL; static_assert(sizeof(INIT_TBL) == 128, "INIT_TBL struct size is not 128 bytes");
 
 #pragma pack(push, 1)
 // XCODE operand struct.
-typedef struct _XCODE
-{
+typedef struct {
     UCHAR opcode;   // al
     UINT addr;      // ebx
     UINT data;      // ecx
-} XCODE; static_assert((sizeof(XCODE) == 9), "XCODE struct size is not 9 bytes");
+} XCODE; static_assert(sizeof(XCODE) == 9, "XCODE struct size is not 9 bytes");
 #pragma pack(pop)
 
 // The boot parameters structure.
-typedef struct
-{
-    UINT krnlDataSize; // size of the kernel data (uncompressed)
-    UINT inittblSize; // size of the init table	
-    UINT signature; // the bldr signature. mcpx checks this to verify the bldr
-    UINT krnlSize; // size of the kernel (compressed)
-    UCHAR digest[20]; // the ROM digest.
+typedef struct {
+    UINT krnlDataSize;  // size of the kernel data section (uncompressed)
+    UINT inittblSize;   // size of the init table	
+    UINT signature;
+    UINT krnlSize;      // size of the kernel (compressed)
+    UCHAR digest[20];   // the ROM digest.
 } BOOT_PARAMS;
 
 // The loader parameters structure.
-typedef struct
-{
+typedef struct {
     UINT bldrEntryPoint;    // 32bit entry point
     char cli[64];           // command line
 } BOOT_LDR_PARAM;
 
 // drive / slew calibration parameters
-typedef struct
-{
+typedef struct {
     USHORT max_m_clk;
 
     UCHAR slow_count_ext;
@@ -115,8 +98,7 @@ typedef struct
 } DRV_SLW_CAL_PARAMS;
 
 // drive / slew pad parameters
-typedef struct
-{
+typedef struct {
     UCHAR adr_drv_fall;
     UCHAR adr_drv_rise;
 
@@ -148,16 +130,14 @@ typedef struct
 } DRV_SLW_PAD_PARAMS;
 
 // data table as found in the bios
-typedef struct
-{
+typedef struct {
     DRV_SLW_CAL_PARAMS cal;         // calibration parameters
     DRV_SLW_PAD_PARAMS samsung[5];  // samsung memory parameters
     DRV_SLW_PAD_PARAMS micron[5];   // micron memory parameters
 } ROM_DATA_TBL;
 
 // The bldr keys structure as found in the bios
-typedef struct
-{
+typedef struct {
     UCHAR bfmKey[KEY_SIZE];     // bfm key; this is used for re-encryption of the 2bl to restore it's original state
     UCHAR eepromKey[KEY_SIZE];  // eeprom key
     UCHAR certKey[KEY_SIZE];    // certificate key
@@ -165,39 +145,21 @@ typedef struct
 } BLDR_KEYS;
 
 // The bldr entry structure as found in the bios
-typedef struct
-{
+typedef struct {
     UINT keysPtr;          // rc4 crypto keys pointer
     UINT bfmEntryPoint;    // bldr entry point
 } BLDR_ENTRY;
 
-// The rsa header structure
-typedef struct
-{
-    char magic[4];
-    UINT mod_size;
-    UINT bits;
-    UINT max_bytes;
-    UINT exponent;
-} RSA_HEADER;
-
-// The public key structure
-typedef struct
-{
-    RSA_HEADER header;
-    UCHAR modulus[264];
-} PUBLIC_KEY;
-
 typedef struct {
     UINT jmpInstr;		// jmp opcode + rel offset
     UINT reserved;
-    UINT funcBlockPtr;	// address to sha func block. should equal PRELDR_ENTRY::shaFuncBlockPtr
+    UINT funcBlockPtr;	// address to sha func block. should equal PRELDR_ENTRY::funcBlockPtr
     UINT pubKeyPtr;		// always 0.
 } PRELDR_PARAMS;
 
 typedef struct {
     UINT pubKeyPtr;		// address to the encrypted public key in the preldr	
-    UINT funcBlockPtr;	// address to sha func block. should equal PRELDR_PARAMS::shaFuncBlockPtr
+    UINT funcBlockPtr;	// address to sha func block. should equal PRELDR_PARAMS::funcBlockPtr
 } PRELDR_ENTRY;
 
 #endif // !XBT_BLDR_H

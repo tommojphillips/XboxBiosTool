@@ -1,9 +1,13 @@
 // lzx.cpp: implements lz decompression algorithm
 
+// std incl
+#include <cstdio>
+#include <memory.h>
+
+// user incl
 #include "lzx.h"
 #include "type_defs.h"
 #include "xbmem.h"
-#include "util.h"
 
 #define MAIN_TREE_ELEMENTS              (256 + (context.num_position_slots << 3))
 
@@ -247,18 +251,7 @@ void lzx_free(void* ptr)
 {
     xb_free(ptr);
 }
-void lzx_cpy(void* dest, const void* src, ULONG size)
-{
-	xb_cpy(dest, src, size);
-}
-void lzx_set(void* dest, int value, ULONG size)
-{
-	xb_set(dest, value, size);
-}
-void lzx_zero(void* dest, ULONG size)
-{
-	xb_zero(dest, size);
-}
+
 
 void initialise_decoder_bitbuf(DEC_CONTEXT& context)
 {
@@ -361,7 +354,7 @@ bool handle_beginning_of_uncompressed_block(DEC_CONTEXT& context)
 
     return true;
 }
-bool make_table(DEC_CONTEXT& context,int nchar,const UCHAR* bitlen,UCHAR tablebits,short* table,short* leftright)
+bool make_table(int nchar,const UCHAR* bitlen,UCHAR tablebits,short* table,short* leftright)
 {
     UINT i;
     int ch;
@@ -388,7 +381,7 @@ bool make_table(DEC_CONTEXT& context,int nchar,const UCHAR* bitlen,UCHAR tablebi
     {
         if (start[17] == 0)
         {
-            lzx_set(table, 0, sizeof(USHORT) * (1 << tablebits));
+            memset(table, 0, sizeof(USHORT) * (1 << tablebits));
             return true;
         }
         else // bad table
@@ -415,7 +408,7 @@ bool make_table(DEC_CONTEXT& context,int nchar,const UCHAR* bitlen,UCHAR tablebi
 
     if (i != 65536)
     {
-        lzx_set(&table[i], 0, sizeof(USHORT) * ((1 << tablebits) - i));
+        memset(&table[i], 0, sizeof(USHORT) * ((1 << tablebits) - i));
     }
 
     avail = nchar;
@@ -439,8 +432,6 @@ bool make_table(DEC_CONTEXT& context,int nchar,const UCHAR* bitlen,UCHAR tablebi
         }
         else
         {
-            UCHAR i;
-
             k = start[len];
             start[len] = nextcode;
             p = &table[k >> jutbits];
@@ -472,7 +463,7 @@ bool make_table(DEC_CONTEXT& context,int nchar,const UCHAR* bitlen,UCHAR tablebi
 
     return true;
 }
-bool make_table_8bit(DEC_CONTEXT& context, UCHAR bitlen[], UCHAR table[])
+bool make_table_8bit(UCHAR bitlen[], UCHAR table[])
 {
     USHORT count[17], weight[17], start[18];
     USHORT i;
@@ -506,7 +497,7 @@ bool make_table_8bit(DEC_CONTEXT& context, UCHAR bitlen[], UCHAR table[])
         i++;
     }
 
-    lzx_set(table, 0, 1 << 7);
+    memset(table, 0, 1 << 7);
 
     for (ch = 0; ch < 8; ch++)
     {
@@ -550,7 +541,7 @@ bool readRepTree(DEC_CONTEXT& context, int	num_elements, UCHAR* lastlen, UCHAR* 
     if (context.error_condition)
         return false;
 
-    if (!make_table(context, NUM_DECODE_SMALL, small_bitlen, DS_TABLE_BITS, small_table, leftright_s))
+    if (!make_table(NUM_DECODE_SMALL, small_bitlen, DS_TABLE_BITS, small_table, leftright_s))
     {
         return false;
     }
@@ -629,7 +620,7 @@ bool read_main_and_secondary_trees(DEC_CONTEXT& context)
         return false;
     }
     
-    if (!make_table(context, MAIN_TREE_ELEMENTS, context.main_tree_len, MAIN_TREE_TABLE_BITS,
+    if (!make_table(MAIN_TREE_ELEMENTS, context.main_tree_len, MAIN_TREE_TABLE_BITS,
         context.main_tree_table, context.main_tree_left_right))
     {
         return false;
@@ -640,7 +631,7 @@ bool read_main_and_secondary_trees(DEC_CONTEXT& context)
         return false;
     }
 
-    if (!make_table(context, NUM_SECONDARY_LENGTHS, context.secondary_length_tree_len, SECONDARY_LEN_TREE_TABLE_BITS,
+    if (!make_table(NUM_SECONDARY_LENGTHS, context.secondary_length_tree_len, SECONDARY_LEN_TREE_TABLE_BITS,
         context.secondary_length_tree_table, context.secondary_length_tree_left_right))
     {
         return false;
@@ -660,7 +651,7 @@ bool read_aligned_offset_tree(DEC_CONTEXT& context)
     if (context.error_condition)
         return false;
 
-    if (!make_table_8bit(context, context.aligned_len, (UCHAR*)context.aligned_table))
+    if (!make_table_8bit(context.aligned_len, (UCHAR*)context.aligned_table))
     {
         return false;
     }
@@ -681,8 +672,8 @@ void decoder_translate_e8(DEC_CONTEXT& context, UCHAR* mem, long bytes)
 
     mem_backup = mem;
 
-    lzx_cpy(temp, &mem[bytes - 6], 6); // backup last 6 bytes
-    lzx_set(&mem[bytes - 6], 0xE8, 6); // set last 6 bytes to 0xE8
+    memcpy(temp, &mem[bytes - 6], 6); // backup last 6 bytes
+    memset(&mem[bytes - 6], 0xE8, 6); // set last 6 bytes to 0xE8
 
     end_instr_pos = context.instr_pos + bytes - 10;
 
@@ -722,14 +713,14 @@ void decoder_translate_e8(DEC_CONTEXT& context, UCHAR* mem, long bytes)
 
     context.instr_pos = end_instr_pos + 10;
 
-    lzx_cpy(&mem_backup[bytes - 6], temp, 6);
+    memcpy(&mem_backup[bytes - 6], temp, 6);
 }
 void copy_data_to_output(DEC_CONTEXT& context, long amount, const UCHAR* data)
 {
     if (context.output_buffer == NULL)
         return;
 
-    lzx_cpy(context.output_buffer, data, amount);
+    memcpy(context.output_buffer, data, amount);
 
     if ((context.current_file_size != 0) && (context.num_cfdata_frames < E8_CFDATA_FRAME_THRESHOLD))
     {
@@ -775,7 +766,7 @@ long special_decode_aligned_block(DEC_CONTEXT& context, long pos, int amount_to_
                 DECODE_LEN_TREE_NOEOFCHECK(match_length);
             }
 
-            m = c >> 3;
+            m = (char)(c >> 3);
 
             if (m > 2)
             {
@@ -883,7 +874,7 @@ long fast_decode_aligned_offset_block(DEC_CONTEXT& context, long pos, int amount
                 DECODE_LEN_TREE_NOEOFCHECK(match_length);
             }
 
-            m = c >> 3;
+            m = (char)(c >> 3);
 
             if (m > 2)
             {
@@ -1013,7 +1004,7 @@ long special_decode_verbatim_block(DEC_CONTEXT& context, long pos, int amount_to
                 DECODE_LEN_TREE_NOEOFCHECK(match_length);
             }
 
-            m = c >> 3;
+            m = (char)(c >> 3);
 
             if (m > 2)
             {
@@ -1103,7 +1094,7 @@ long fast_decode_verbatim_block(DEC_CONTEXT& context, long pos, int amount_to_de
                 DECODE_LEN_TREE_NOEOFCHECK(match_length);
             }
 
-            m = c >> 3; // get match position slot
+            m = (char)(c >> 3); // get match position slot
 
             // read any extra bits for the match position
             if (m > 2)
@@ -1179,7 +1170,6 @@ int decode_verbatim_block(DEC_CONTEXT& context, long pos, int amount_to_decode)
 }
 int decode_uncompressed_block(DEC_CONTEXT& context, long pos, int amount_to_decode)
 {
-    long	bytes_decoded = 0;
     long	pos_end;
     long	decode_residue;
     ULONG   pos_start;
@@ -1281,8 +1271,8 @@ long decode_data(DEC_CONTEXT& context, long bytes_to_decode)
                     // fall through to VERBATIM
 
                 case BLOCKTYPE_VERBATIM:
-                    lzx_cpy(context.main_tree_prev_len, context.main_tree_len, MAIN_TREE_ELEMENTS);
-                    lzx_cpy(context.secondary_length_tree_prev_len, context.secondary_length_tree_len, NUM_SECONDARY_LENGTHS);
+                    memcpy(context.main_tree_prev_len, context.main_tree_len, MAIN_TREE_ELEMENTS);
+                    memcpy(context.secondary_length_tree_prev_len, context.secondary_length_tree_len, NUM_SECONDARY_LENGTHS);
                     read_main_and_secondary_trees(context);
                     break;
 
@@ -1377,10 +1367,10 @@ bool lzx_decodeInit(DEC_CONTEXT& context, long compression_window_size)
         return false;
 
     // reset decoder state
-    lzx_zero(context.main_tree_len, MAIN_TREE_ELEMENTS);
-    lzx_zero(context.main_tree_prev_len, MAIN_TREE_ELEMENTS);
-    lzx_zero(context.secondary_length_tree_len, NUM_SECONDARY_LENGTHS);
-    lzx_zero(context.secondary_length_tree_prev_len, NUM_SECONDARY_LENGTHS);
+    memset(context.main_tree_len, 0, MAIN_TREE_ELEMENTS);
+    memset(context.main_tree_prev_len, 0, MAIN_TREE_ELEMENTS);
+    memset(context.secondary_length_tree_len, 0, NUM_SECONDARY_LENGTHS);
+    memset(context.secondary_length_tree_prev_len, 0, NUM_SECONDARY_LENGTHS);
 
     // init decoder state
     context.last_matchpos_offset[0] = 1;
@@ -1455,7 +1445,6 @@ int decompressBlock(LDI_CONTEXT& context, const UCHAR* src, UINT srcSize, UCHAR*
 {
     int	result;
     long bytes_to_decode;
-    long total_bytes_written = 0;
 
     if (context.signature != LDI_SIGNATURE) // invalid decompression signature
     {
@@ -1482,21 +1471,12 @@ int decompressBlock(LDI_CONTEXT& context, const UCHAR* src, UINT srcSize, UCHAR*
 
     if (result < 0) // error
     {
-        total_bytes_written = 0;
+        numOfDecompressedBytes = 0;
         return 1;
     }
-    else
-    {
-        total_bytes_written = result;
-        context.decoder_context->position_at_start += result;
-        return 0;
-    }
 
-    numOfDecompressedBytes = (UINT)total_bytes_written;
-
-    if (result != 0)
-        return ERROR_FAILED;
-    
+    numOfDecompressedBytes = result;
+    context.decoder_context->position_at_start += result;
     return 0;
 }
 
@@ -1553,7 +1533,7 @@ int decompress(const UCHAR* data, const UINT size, UCHAR*& buff, UINT& buffSize,
         result = decompressBlock(*context, src, bytesCompressed, dest, bytesDecompressed);
         if (result != 0)
         {
-            print("Error: Block decompress failed. Error code: %d\n", result);
+            printf("Error: Block decompress failed. Error code: %d\n", result);
             goto Cleanup;
         }
 
@@ -1570,7 +1550,7 @@ int decompress(const UCHAR* data, const UINT size, UCHAR*& buff, UINT& buffSize,
 
     decompressedSize = totalUncompressedSize;
 
-    print("Decompressed %ld bytes (%d blocks)\n", totalUncompressedSize, i+1);
+    printf("Decompressed %ld bytes (%d blocks)\n", totalUncompressedSize, i+1);
 
 Cleanup:
         

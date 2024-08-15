@@ -20,11 +20,10 @@
 // GitHub: https:\\github.com\tommojphillips
 
 #include "file.h"
-#include "util.h"
 #include "type_defs.h"
 #include "xbmem.h"
 
-UCHAR* readFile(const char* filename, UINT* bytesRead, const int expectedSize)
+UCHAR* readFile(const char* filename, UINT* bytesRead, const UINT expectedSize)
 {
 	FILE* file = NULL;
 	UINT size = 0;
@@ -35,15 +34,15 @@ UCHAR* readFile(const char* filename, UINT* bytesRead, const int expectedSize)
 	file = fopen(filename, "rb");
 	if (file == NULL)
 	{
-		print("Error: Could not open file: %s\n", filename);
+		printf("Error: Could not open file: %s\n", filename);
 		return NULL;
 	}
 
 	getFileSize(file, &size);
 
-	if (expectedSize != -1 && size != expectedSize)
+	if (expectedSize != 0 && size != expectedSize)
 	{
-		print("Error: Invalid file size. Expected %d bytes. Got %d bytes\n", expectedSize, size);
+		printf("Error: Invalid file size. Expected %d bytes. Got %d bytes\n", expectedSize, size);
 		fclose(file);
 		return NULL;
 	}
@@ -73,7 +72,7 @@ int writeFile(const char* filename, void* ptr, const UINT bytesToWrite)
 	file = fopen(filename, "wb");
 	if (file == NULL)
 	{
-		print("Error: Could not open file: %s\n", filename);
+		printf("Error: Could not open file: %s\n", filename);
 		return 1;
 	}
 

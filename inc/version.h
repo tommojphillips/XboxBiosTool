@@ -31,7 +31,6 @@
 #define XB_BIOS_TOOL_VER_BUILD 0
 
 #define XB_BIOS_TOOL_AUTHOR_STR "tommojphillips"
-#define XB_BIOS_TOOL_NAME_STR "XbTool"
 
 #define XB_BIOS_TOOL_VER \
 		XB_BIOS_TOOL_VER_MAJOR, \
@@ -45,11 +44,8 @@
 		STR(XB_BIOS_TOOL_VER_PATCH) "." \
 		STR(XB_BIOS_TOOL_VER_BUILD)
 
-#define XB_BIOS_TOOL_HEADER_STR XB_BIOS_TOOL_NAME_STR " v" \
-								XB_BIOS_TOOL_VER_STR " by " \
-								XB_BIOS_TOOL_AUTHOR_STR ". " \
-								"Bulit: " \
-								__DATE__ " at " \
-								__TIME__ "\n\n"
+#define XB_BIOS_TOOL_NAME_STR	"XbTool v" \
+								XB_BIOS_TOOL_VER_STR " Copyright (c) " \
+								XB_BIOS_TOOL_AUTHOR_STR " 2024."
 
 #endif // !XB_BIOS_TOOL_VERSION_H

@@ -22,16 +22,10 @@
 #ifndef XB_UTIL_H
 #define XB_UTIL_H
 
-// std incl
-#include <stdio.h>
-
 // user incl
 #include "type_defs.h"
 
 #define IN_BOUNDS(struc, buff, size) ((UCHAR*)struc >= (UCHAR*)buff && (UCHAR*)struc + sizeof(*struc) < (UCHAR*)buff + size)
-
-// make 4 byte signature
-#define MAKE_SIGNATURE(a,b,c,d) (a + (b<<8) + (c<<16) + (d<<24))
 
 enum XB_ERROR_CODES : int {
 	ERROR_SUCCESS =			0,
@@ -51,15 +45,6 @@ void setErrorCode(const int code);
 // set console color
 void setConsoleColor(const int col = -1);
 
-// format string
-void format(char* buffer, const char* format, ...);
-
-// print to stream (stdout, stderr, FILE*)
-void print(FILE* stream, const char* format, ...);
-
-// std print to console			
-void print(const char* format, ...);
-
 // std print to console with color
 void print(const CON_COL col, const char* format, ...);
 
@@ -68,9 +53,6 @@ void print_f(char* buffer, const int bufferSize, const char* format, ...);
 
 // print a char array
 void printData(UCHAR* data, int len, bool newLine = true);
-
-// check rom size.
-int checkSize(const UINT& size);						
 
 // get timestamp string.
 void getTimestamp(UINT timestamp, char* timestamp_str);
@@ -81,13 +63,7 @@ void ltrim(char*& str);
 // trim right side of string.
 void rtrim(char*& str);
 
-// pad left side of string.
-void lpad(char buff[], const UINT buffSize, const char pad);
-
 // pad right side of string.
-void rpad(char buff[], const UINT buffSize, const char pad);
-
-// error exit
-void errorExit(const int code, const char* format, ...);
+void rpad(char* str, const int buffSize, const char pad);
 
 #endif //XBT_UTIL_H

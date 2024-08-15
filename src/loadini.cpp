@@ -43,7 +43,7 @@ void setSettingValue(char** setting, const char* value, UINT len)
 	strcpy(*setting, value);
 }
 
-int loadini(FILE* stream, LOADINI_SETTING_MAP* settings_map, UINT map_size)
+int loadini(FILE* stream, const LOADINI_SETTING_MAP* settings_map, UINT map_size)
 {
 	UINT i = 0;
 	UINT len = 0;
@@ -61,30 +61,51 @@ int loadini(FILE* stream, LOADINI_SETTING_MAP* settings_map, UINT map_size)
 		line_ptr = buf;
 		ltrim(line_ptr);
 
-		// line-format: key=value
-
-		// ignore invalid characters
 		if (line_ptr[0] == ';')
 			continue;
+
+		// line-format: key=value
 
 		// get the key.
 		key = strtok(line_ptr, delim);
 		if (key == NULL)
 			continue;
+		ltrim(key);
+		rtrim(key);
 
 		// get the value
 		value = strtok(NULL, delim);
 		if (value == NULL)
 			continue;
 		len = strlen(value);
-		ltrim(value);
-		if (value[len - 1] == '\n')
-			value[len - 1] = '\0';
+		ltrim(value);		
 		rtrim(value);
 
-		// cmp key and set values.
+		// quote check
+		// walk the string and matching quotes
 
-		strcpy(buf, key);
+		if (value[0] == '\"' || value[0] == '\'')
+		{
+			value++;
+			len = strlen(value);
+			if (value[len - 1] == '\"' || value[len - 1] == '\'')
+			{
+				value[len - 1] = '\0';
+				len--;
+			}
+		}
+
+
+		
+		/*if (value[0] == '\"' || value[0] == '\'')
+		{
+			value++;
+			len = strlen(value);
+			if (value[len - 1] == '\"' || value[len - 1] == '\'')
+				value[len - 1] = '\0';
+		}*/
+
+		// cmp key and set values.
 
 		for (i = 0; i < map_size / sizeof(LOADINI_SETTING_MAP); i++)
 		{
@@ -108,7 +129,7 @@ int loadini(FILE* stream, LOADINI_SETTING_MAP* settings_map, UINT map_size)
 				}
 				else
 				{
-					print("Error: invalid value for key: '%s'. value: '%s'\n", buf, value);
+					printf("Error: invalid value for key: '%s'. value: '%s'\n", buf, value);
 					return LOADINI_ERROR_INVALID_DATA;
 				}
 				break;
@@ -118,7 +139,7 @@ int loadini(FILE* stream, LOADINI_SETTING_MAP* settings_map, UINT map_size)
 
 		if (i == map_size / sizeof(LOADINI_SETTING_MAP)) // key not found
 		{
-			print("Error: unknown entry: '%s'\n", buf);
+			printf("Error: unknown entry: '%s'\n", buf);
 			return LOADINI_ERROR_INVALID_KEY;
 		}
 	}

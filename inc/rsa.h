@@ -1,4 +1,4 @@
-// X86Interp.h
+// rsa.h:
 
 /* Copyright(C) 2024 tommojphillips
  *
@@ -19,31 +19,27 @@
 // Author: tommojphillips
 // GitHub: https:\\github.com\tommojphillips
 
-#ifndef XB_X86_INTERP_H
-#define XB_X86_INTERP_H
+#ifndef RSA_H
+#define RSA_H
 
-// std incl
-#include <cstdio>
-
-// user incl
 #include "type_defs.h"
 
-enum X86_INSTR_TYPE : UCHAR {
-	X86_INSTR_OP,
-	X86_INSTR_REG_NUM,
-	X86_INSTR_REG_PTR,
-	X86_INSTR_JMP_FAR,
-	X86_INSTR_JMP_REL,
-};
-struct X86_INSTR_MAP {
-	X86_INSTR_TYPE type;
-	USHORT opcode;
-	const char* asm_instr;
-	USHORT opcode_len;
-	USHORT operrand_len;
-};
+// The rsa header structure
+typedef struct {
+    char magic[4];
+    UINT modSize;
+    UINT bits;
+    UINT maxBytes;
+    UINT exponent;
+} RSA_HEADER;
 
-int parseInstruction(char* buf, UCHAR* data, UINT& offset);
-int decodeX86(UCHAR* data, UINT size, FILE* stream);
+// The public key structure
+typedef struct {
+    RSA_HEADER header;
+    UCHAR modulus[264];
+} PUBLIC_KEY;
 
-#endif // XB_X86_INTERP_H
+PUBLIC_KEY* rsaVerifyPublicKey(UCHAR* data);
+int rsaPrintPublicKey(PUBLIC_KEY* pubkey);
+
+#endif // !RSA_H

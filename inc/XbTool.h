@@ -27,7 +27,6 @@
 #include "Mcpx.h"
 #include "cli_tbl.h"
 #include "type_defs.h"
-#include "version.h"
 
 enum CLI_COMMAND : char {
 	CMD_NONE,
@@ -43,7 +42,6 @@ enum CLI_COMMAND : char {
 	CMD_ENCODE_X86,
 	CMD_DUMP_NT_IMG
 };
-
 enum CLI_SWITCH : char {
 	SW_NONE = 0,
 	SW_HELP,		
@@ -76,145 +74,104 @@ enum CLI_SWITCH : char {
 	SW_BANK2_FILE,
 	SW_BANK3_FILE,
 	SW_BANK4_FILE,
+	SW_INI_FILE,
 };
 const int CLI_LS_FLAGS = (1 << SW_LS_DATA_TBL) | (1 << SW_LS_NV2A_TBL) | (1 << SW_LS_DUMP_KRNL);
 
-struct Parameters
-{
+struct Parameters {
 	int sw_flags[CLI_ARRAY_SIZE];
 
 	UINT romsize;
 	UINT binsize;
-
 	UINT simSize;
 	UINT xcodeBase;
-
 	UCHAR* keyBldr;
 	UCHAR* keyKrnl;
-
 	const char* inFile;
 	const char* outFile;
 	const char* bankFiles[4];
-
 	const char* inittblFile;
 	const char* bldrFile;
 	const char* krnlFile;
 	const char* krnlDataFile;
-
 	const char* mcpxFile;
-
 	const char* bldrKeyFile;
 	const char* krnlKeyFile;
-
 	MCPX_ROM mcpx;
-
 	const char* pubKeyFile;
 	const char* certKeyFile;
 	const char* eepromKeyFile;
-
-	void construct()
-	{
-		for (int i = 0; i < CLI_ARRAY_SIZE; i++)
-		{
-			sw_flags[i] = 0;
-		}
-		romsize = 0;
-		binsize = 0;
-		simSize = 0;
-		xcodeBase = 0;
-
-		keyBldr = NULL;
-		keyKrnl = NULL;
-		inFile = NULL;
-		outFile = NULL;
-		inittblFile = NULL;
-		bldrFile = NULL;
-		krnlFile = NULL;
-		krnlDataFile = NULL;
-		mcpxFile = NULL;
-		bldrKeyFile = NULL;
-		krnlKeyFile = NULL;
-		pubKeyFile = NULL;
-		certKeyFile = NULL;
-		eepromKeyFile = NULL;
-
-		mcpx.construct();
-	};
-
-	void deconstruct()
-	{
-		if (keyBldr != NULL)
-		{
-			xb_free(keyBldr);
-			keyBldr = NULL;
-		}
-
-		if (keyKrnl != NULL)
-		{
-			xb_free(keyKrnl);
-			keyKrnl = NULL;
-		}
-
-		mcpx.deconstruct();
-	};
+	const char* settingsFile;
 };
 
-class XbTool
-{
+class XbTool {
 	public:
+		XbTool() {
+			cmd = NULL;			
+			params.romsize = 0;
+			params.binsize = 0;
+			params.simSize = 0;
+			params.xcodeBase = 0;
+
+			params.keyBldr = NULL;
+			params.keyKrnl = NULL;
+			params.inFile = NULL;
+			params.outFile = NULL;
+			params.inittblFile = NULL;
+			params.bldrFile = NULL;
+			params.krnlFile = NULL;
+			params.krnlDataFile = NULL;
+			params.mcpxFile = NULL;
+			params.bldrKeyFile = NULL;
+			params.krnlKeyFile = NULL;
+			params.pubKeyFile = NULL;
+			params.certKeyFile = NULL;
+			params.eepromKeyFile = NULL;
+			params.settingsFile = NULL;
+
+			for (int i = 0; i < CLI_ARRAY_SIZE; i++)
+			{
+				params.sw_flags[i] = 0;
+			}
+		};
+		~XbTool() {
+			if (params.keyBldr != NULL)
+			{
+				xb_free(params.keyBldr);
+				params.keyBldr = NULL;
+			}
+			if (params.keyKrnl != NULL)
+			{
+				xb_free(params.keyKrnl);
+				params.keyKrnl = NULL;
+			}
+		};
+
 		const CMD_TBL* cmd;
 		Parameters params;
 		Bios bios;
-				
-		void construct();
-		void deconstruct();
-
+		
 		int run();
 
-		// print the bios info. (boot params, sizes, xcodes, nv2a tbl, etc.)
 		int listBios();
-
-		// extract the bios. (bldr, krnl, krnl data, inittbl) to their respective files.
 		int extractBios();
-
-		// build the bios. (bldr, krnl, inittbl) from the files provided.
 		int buildBios();
-
-		// split the bios into separate banks. based on the rom size provided.
-		int splitBios();		
-		
-		// combine the bios files provided into a single bios file. (bank1, bank2, bank3, bank4)
-		int combineBios();
-
-		// simulate the xcodes.
+		int splitBios() const;		
+		int combineBios() const;
 		int simulateXcodes() const;
-		
-		// decode the xcodes. 
 		int decodeXcodes() const;
-
-		// decompress the kernel from the bios file provided.
 		int decompressKrnl();
-
-		// read in the keys from the key files provided. (key-bldr, key-krnl)
-		int readKeys();		
 		
-		// read in the mcpx file provided. 
+		int readKeys();		
 		int readMCPX();
 		
-		// attempt to find the public key in the ptr.
-		int extractPubKey(UCHAR* data, UINT size);
-
-		// encode x86 code as xcode mem write instructions.
-		int encodeX86();
-
-		// dump nt image info to the console.
+		int extractPubKey(UCHAR* data, UINT size) const;
+		int encodeX86() const;
 		int dumpImg(UCHAR* data, UINT size) const;
 private:
-	// load the inittbl file.
-	UCHAR* load_init_tbl_file(UINT& size, UINT& xcodeBase) const;
+		UCHAR* load_init_tbl_file(UINT& size, UINT& xcodeBase) const;
 };
 
-int verifyPubKey(UCHAR* data, PUBLIC_KEY*& pubkey);
-int printPubKey(PUBLIC_KEY* pubkey);
+int checkSize(const UINT& size);
 
 #endif // !XB_BIOS_TOOL_H

@@ -119,7 +119,7 @@ int SHA1Result(SHA1Context* context, UCHAR digest[SHA1_DIGEST_LEN])
 
     for(i = 0; i < SHA1_DIGEST_LEN; ++i)
     {
-        digest[i] = context->intermediate_hash[i >> 2] >> 8 * (3 - (i & 0x03));
+        digest[i] = (UCHAR)(context->intermediate_hash[i >> 2] >> 8 * (3 - (i & 0x03)));
     }
 
     return SHA_STATUS_SUCCESS;
@@ -328,14 +328,15 @@ void SHA1PadMessage(SHA1Context *context)
         }
     }
 
-    context->block[56] = context->length_high >> 24;
-    context->block[57] = context->length_high >> 16;
-    context->block[58] = context->length_high >> 8;
-    context->block[59] = context->length_high;
+    context->block[56] = (context->length_high >> 24);
+    context->block[57] = (UCHAR)(context->length_high >> 16);
+    context->block[58] = (UCHAR)(context->length_high >> 8);
+    context->block[59] = (UCHAR)(context->length_high);
+
     context->block[60] = context->length_low >> 24;
-    context->block[61] = context->length_low >> 16;
-    context->block[62] = context->length_low >> 8;
-    context->block[63] = context->length_low;
+    context->block[61] = (UCHAR)(context->length_low >> 16);
+    context->block[62] = (UCHAR)(context->length_low >> 8);
+    context->block[63] = (UCHAR)(context->length_low);
       
     SHA1ProcessMessageBlock(context);
 }  
