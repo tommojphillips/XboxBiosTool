@@ -104,12 +104,16 @@ typedef struct {
     UINT rawDataPtr;
     UINT virtualAddr;
 } DATA_SECTION_HEADER;
-static_assert(sizeof(DATA_SECTION_HEADER) <= (sizeof(USHORT) * 10), "DATA_SECTION_HEADER size is greater than 10 USHORTs");
 
-void print_image_dos_header(IMAGE_DOS_HEADER* dos_header);
 void print_krnl_data_section_header(IMAGE_DOS_HEADER* dos_header);
 
+void print_image_dos_header(IMAGE_DOS_HEADER* dos_header);
+void print_image_file_header(COFF_FILE_HEADER* file_header, bool basic);
+void print_image_optional_header(IMAGE_OPTIONAL_HEADER* optional_header, bool basic);
 void print_nt_headers(IMAGE_NT_HEADER* nt_header, bool basic);
+
+IMAGE_DOS_HEADER* verify_dos_header(UCHAR* data, UINT size);
+IMAGE_NT_HEADER* verify_nt_headers(UCHAR* data, UINT size);
 
 int dump_nt_headers(UCHAR* data, UINT size, bool basic);
 

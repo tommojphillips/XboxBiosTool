@@ -30,7 +30,8 @@
 
 enum LOADINI_SETTING_TYPE : int { STR, BOOL };
 
-enum LOADINI_ERROR_CODE : int {
+typedef int LOADINI_ERROR_CODE;
+enum LOADINI_ERROR_CODES : LOADINI_ERROR_CODE {
 	LOADINI_ERROR_SUCCESS = 0,
 	LOADINI_ERROR_INVALID_DATA = 1,
 	LOADINI_ERROR_INVALID_KEY = 2
@@ -39,14 +40,22 @@ enum LOADINI_ERROR_CODE : int {
 typedef struct {
 	const char* key;
 	const LOADINI_SETTING_TYPE type;
-	void* setting;
+} LOADINI_SETTING;
+typedef struct {
+	const LOADINI_SETTING* s;
+	void* var;
 } LOADINI_SETTING_MAP;
+typedef struct {
+	const LOADINI_SETTING* s;
+	const UINT size;
+	const UINT count;
+} LOADINI_RETURN_MAP;
 
 // load ini file
 // stream: file stream
 // settings_map: map of settings
 // map_size: size of the map
 // returns LOADINI_ERROR_CODE
-int loadini(FILE* stream, const LOADINI_SETTING_MAP* settings_map, UINT map_size);
+LOADINI_ERROR_CODE loadini(FILE* stream, const LOADINI_SETTING_MAP* settings_map, UINT map_size);
 
 #endif // !XB_LOADINI_H

@@ -21,7 +21,12 @@
 
 #include "file.h"
 #include "type_defs.h"
-#include "xbmem.h"
+
+#ifdef MEM_TRACKING
+#include "mem_tracking.h"
+#else
+#include <malloc.h>
+#endif
 
 UCHAR* readFile(const char* filename, UINT* bytesRead, const UINT expectedSize)
 {
@@ -47,7 +52,7 @@ UCHAR* readFile(const char* filename, UINT* bytesRead, const UINT expectedSize)
 		return NULL;
 	}
 
-	UCHAR* data = (UCHAR*)xb_alloc(size);
+	UCHAR* data = (UCHAR*)malloc(size);
 	if (data != NULL)
 	{
 		fread(data, 1, size, file);
@@ -81,6 +86,40 @@ int writeFile(const char* filename, void* ptr, const UINT bytesToWrite)
 
 	return 0;
 }
+int writeFileF(const char* filename, void* ptr, const UINT bytesToWrite, const char* name)
+{
+	static const char SUCCESS_OUT[] = "Wrote %s ( %.2f %s )\n";
+	static const char FAIL_OUT[] = "Error failed to write %s\n";
+	static const char WRITE_OUT[] = "Writing %s to %s\n";
+
+	static const char* units[] = { "bytes", "kb", "mb", "gb" };
+	//static const char* units[] = { "bytes", "kb", };
+
+	int result;
+	float bytesF;
+	const char* sizeSuffix;
+	
+	bytesF = (float)bytesToWrite;
+	result = 0;
+	while (bytesF > 1024.0f && result < (sizeof(units) / sizeof(char*)) - 1)
+	{
+		bytesF /= 1024.0f;
+		result++;
+	}
+	sizeSuffix = units[result];
+	
+	printf(WRITE_OUT, name, filename);
+	result = writeFile(filename, ptr, bytesToWrite);
+	if (result == 0)
+	{
+		printf(SUCCESS_OUT, filename, bytesF, sizeSuffix);
+	}
+	else
+	{
+		printf(FAIL_OUT, name);
+	}
+	return result;
+}
 
 int getFileSize(FILE* file, UINT* fileSize)
 {
@@ -105,6 +144,7 @@ bool fileExists(const char* filename)
 	fclose(file);
 	return true;
 }
+
 int deleteFile(const char* filename)
 {
 	if (filename == NULL)

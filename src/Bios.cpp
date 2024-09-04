@@ -23,109 +23,52 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <memory.h>
 
 // user incl
 #include "Bios.h"
 #include "Mcpx.h"
-#include "XbTool.h"
-#include "XcodeInterp.h"
-
-#include "file.h"
-#include "rc4.h"
+#include "type_defs.h"
+#include "bldr.h"
 #include "util.h"
-#include "xbmem.h"
-
+#include "file.h"
 #include "lzx.h"
+#include "rc4.h"
+#include "rsa.h"
 #include "sha1.h"
 
-extern Parameters& params;
+#ifdef MEM_TRACKING
+#include "mem_tracking.h"
+#else
+#include <malloc.h>
+#endif
 
 const char ERROR_MSG_ROMSIZE_INVALID[] = "Error: romsize is less than the total size of the bios.\n";
-const char ERROR_MSG_WRONG_MCPX_ROM[] = "Error: decrypting the bldr. MCPX v%s was expected but v%s was provided.\n";
-
-void Bios::reset()
-{
-	// reset pointers, offsets
-
-	// sizes
-	size = 0;
-	totalSpaceAvailable = 0;
-	availableSpace = 0;
-	decompressedKrnlSize = 0;
-
-	bldrEncryptionState = false;
-	kernelEncryptionState = false;
-	bldrBootParamsValid = false;
-	bldrSignatureValid = false;
-
-	// pointers
-	bldr = NULL;
-	bootParams = NULL;
-	ldrParams = NULL;
-	initTbl = NULL;
-	dataTbl = NULL;
-	krnl = NULL;
-	krnlData = NULL;
-	bldrEntry = NULL;
-	bldrKeys = NULL;
-	preldr = NULL;
-	preldrParams = NULL;
-	preldrEntry = NULL;
-}
-
-/*void Bios::construct()
-{
-	// allocated memory
-	data = NULL;
-	decompressedKrnl = NULL;
-	preldrKey = NULL;
-
-	reset();
-}
-void Bios::deconstruct()
-{
-	if (data != NULL)
-	{
-		xb_free(data);
-		data = NULL;
-	}
-	if (decompressedKrnl != NULL)
-	{
-		xb_free(decompressedKrnl);
-		decompressedKrnl = NULL;
-	}
-	if (preldrKey != NULL)
-	{
-		xb_free(preldrKey);
-		preldrKey = NULL;
-	}
-
-	reset();
-}*/
 
 void Bios::getOffsets2(const UINT krnlSize, const UINT krnlDataSize)
 {
 	// get the pointers to the bldr entry and keys. Bldr needs to be unencrypted for this to work.
 		
-	UINT entryPointOffset = ldrParams->bldrEntryPoint - BLDR_BASE;
-	bldrEntry = (BLDR_ENTRY*)(bldr + entryPointOffset - sizeof(BLDR_ENTRY));
-	if ((UCHAR*)bldrEntry < bldr || (UCHAR*)bldrEntry + sizeof(BLDR_ENTRY) > bldr + BLDR_BLOCK_SIZE)
+	bldr.entryPointOffset = bldr.ldrParams->bldrEntryPoint - BLDR_BASE;
+	bldr.entry = (BLDR_ENTRY*)(bldr.data + bldr.entryPointOffset - sizeof(BLDR_ENTRY));
+	if (IN_BOUNDS(bldr.entry, bldr.data, BLDR_BLOCK_SIZE) == false)
 	{
-		bldrEntry = NULL;
+		bldr.entry = NULL;
 	}
-	if (bldrEntry != NULL)
+
+	if (bldr.entry != NULL)
 	{
-		UINT keysOffset = bldrEntry->keysPtr - BLDR_RELOC;
-		bldrKeys = (BLDR_KEYS*)(bldr + keysOffset - KEY_SIZE); // bfm key is 16 bytes before the keys ptr.
-		if ((UCHAR*)bldrKeys < bldr || (UCHAR*)bldrKeys + sizeof(BLDR_KEYS) > bldr + BLDR_BLOCK_SIZE)
+		bldr.keysOffset = bldr.entry->keysPtr - BLDR_RELOC;
+		
+		// the bfm key is just before the keys ptr so we will include it in our struct as well.
+		bldr.keys = (BLDR_KEYS*)(bldr.data + bldr.keysOffset - KEY_SIZE); 
+		if (IN_BOUNDS(bldr.keys, bldr.data, BLDR_BLOCK_SIZE) == false)
 		{
-			bldrKeys = NULL;
+			bldr.keys = NULL;
 		}
 	}
 
 	// set the kernel pointers.
-	krnlData = (bldr - krnlDataSize);
+	krnlData = (bldr.data - krnlDataSize);
 	krnl = (krnlData - krnlSize);
 
 	// calculate the available space in the bios.
@@ -133,162 +76,162 @@ void Bios::getOffsets2(const UINT krnlSize, const UINT krnlDataSize)
 	availableSpace = totalSpaceAvailable - krnlSize - krnlDataSize;
 }
 void Bios::getOffsets()
-{		
+{
+	bldr.data = (data + size - BLDR_BLOCK_SIZE - MCPX_BLOCK_SIZE);
+	bldr.ldrParams = (BOOT_LDR_PARAM*)(bldr.data);
+	bldr.bootParams = (BOOT_PARAMS*)(bldr.data + BLDR_BLOCK_SIZE - sizeof(BOOT_PARAMS));
+
 	initTbl = (INIT_TBL*)(data);
 	dataTbl = (ROM_DATA_TBL*)(data + initTbl->data_tbl_offset);
-	
-	bldr = (data + size - BLDR_BLOCK_SIZE - MCPX_BLOCK_SIZE);
-	ldrParams = (BOOT_LDR_PARAM*)(bldr);
-	bootParams = (BOOT_PARAMS*)(bldr + BLDR_BLOCK_SIZE - sizeof(BOOT_PARAMS));
 }
 
-int Bios::checkForPreldr()
-{
-	// find preldr entry params, rsa1 header.
-	
-	preldr = bldr + BLDR_BLOCK_SIZE - PRELDR_BLOCK_SIZE;
-	preldrParams = (PRELDR_PARAMS*)preldr;
-	
+void Bios::checkForPreldr()
+{	
+	preldr.data = (bldr.data + BLDR_BLOCK_SIZE - PRELDR_BLOCK_SIZE);
+	preldr.params = (PRELDR_PARAMS*)(preldr.data);
+	preldr.jmpInstr = (preldr.params->jmpInstr & 0xFF);
+	preldr.jmpOffset = (preldr.params->jmpInstr >> 8);
+	preldr.romDigest = (preldr.data + PRELDR_BLOCK_SIZE - PRELDR_ROM_DIGEST_SIZE);
+	preldr.nonce = (preldr.data + PRELDR_BLOCK_SIZE - KEY_SIZE);
+	preldr.bldrEntryOffset = (UINT*)(bldr.data + BLDR_BLOCK_SIZE - PRELDR_BLOCK_SIZE - 8);
+	preldr.status = PRELDR_STATUS_OK;
+	const UCHAR* sbkey = NULL;
+
 	// check for the jmp instruction. this is patched in during the build process.
-	
-	if ((preldrParams->jmpInstr & 0xFF) != 0xE9)
+	if (preldr.jmpInstr != 0xE9)
 	{
-		preldr = NULL;
-		preldrParams = NULL;
-		return PRELDR_STATUS_NOT_FOUND; // preldr was not found in this bios.
+		preldr.status = PRELDR_STATUS_NOT_FOUND;
+		return;
 	}
 
 	printf("\npreldr found\n");
 
-	preldrEntry = (PRELDR_ENTRY*)(preldr + (preldrParams->jmpInstr >> 8) + 0x5 - sizeof(PRELDR_ENTRY));
-	if ((UCHAR*)preldrEntry < preldr || (UCHAR*)preldrEntry + sizeof(PRELDR_ENTRY) > preldr + PRELDR_BLOCK_SIZE)
+	preldr.entry = (PRELDR_ENTRY*)(preldr.data + preldr.jmpOffset + 0x5 - sizeof(PRELDR_ENTRY));
+	if (IN_BOUNDS(preldr.entry, preldr.data, PRELDR_BLOCK_SIZE) == false)
 	{
-		// preldr entry point ptr is out of bounds
-		preldrEntry = NULL;
-		return PRELDR_STATUS_ERROR;
+		printf("Error: preldr entry is out of bounds\n");
+		preldr.entry = NULL;
+		preldr.status = PRELDR_STATUS_ERROR;
+		return;
 	}
 
-#if 0
-	// decrypt the preldr pubkey
-	const UINT PRELDR_BASE = (0xFFFFFFFF - MCPX_BLOCK_SIZE - PRELDR_BLOCK_SIZE + 1);
-	PUBLIC_KEY pubkey = { 0 };
-	UINT pubKeyOffset = preldrEntry->encryptedPubKeyPtr - PRELDR_BASE;
-
-	print("Decrypting preldr pubkey..\n");
-
-	// create cpy of the encrypted pub key
-	xb_cpy(&pubkey, (preldr + pubKeyOffset), sizeof(PUBLIC_KEY));
-
-	// decrypt the pub key with the first 12 bytes of the sb key
-	symmetricEncDec((UCHAR*)&pubkey, sizeof(PUBLIC_KEY), sb_key, 12);
-	
-	if (verifyPubKey(&pubkey) != 0)
+	preldr.pubkey = (PUBLIC_KEY*)(preldr.data + preldr.entry->pubKeyPtr - PRELDR_BASE);
+	if (IN_BOUNDS(preldr.pubkey, preldr.data, PRELDR_BLOCK_SIZE) == false)
 	{
-		print("Error: Public key header is invalid\n");
-		return PRELDR_STATUS_ERROR;
+		printf("Error: preldr public key is out of bounds\n");
+		preldr.pubkey = NULL;
+		preldr.status = PRELDR_STATUS_ERROR;
+		return;
 	}
-	print("pubkey is valid\n");
+
+	// continue only if the bldr is encrypted.
+	if (!bldr.encryptionState)
+	{
+		preldr.status = PRELDR_STATUS_INVALID_BLDR;
+		return;
+	}
+
+	// get sbkey
+	if (params.keyBldr != NULL)
+	{
+		sbkey = params.keyBldr;
+	}
+	else if (params.mcpx->data != NULL)
+	{
+		sbkey = params.mcpx->sbkey;
+	}
+
+	// check sbkey; cannot build the preldr key without it. sbkey must point to a valid 16 byte key.
+	if (sbkey == NULL)
+	{
+		preldr.status = PRELDR_STATUS_ERROR;
+		return;
+	}
+
+	// verify the preldr public key; this needs to be moved somewhere else.. its not really needed here.
+#if 0 
+	printf("decrypting preldr public key..\n");
+	symmetricEncDec((UCHAR*)preldr.pubkey, sizeof(PUBLIC_KEY), params.mcpx.sbkey, 12);
+	PUBLIC_KEY* pubkey = rsaVerifyPublicKey((UCHAR*)preldr.pubkey);
+	if (pubkey == NULL)
+	{
+		printf("Error: preldr public key is invalid\n");
+		preldr.status = PRELDR_STATUS_ERROR;
+		return;
+	}
+	printf("preldr public key is valid\n");
 #endif
 
-	if (isBldrEncrypted())
+	// create the preldr key
+	SHA1Context sha;
+	SHA1Reset(&sha);
+	SHA1Input(&sha, params.mcpx->sbkey, KEY_SIZE);
+	SHA1Input(&sha, preldr.nonce, KEY_SIZE);
+	for (int i = 0; i < KEY_SIZE; i++)
+		preldr.bldrKey[i] = params.mcpx->sbkey[i] ^ 0x5C;
+	SHA1Input(&sha, preldr.bldrKey, KEY_SIZE);
+	SHA1Result(&sha, preldr.bldrKey);
+
+	// decrypt the bldr
+	symmetricEncDecBldr(preldr.bldrKey, SHA1_DIGEST_LEN);
+		
+	if (bldr.data + *preldr.bldrEntryOffset < bldr.data || bldr.data + *preldr.bldrEntryOffset > bldr.data + BLDR_BLOCK_SIZE)
 	{
-		if (params.mcpx.data == NULL)
-		{
-			printf("Warning: A preldr was found but no mcpx rom was provided.\n");
-			return PRELDR_STATUS_ERROR;
-		}
-		if (params.mcpx.version != MCPX_ROM::MCPX_V1_1)
-		{
-			printf(ERROR_MSG_WRONG_MCPX_ROM, "1.1", "1.0");
-			return PRELDR_STATUS_ERROR;
-		}
-
-		// create the bldr key
-		UCHAR* last16Bytes = (bldr + BLDR_BLOCK_SIZE - KEY_SIZE);
-		UCHAR encKey[SHA1_DIGEST_LEN] = { 0 };
-		SHA1Context sha;
-
-		SHA1Reset(&sha);
-		SHA1Input(&sha, params.mcpx.sbkey, KEY_SIZE);
-		SHA1Input(&sha, last16Bytes, KEY_SIZE);
-		for (int i = 0; i < KEY_SIZE; i++)
-			encKey[i] = params.mcpx.sbkey[i] ^ 0x5C;
-		SHA1Input(&sha, encKey, KEY_SIZE);
-		SHA1Result(&sha, encKey);
-
-		// cpy built key for later use.
-		if (preldrKey == NULL)
-		{
-			preldrKey = (UCHAR*)xb_alloc(SHA1_DIGEST_LEN);
-		}
-		memcpy(preldrKey, encKey, SHA1_DIGEST_LEN);
-
-		// decrypt the bldr
-		symmetricEncDecBldr(encKey, SHA1_DIGEST_LEN);
+		printf("Error: bldr entry point offset is out of bounds\n");
+		preldr.status = PRELDR_STATUS_ERROR;
+		return;
 	}
 
-#if 0
-	// fix up the boot params ptr, with a preldr it's -16 bytes where it is normally.
-	bootParams = (BOOT_PARAMS*)((UCHAR*)bootParams - 16);
-#else
-	// copy boot params to where it should be.
+	// fixup bldr entry point, this is zeroed during the build process. preldr uses a rel jmp instead.	
+	bldr.ldrParams->bldrEntryPoint = BLDR_BASE + *preldr.bldrEntryOffset;
+	
+	// fixup the bldr boot params.
+#if 0 
+	// via ptr.
+	bldr.bootParams = (BOOT_PARAMS*)((UCHAR*)bldr.bootParams - 16);
+#else 
+	// via copy.
 	BOOT_PARAMS bootParamsCpy = { 0 };
-	memcpy(&bootParamsCpy, ((UCHAR*)bootParams - 16), sizeof(BOOT_PARAMS));
-	memcpy(bootParams, &bootParamsCpy, sizeof(BOOT_PARAMS));
+	memcpy(&bootParamsCpy, ((UCHAR*)bldr.bootParams - 16), sizeof(BOOT_PARAMS));
+	memcpy(bldr.bootParams, &bootParamsCpy, sizeof(BOOT_PARAMS));
 #endif
-
-	// fixup bldr entry point, this is zeroed during the build process to prevent a resolved rc4 key attack. preldr uses a rel jmp instead.
-	UINT entryOffset = *(UINT*)(bldr + BLDR_BLOCK_SIZE - PRELDR_BLOCK_SIZE - 8); // should equal 01bc for preldrs (mcpx v1.1)
-	ldrParams->bldrEntryPoint = BLDR_BASE + entryOffset;
-	
-	return PRELDR_STATUS_FOUND;
 }
 
-int Bios::load(UCHAR* buff, const UINT buff_size)
+int Bios::load(UCHAR* buff, const UINT buffSize, const BiosParams biosParams)
 {
 	int result = 0;
 
-	if (data != NULL)
-		return BIOS_LOAD_STATUS_FAILED_ALREADY_LOADED;
+	memcpy(&params, &biosParams, sizeof(BiosParams));
 
 	data = buff;
-	size = buff_size;
-	buffersize = size;
+	size = buffSize;
+	buffersize = buffSize;
 
 	// check size
-	if (checkSize(size) != 0)
+	if (checkBiosSize(size) != 0)
 	{
 		printf("Error: Invalid bios size, expecting 256Kb, 512Kb or 1Mb bios file.\n");
 		return BIOS_LOAD_STATUS_FAILED;
 	}
-	
-	// set encryption states based on user input.
-	bldrEncryptionState = isFlagClear(SW_ENC_BLDR, params.sw_flags);
-	kernelEncryptionState = isFlagClear(SW_ENC_KRNL, params.sw_flags);
+
+	// set encryption states based on bios parameters.
+	bldr.encryptionState = !params.encBldr;
+	kernelEncryptionState = !params.encKrnl;
 
 	getOffsets();
+	
+	checkForPreldr();
 
-	if (checkForPreldr() == PRELDR_STATUS_NOT_FOUND)
+	// decrypt the 2bl if it is encrypted and a preldr was not found. (mcpx v1.0)
+	if (bldr.encryptionState && preldr.status == PRELDR_STATUS_NOT_FOUND)
 	{
-		// only decrypt the bldr if the user has provided a key file or a mcpx rom and the bldr is encrypted.
-		if (isBldrEncrypted())
+		if (params.keyBldr != NULL)
 		{
-			if (params.keyBldr != NULL)
-			{
-				symmetricEncDecBldr(params.keyBldr, KEY_SIZE);
-			}
-			else if (params.mcpxFile != NULL)
-			{
-				switch (params.mcpx.version)
-				{
-				case MCPX_ROM::MCPX_V1_0:
-					symmetricEncDecBldr(params.mcpx.sbkey, KEY_SIZE);
-					break;
-				case MCPX_ROM::MCPX_V1_1:
-					printf(ERROR_MSG_WRONG_MCPX_ROM, "1.0", "1.1");
-					return BIOS_LOAD_STATUS_FAILED;
-				}
-			}
+			symmetricEncDecBldr(params.keyBldr, KEY_SIZE);
+		}
+		else if (params.mcpx->data != NULL)
+		{
+			symmetricEncDecBldr(params.mcpx->sbkey, KEY_SIZE);
 		}
 	}
 
@@ -301,7 +244,7 @@ int Bios::load(UCHAR* buff, const UINT buff_size)
 
 	// do stuff that depends on the boot params being decrypted and valid.
 
-	getOffsets2(bootParams->krnlSize, bootParams->krnlDataSize);
+	getOffsets2(bldr.bootParams->krnlSize, bldr.bootParams->krnlDataSize);
 
 	if (isKernelEncrypted())
 	{
@@ -311,35 +254,29 @@ int Bios::load(UCHAR* buff, const UINT buff_size)
 	return BIOS_LOAD_STATUS_SUCCESS;
 }
 
-int Bios::loadFromFile(const char* filename)
+int Bios::loadFromFile(const char* filename, BiosParams biosParams)
 {
 	UINT biosSize = 0;
 	UCHAR* bios = readFile(filename, &biosSize);
 	if (bios == NULL)
 		return BIOS_LOAD_STATUS_FAILED;
-
-	int result = load(bios, biosSize);
-	if (result == BIOS_LOAD_STATUS_FAILED_ALREADY_LOADED)
-		xb_free(bios);
-	return result;
+		
+	return load(bios, biosSize, biosParams);
 }
-int Bios::loadFromData(const UCHAR* bios, const UINT biosSize)
+int Bios::loadFromData(const UCHAR* bios, const UINT biosSize, BiosParams biosParams)
 {
-	UCHAR* biosData = (UCHAR*)xb_alloc(biosSize);
+	UCHAR* biosData = (UCHAR*)malloc(biosSize);
 	if (biosData == NULL)
 		return BIOS_LOAD_STATUS_FAILED;
 
 	memcpy(biosData, bios, biosSize);
 	
-	int result = load(biosData, biosSize);
-	if (result == BIOS_LOAD_STATUS_FAILED_ALREADY_LOADED)
-		xb_free(biosData);
-	return result;
+	return load(biosData, biosSize, biosParams);
 }
 
 int Bios::saveBiosToFile(const char* filename)
 {
-	return writeFile(filename, data, size);
+	return writeFileF(filename, data, size, "bios");
 }
 int Bios::saveBldrBlockToFile(const char* filename)
 {
@@ -347,54 +284,47 @@ int Bios::saveBldrBlockToFile(const char* filename)
 }
 int Bios::saveBldrToFile(const char* filename, const UINT bldrSize)
 {
-	printf("Writing bldr to %s (%d bytes)\n", filename, bldrSize);
-	return writeFile(filename, bldr, bldrSize);
+	return writeFileF(filename, bldr.data, bldrSize, "bldr");
 }
 int Bios::saveKernelToFile(const char* filename)
 {
-	printf("Writing krnl to %s (%d bytes)\n", filename, bootParams->krnlSize);
-	return writeFile(filename, krnl, bootParams->krnlSize);
+	return writeFileF(filename, krnl, bldr.bootParams->krnlSize, "compressed kernel");
 }
 int Bios::saveKernelDataToFile(const char* filename)
 {
-	printf("Writing krnl data to %s (%d bytes)\n", filename, bootParams->krnlDataSize);
-	return writeFile(filename, krnlData, bootParams->krnlDataSize);
+	return writeFileF(filename, krnlData, bldr.bootParams->krnlDataSize, "kernel section data");
 }
 int Bios::saveKernelImgToFile(const char* filename)
 {
-	// extract the compressed kernel + uncompressed krnl data
-	UINT krnlImgSize = bootParams->krnlSize + bootParams->krnlDataSize;
-	printf("Writing krnl img (compressed krnl+data) to %s (%d bytes)\n", filename, krnlImgSize);
-	return writeFile(filename, krnl, krnlImgSize);
+	UINT krnlImgSize = bldr.bootParams->krnlSize + bldr.bootParams->krnlDataSize;
+	return writeFileF(filename, krnl, krnlImgSize, "kernel image");
 }
 int Bios::saveInitTblToFile(const char* filename)
 {
-	// extract the init table
-	printf("Writing init tbl to %s (%d bytes)\n", filename, bootParams->inittblSize);
-	return writeFile(filename, data, bootParams->inittblSize);
+	return writeFileF(filename, data, bldr.bootParams->inittblSize, "init table");
 }
 
 void Bios::symmetricEncDecBldr(const UCHAR* key, const UINT keyLen)
 {
-	if (bldr == NULL)
+	if (bldr.data == NULL)
 		return;
 
-	printf("%s Bldr..\n", bldrEncryptionState ? "Decrypting" : "Encrypting");
+	printf("%s 2BL..\n", bldr.encryptionState ? "decrypting" : "encrypting");
 
 	// verify the bldr ptr is within the bounds or this will cause an access violation.
-	if (bldr < data || (bldr + BLDR_BLOCK_SIZE) > (data + size))
+	if (bldr.data < data || (bldr.data + BLDR_BLOCK_SIZE) > (data + size))
 	{
-		printf("Error: bldr ptr is out of bounds\n");
+		printf("Error: 2BL ptr is out of bounds\n");
 		return;
 	}
 
-	symmetricEncDec(bldr, BLDR_BLOCK_SIZE, key, keyLen);
+	symmetricEncDec(bldr.data, BLDR_BLOCK_SIZE, key, keyLen);
 
-	bldrEncryptionState = !bldrEncryptionState;
+	bldr.encryptionState = !bldr.encryptionState;
 }
 void Bios::symmetricEncDecKernel()
 {
-	if (krnl == NULL || bootParams == NULL)
+	if (krnl == NULL || bldr.bootParams == NULL)
 		return;
 
 	UCHAR* key = params.keyKrnl;
@@ -402,10 +332,10 @@ void Bios::symmetricEncDecKernel()
 	{
 		// key not provided on cli; try get key from bldr block.
 
-		if (bldrKeys == NULL)
+		if (bldr.keys == NULL)
 			return;
 
-		key = bldrKeys->krnlKey;
+		key = bldr.keys->krnlKey;
 		if (key == NULL)
 			return;
 
@@ -418,285 +348,38 @@ void Bios::symmetricEncDecKernel()
 			return; // kernel key is all FF's
 
 		// key is valid; use it.
-		printf("krnl key from 2bl: ");
-		printData(key, KEY_SIZE);
 	}
 
 	// en/decrypt the kernel.
-
-	printf("%s Kernel..\n", kernelEncryptionState ? "Decrypting" : "Encrypting");
+	printf("%s kernel.. (using key %s)\n", (kernelEncryptionState ? "decrypting" : "encrypting"), (params.keyKrnl != NULL ? "from CLI" : "found in 2BL"));
 
 	// verify the krnl is within the bounds or this will cause an access violation.
-	if (krnl < data || (krnl + bootParams->krnlSize) > (data + size))
+	if (krnl < data || (krnl + bldr.bootParams->krnlSize) > (data + size))
 	{
 		printf("Error: krnl ptr is out of bounds\n");
 		return;
 	}
 
-	symmetricEncDec(krnl, bootParams->krnlSize, key, KEY_SIZE);
+	symmetricEncDec(krnl, bldr.bootParams->krnlSize, key, KEY_SIZE);
 
 	kernelEncryptionState = !kernelEncryptionState;
 }
 
-void Bios::printBldrInfo()
-{
-	printf("\nBldr:\n");
-
-	if (bldrBootParamsValid)
-	{
-		printf("entry point:\t\t0x%08X\n", ldrParams->bldrEntryPoint);
-
-		if (bldrEntry != NULL)
-		{
-			printf("bfm entry point:\t0x%08X\n", bldrEntry->bfmEntryPoint);
-		}
-	}
-
-	printf("signature:\t\t");
-	printData((UCHAR*)&bootParams->signature, 4);
-	
-	UINT krnlSize = bootParams->krnlSize;
-	UINT krnlDataSize = bootParams->krnlDataSize;
-
-	bool isKrnlSizeValid = krnlSize >= 0 && krnlSize <= params.romsize;
-	bool isKrnlDataSizeValid = krnlDataSize >= 0 && krnlDataSize <= params.romsize;
-
-	printf("kernel data size:\t");
-	print((CON_COL)isKrnlDataSizeValid, "%ld", krnlDataSize);
-	printf(" bytes\n");
-
-	printf("kernel size:\t\t");
-	print((CON_COL)isKrnlSizeValid, "%ld", krnlSize);
-	printf(" bytes\n");
-}
-void Bios::printKernelInfo()
-{
-	printf("\nKrnl:\n");
-
-	USHORT kernel_ver = initTbl->kernel_ver;
-	if ((kernel_ver & 0x8000) != 0) // does the kernel version have the 0x8000 bit set?
-	{
-		kernel_ver = kernel_ver & 0x7FFF; // clear the 0x8000 bit
-		printf("KD Delay flag set\t0x%04X\n", 0x8000);
-	}
-
-	printf("Version:\t\t%d ( %04X )\n", kernel_ver, kernel_ver);
-
-	bool isValid = availableSpace >= 0 && availableSpace <= size;
-
-	printf("Available space:\t");
-	print((CON_COL)isValid, "%ld", availableSpace);
-	printf(" bytes\n");
-}
-void Bios::printInitTblInfo()
-{
-	printf("\nInit tbl:\n");
-	
-	printf("Identifier:\t\t");
-	switch (initTbl->init_tbl_identifier)
-	{
-		case 0x30: // dvt3
-			printf("DVT3");
-			break;
-		case 0x46: // dvt4.
-			printf("DVT4");
-			break;
-		case 0x60: // dvt6.
-			printf("DVT6");
-			break;
-		case 0x70: // retail v1.0 - v1.1. i've only seen this ID in bios built for mcpx v1.0
-		case 0x80: // retail > v1.1. i've only seen this ID in bios built for mcpx v1.1
-			printf("Retail");
-			break;
-		default:
-			printf("UKN");
-			break;
-	}
-	printf(" ( %04x )\nRevision:\t\trev %d.%02d\n", initTbl->init_tbl_identifier, initTbl->revision >> 8, initTbl->revision & 0xFF);
-
-	UINT initTblSize = bootParams->inittblSize;
-	bool isInitTblSizeValid = initTblSize >= 0 && initTblSize <= params.romsize;
-
-	printf("Size:\t\t\t");
-	print((CON_COL)isInitTblSizeValid, "%ld", initTblSize);
-	printf(" bytes");
-
-	if (bootParams->inittblSize == 0)
-	{
-		printf(" ( not hashed )");
-	}
-	printf("\n");
-}
-void Bios::printNv2aInfo()
-{	
-	int i;
-	UINT item;
-
-	const UINT UINT_ALIGN = sizeof(UINT);
-	const UINT ARRAY_BYTES = sizeof(initTbl->vals);
-	const UINT ARRAY_SIZE = ARRAY_BYTES / UINT_ALIGN;
-	const UINT ARRAY_START = (ARRAY_BYTES - UINT_ALIGN) / UINT_ALIGN;
-
-	const char* init_tbl_comments[5] = {	
-		"; init tbl revision","","",		
-		"; kernel version + init tbl identifier",		
-		"; rom data tbl offset",
-	};
-
-	printf("\nNV2A Init Tbl:\n");
-
-	// print the first part of the table
-	for (i = 0; i < ARRAY_START; i++)
-	{
-		item = ((UINT*)initTbl)[i];
-		printf("%04x:\t\t0x%08x\n", i * UINT_ALIGN, item);
-	}
-
-	// print the array
-	char str[14 * 4 + 1] = { 0 };
-	bool hasValue = false;
-	bool cHasValue = false;
-	const UINT* valArray = initTbl->vals;
-
-	for (i = 0; i < ARRAY_SIZE; i++)
-	{
-		cHasValue = false;
-
-		if (*(UINT*)&valArray[i] != 0)
-		{
-			cHasValue = true;
-			hasValue = true;
-		}
-
-		if (cHasValue && hasValue)
-			sprintf(str + i * 3, "%02X ", *(UINT*)valArray[i]);
-	}
-	if (hasValue)
-	{
-		if (str[0] == '\0')
-		{
-			i = 0;
-			while (str[i] == '\0' && i < ARRAY_SIZE * 3) // sanity check
-			{
-				memcpy(str + i, "00 ", 3);
-				i += 3;
-			}
-		}
-	}
-	else
-	{
-		strcat(str, "0x00..0x00");
-	}
-	printf("%04x-%04x:\t%s\n", ARRAY_START * UINT_ALIGN, (ARRAY_START * UINT_ALIGN) + (ARRAY_SIZE * UINT_ALIGN) - UINT_ALIGN, str);
-
-	// print the second part of the table
-	for (i = ARRAY_START + ARRAY_SIZE; i < sizeof(INIT_TBL) / UINT_ALIGN; i++)
-	{
-		item = ((UINT*)initTbl)[i];
-		printf("%04x:\t\t0x%08x %s\n", i * UINT_ALIGN, item, init_tbl_comments[i - ARRAY_START - ARRAY_SIZE]);
-	}
-}
-void Bios::printDataTbl()
-{
-	printf("\nDrv/Slw data tbl:\n" \
-		"max mem clk: %d\n\n" \
-		"Calibrat: COUNT A\tCOUNT B\n" \
-		"slow_ext: 0x%04X\t0x%04X\n" \
-		"slow_avg: 0x%04X\t0x%04X\n" \
-		"typi:     0x%04X\t0x%04X\n" \
-		"fast_avg: 0x%04X\t0x%04X\n" \
-		"fast_ext: 0x%04X\t0x%04X\n",
-		dataTbl->cal.max_m_clk,
-		dataTbl->cal.slow_count_ext, dataTbl->cal.slow_countB_ext,
-		dataTbl->cal.slow_count_avg, dataTbl->cal.slow_countB_avg,
-		dataTbl->cal.typi_count, dataTbl->cal.typi_countB,
-		dataTbl->cal.fast_count_avg, dataTbl->cal.fast_countB_avg,
-		dataTbl->cal.fast_count_ext, dataTbl->cal.fast_countB_ext);
-
-	const char* str[5] = {
-		"Extreme Fast",
-		"Fast",
-		"Typical",
-		"Slow",
-		"Extreme Slow"
-	};
-
-	printf("\n\t\t Samsung\t Micron\n\t\tFALL RISE\tFALL RISE");
-	for (int i = 0; i < 5; i++)
-	{
-		printf("\n%s:\naddr drv:\t0x%02X 0x%02X\t0x%02X 0x%02X\n" \
-			"addr slw:\t0x%02X 0x%02X\t0x%02X 0x%02X\n" \
-			"clk drv:\t0x%02X 0x%02X\t0x%02X 0x%02X\n" \
-			"clk slw:\t0x%02X 0x%02X\t0x%02X 0x%02X\n" \
-			"dat drv:\t0x%02X 0x%02X\t0x%02X 0x%02X\n" \
-			"dat slw:\t0x%02X 0x%02X\t0x%02X 0x%02X\n" \
-			"dsq drv:\t0x%02X 0x%02X\t0x%02X 0x%02X\n" \
-			"dsq slw:\t0x%02X 0x%02X\t0x%02X 0x%02X\n\n" \
-			"data delay:\t0x%02X\t\t0x%02X\n" \
-			"clk delay:\t0x%02X\t\t0x%02X\n" \
-			"dsq delay:\t0x%02X\t\t0x%02X\n", str[i],
-			dataTbl->samsung[i].adr_drv_fall, dataTbl->samsung[i].adr_drv_rise, dataTbl->micron[i].adr_drv_fall, dataTbl->micron[i].adr_drv_rise,
-			dataTbl->samsung[i].adr_slw_fall, dataTbl->samsung[i].adr_slw_rise, dataTbl->micron[i].adr_slw_fall, dataTbl->micron[i].adr_slw_rise,
-			dataTbl->samsung[i].clk_drv_fall, dataTbl->samsung[i].clk_drv_rise, dataTbl->micron[i].clk_drv_fall, dataTbl->micron[i].clk_drv_rise,
-			dataTbl->samsung[i].clk_slw_fall, dataTbl->samsung[i].clk_slw_rise, dataTbl->micron[i].clk_slw_fall, dataTbl->micron[i].clk_slw_rise,
-			dataTbl->samsung[i].dat_drv_fall, dataTbl->samsung[i].dat_drv_rise, dataTbl->micron[i].dat_drv_fall, dataTbl->micron[i].dat_drv_rise,
-			dataTbl->samsung[i].dat_slw_fall, dataTbl->samsung[i].dat_slw_rise, dataTbl->micron[i].dat_slw_fall, dataTbl->micron[i].dat_slw_rise,
-			dataTbl->samsung[i].dqs_drv_fall, dataTbl->samsung[i].dqs_drv_rise, dataTbl->micron[i].dqs_drv_fall, dataTbl->micron[i].dqs_drv_rise,
-			dataTbl->samsung[i].dqs_slw_fall, dataTbl->samsung[i].dqs_slw_rise, dataTbl->micron[i].dqs_slw_fall, dataTbl->micron[i].dqs_slw_rise,
-			dataTbl->samsung[i].dat_inb_delay, dataTbl->micron[i].dat_inb_delay,
-			dataTbl->samsung[i].clk_ic_delay, dataTbl->micron[i].clk_ic_delay,
-			dataTbl->samsung[i].dqs_inb_delay, dataTbl->micron[i].dqs_inb_delay);
-	}
-}
-void Bios::printKeys()
-{
-	// print the keys
-	printf("\nKeys:\n");
-	if (params.mcpxFile != NULL && params.mcpx.version != MCPX_ROM::MCPX_UNK)
-	{
-		printf("sb key (+%d):\t", params.mcpx.sbkey - params.mcpx.data);
-		printData(params.mcpx.sbkey, KEY_SIZE);
-
-		if (params.mcpx.version == MCPX_ROM::MCPX_V1_1 && preldrKey != NULL)
-		{
-			// print built key
-			printf("built bldr key: ");
-			printData(preldrKey, SHA1_DIGEST_LEN);
-		}
-	}
-	if (bldrKeys != NULL)
-	{
-		printf("bfm key:\t");
-		printData(bldrKeys->bfmKey, KEY_SIZE);
-		printf("eeprom key:\t");
-		printData(bldrKeys->eepromKey, KEY_SIZE);
-		printf("cert key:\t");
-		printData(bldrKeys->certKey, KEY_SIZE);
-		printf("kernel key:\t");
-		printData(bldrKeys->krnlKey, KEY_SIZE);
-	}
-	else
-	{
-		printf("Not found\n");
-	}
-}
-
 int Bios::validateBldr()
 {
-	const UINT krnlSize = bootParams->krnlSize;
-	const UINT krnlDataSize = bootParams->krnlDataSize;
-	const UINT tblSize = bootParams->inittblSize;
+	const UINT krnlSize = bldr.bootParams->krnlSize;
+	const UINT krnlDataSize = bldr.bootParams->krnlDataSize;
+	const UINT tblSize = bldr.bootParams->inittblSize;
 
 	const bool isKrnlSizeValid = krnlSize >= 0 && krnlSize <= size;
 	const bool isDataSizeValid = krnlDataSize >= 0 && krnlDataSize <= size;
 	const bool istblSizeValid = tblSize >= 0 && tblSize <= size;
 	
-	bldrSignatureValid = (BOOT_PARAMS_SIGNATURE == bootParams->signature);
-	bldrBootParamsValid = isKrnlSizeValid && isDataSizeValid && istblSizeValid;
+	bldr.signatureValid = (BOOT_SIGNATURE == bldr.bootParams->signature);
+	bldr.bootParamsValid = isKrnlSizeValid && isDataSizeValid && istblSizeValid;
 
-	if (!bldrBootParamsValid)
+	if (!bldr.bootParamsValid)
 	{
-		printf("boot params are invalid/encrypted\n");
 		return BIOS_LOAD_STATUS_INVALID_BLDR;
 	}
 
@@ -715,68 +398,97 @@ int Bios::decompressKrnl()
 	if (decompressedKrnl != NULL)
 		return 1;
 
-	UINT bufferSize = 1 * 1024 * 1024; // 1MB ( 52 blocks ); initial value, decompress() will reallocate if needed. 
+	printf("decompressing kernel... (%d bytes)\n", bldr.bootParams->krnlSize);
+
+#if 0
+	// set initial value, decompress() will reallocate if needed. 
+	UINT bufferSize = 1 * 1024 * 1024 / 2; // 512 kb ( 26 blocks )
 	
 	decompressedKrnl = (UCHAR*)xb_alloc(bufferSize); // allocate initial buffer for the decompressed kernel. buff will be reallocated if needed.
 	if (decompressedKrnl == NULL)
 	{
 		return ERROR_OUT_OF_MEMORY;
 	}
-
-	printf("Decompressing kernel (%d bytes)\n", bootParams->krnlSize);
-	
-	if (decompress(krnl, bootParams->krnlSize, decompressedKrnl, bufferSize, decompressedKrnlSize) != 0)
+		
+	if (decompress(krnl, bldr.bootParams->krnlSize, decompressedKrnl, bufferSize, &decompressedKrnlSize) != 0)
 	{
 		return 1;
 	}
+#else
+	decompressedKrnl = decompressImg(krnl, bldr.bootParams->krnlSize, &decompressedKrnlSize);
+	if (decompressedKrnl == NULL)
+	{
+		return 1;
+	}
+#endif
 			
 	return 0;
 }
 
-int Bios::build(UCHAR* in_bl, UINT in_blSize, UCHAR* in_tbl, UINT in_tblSize, UCHAR* in_k, UINT in_kSize, UCHAR* in_kData, UINT in_kDataSize)
+int Bios::build(UCHAR* in_preldr, UINT in_preldrSize,
+	UCHAR* in_2bl, UINT in_2blSize,
+	UCHAR* in_inittbl, UINT in_inittblSize,
+	UCHAR* in_krnl, UINT in_krnlSize,
+	UCHAR* in_krnlData, UINT in_krnlDataSize,
+	UINT binsize, bool bfm, BiosParams biosParams)
 {
 	if (data != NULL)
+	{
 		return BIOS_LOAD_STATUS_FAILED;
+	}
+
+	memcpy(&params, &biosParams, sizeof(BiosParams));
 
 	// verify the rom size is big enough for the bios.
-	if (params.romsize < BLDR_BLOCK_SIZE + MCPX_BLOCK_SIZE + in_kSize + in_kDataSize + in_tblSize)
+	if (params.romsize < BLDR_BLOCK_SIZE + MCPX_BLOCK_SIZE + in_krnlSize + in_krnlDataSize + in_inittblSize)
 	{
 		printf(ERROR_MSG_ROMSIZE_INVALID);
 		return BIOS_LOAD_STATUS_FAILED_INVALID_ROMSIZE;
 	}
-	if (params.binsize < params.romsize)
+
+	if (binsize < params.romsize)
 	{
 		printf("Error: binsize is less than the romsize\n");
 		return BIOS_LOAD_STATUS_FAILED_INVALID_BINSIZE;
 	}
 
-	data = (UCHAR*)xb_alloc(params.binsize);
+	data = (UCHAR*)malloc(binsize);
 	if (data == NULL)
+	{
 		return BIOS_LOAD_STATUS_FAILED;
+	}
 
 	size = params.romsize;
-	buffersize = params.binsize;
+	buffersize = binsize;
 
 	// set encryption states.
-	bldrEncryptionState = isFlagSet(SW_ENC_BLDR, params.sw_flags);
+	bldr.encryptionState = params.encBldr;
 	// is flag set = not encrypted ; key provided = encrypted ; flag set + key provided = not encrypted
-	kernelEncryptionState = (isFlagClear(SW_ENC_KRNL, params.sw_flags) && params.keyKrnl == NULL) || (isFlagSet(SW_ENC_KRNL, params.sw_flags) && params.keyKrnl != NULL);
+	kernelEncryptionState = (!params.encKrnl && params.keyKrnl == NULL) || (params.encKrnl && params.keyKrnl != NULL);
 
 	getOffsets();
-	memcpy(data, in_tbl, in_tblSize);
-	memcpy(bldr, in_bl, in_blSize);
 
-	getOffsets2(in_kSize, in_kDataSize);
-	memcpy(krnl, in_k, in_kSize);
-	memcpy(krnlData, in_kData, in_kDataSize);
+	// init table
+	memcpy(data, in_inittbl, in_inittblSize);
+	
+	// 2bl
+	memcpy(bldr.data, in_2bl, in_2blSize);
+
+	getOffsets2(in_krnlSize, in_krnlDataSize);
+
+	// compress kernel image.
+	memcpy(krnl, in_krnl, in_krnlSize);
+	
+	// uncompressed kernel section data
+	memcpy(krnlData, in_krnlData, in_krnlDataSize);
 
 	// fixup the boot params.
-	bootParams->krnlSize = in_kSize;
-	bootParams->krnlDataSize = in_kDataSize;
-	bootParams->inittblSize = in_tblSize;
+	bldr.bootParams->krnlSize = in_krnlSize;
+	bldr.bootParams->krnlDataSize = in_krnlDataSize;
+	bldr.bootParams->inittblSize = in_inittblSize;
 
-	printf("\nBLDR Entry:\t0x%08X\n\nSignature:\t", ldrParams->bldrEntryPoint);
-	printData((UCHAR*)&bootParams->signature, 4);
+	printf("\nBLDR Entry:\t0x%08X\n\nSignature:\t", bldr.ldrParams->bldrEntryPoint);
+	printData((UCHAR*)&bldr.bootParams->signature, 4);
 	printf("Krnl data size:\t%ld bytes\n" \
 		"Krnl size:\t%ld bytes\n" \
 		"2BL size:\t%ld bytes\n" \
@@ -784,9 +496,9 @@ int Bios::build(UCHAR* in_bl, UINT in_blSize, UCHAR* in_tbl, UINT in_tblSize, UC
 		"Avail space:\t%ld bytes\n" \
 		"rom size:\t%ld Kb\n" \
 		"bin size:\t%ld Kb\n",
-		bootParams->krnlDataSize, bootParams->krnlSize,
-		BLDR_BLOCK_SIZE, bootParams->inittblSize, availableSpace,
-		params.romsize / 1024, params.binsize / 1024);
+		bldr.bootParams->krnlDataSize, bldr.bootParams->krnlSize,
+		BLDR_BLOCK_SIZE, bldr.bootParams->inittblSize, availableSpace,
+		params.romsize / 1024, binsize / 1024);
 
 	// encrypt the kernel
 	if (!isKernelEncrypted())
@@ -794,37 +506,50 @@ int Bios::build(UCHAR* in_bl, UINT in_blSize, UCHAR* in_tbl, UINT in_tblSize, UC
 		symmetricEncDecKernel();
 		if (isKernelEncrypted())
 		{
-			// TO-DO: replace kernel rc4 key in the 2bl with the key used to encrypt it.
+			// if the kernel was encrypted with a key file, update the key in the 2BL.
+			if (bldr.keys != NULL && params.keyKrnl != NULL)
+			{
+				memcpy(bldr.keys->krnlKey, params.keyKrnl, KEY_SIZE);
+				printf("Updated kernel key in 2BL\n");
+			}
 		}
 	}
 
 	// build a bios that boots from media. ( BFM )
-	if (isFlagSet(SW_BLD_BFM, params.sw_flags))
+	if (bfm)
 	{
 		convertToBootFromMedia();
+
+		// force the bfm bios to be 1Mb in size.
+		binsize = 1 * 1024 * 1024; // 1Mb
 	}
 
-	// only encrypt the bldr if the user has provided a key file or a mcpx rom and the bldr is not already encrypted.
-	if (!isBldrEncrypted())
+	// encrypt if a key file or mcpx rom is provided and it is not already encrypted.
+	if (!bldr.encryptionState)
 	{
 		if (params.keyBldr != NULL)
 		{
 			symmetricEncDecBldr(params.keyBldr, KEY_SIZE);
 		}
-		else if (params.mcpxFile != NULL)
+		else if (params.mcpx->sbkey != NULL)
 		{
-			switch (params.mcpx.version)
-			{
-				case MCPX_ROM::MCPX_V1_0:
-					symmetricEncDecBldr(params.mcpx.sbkey, KEY_SIZE);
-					break;
-			}
+			symmetricEncDecBldr(params.mcpx->sbkey, KEY_SIZE);
 		}
 	}
 
-	if (params.binsize > params.romsize)
+	// copy in the preldr if it was provided.
+	if (in_preldr != NULL && in_preldrSize > 0)
 	{
-		if (replicateBios() != 0)
+		preldr.data = (bldr.data + BLDR_BLOCK_SIZE - PRELDR_BLOCK_SIZE);
+		if (in_preldrSize < PRELDR_BLOCK_SIZE)
+		{
+			memcpy(preldr.data, in_preldr, in_preldrSize);
+		}
+	}
+
+	if (binsize > params.romsize)
+	{
+		if (replicateBios(binsize) != 0)
 		{
 			printf("Error: failed to replicate the bios\n");
 			return BIOS_LOAD_STATUS_FAILED;
@@ -850,25 +575,21 @@ int Bios::convertToBootFromMedia()
 
 	if (params.keyBldr == NULL)
 	{
-		if (bldrKeys == NULL)
+		if (bldr.keys == NULL)
 			return 1;
 
-		symmetricEncDecBldr(bldrKeys->bfmKey, KEY_SIZE);
+		symmetricEncDecBldr(bldr.keys->bfmKey, KEY_SIZE);
 	}
-
-	// force the bfm bios to be 1Mb in size.
-	params.binsize = 1 * 1024 * 1024; // 1Mb
 
 	return 0;
 }
 
-int Bios::replicateBios()
+int Bios::replicateBios(UINT binsize)
 {
 	// replicate the bios file base on binsize
 
 	UINT offset = 0;
 	UINT new_size = 0;
-	UINT binsize = params.binsize;
 	UINT romsize = params.romsize;
 
 	if (binsize < romsize || buffersize < binsize)
@@ -888,31 +609,19 @@ int Bios::replicateBios()
 		offset = new_size;
 	}
 
-#if 0
-	print("Verifying replicated bios..\n");
-	
-	// verify we got to the end of the bios size
-	if (new_size != params.binsize)
-	{
-		printf("Error: Replicated bios is not the correct size\n");
-		return 1;
-	}
-
-	// verify replications
-	offset = params.romsize;
-	while (offset < new_size)
-	{
-		if (xb_cmp(_bios, (_bios + offset), offset) != 0)
-		{
-			printf("Error: Replicated bios does not match the original\n");
-			return 1;
-		}
-		offset *= 2;
-	}
-#endif
-
-	// update the size of the bios
 	size = new_size;
 
 	return 0;
+}
+
+int checkBiosSize(const UINT size)
+{
+	switch (size)
+	{
+	case 0x40000U:
+	case 0x80000U:
+	case 0x100000U:
+		return 0;
+	}
+	return 1;
 }

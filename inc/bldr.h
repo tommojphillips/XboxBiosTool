@@ -25,7 +25,6 @@
 #include "type_defs.h"
 
 const UINT KEY_SIZE = 16;
-const UINT BOOT_PARAMS_SIGNATURE = MAKE_4BYTE_SIGNATURE('J', 'y', 'T', 'x');
 
 // The init table structure.
 typedef struct {
@@ -76,25 +75,19 @@ typedef struct {
     char cli[64];           // command line
 } BOOT_LDR_PARAM;
 
+typedef struct {
+    UCHAR countA;
+    UCHAR countB;
+} DRV_SLW_COUNTS;
+
 // drive / slew calibration parameters
 typedef struct {
     USHORT max_m_clk;
-
-    UCHAR slow_count_ext;
-    UCHAR slow_countB_ext;
-
-    UCHAR slow_count_avg;
-    UCHAR slow_countB_avg;
-    
-    UCHAR typi_count;
-    UCHAR typi_countB;
-
-    UCHAR fast_count_avg;
-    UCHAR fast_countB_avg;
-    
-    UCHAR fast_count_ext;
-    UCHAR fast_countB_ext;
-
+    DRV_SLW_COUNTS slowest;
+    DRV_SLW_COUNTS slow;
+    DRV_SLW_COUNTS standard;
+    DRV_SLW_COUNTS fast;
+    DRV_SLW_COUNTS fastest;
 } DRV_SLW_CAL_PARAMS;
 
 // drive / slew pad parameters
@@ -152,9 +145,9 @@ typedef struct {
 
 typedef struct {
     UINT jmpInstr;		// jmp opcode + rel offset
-    UINT reserved;
+    UINT reserved1;
     UINT funcBlockPtr;	// address to sha func block. should equal PRELDR_ENTRY::funcBlockPtr
-    UINT pubKeyPtr;		// always 0.
+    UINT reserved2;
 } PRELDR_PARAMS;
 
 typedef struct {

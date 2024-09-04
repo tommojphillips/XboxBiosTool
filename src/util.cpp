@@ -31,7 +31,6 @@
 #include "util.h"
 #include "type_defs.h"
 
-static int console_util_color = 0;
 static int _g_error_code = XB_ERROR_CODES::ERROR_SUCCESS;
 
 int getErrorCode()
@@ -45,6 +44,8 @@ void setErrorCode(const int code)
 
 void setConsoleColor(const int col)
 {
+	static int console_util_color = 0;
+	
 	if (col != 0)
 	{
 		console_util_color = 0;
@@ -234,52 +235,16 @@ void getTimestamp(UINT timestamp, char* timestamp_str)
 
 	time_t rawtime = (time_t)timestamp;
 	struct tm* ptm;
-
 	ptm = gmtime(&rawtime);
-
 	char* time_str = asctime(ptm);
+
 	if (time_str == NULL)
 	{
 		strcpy(timestamp_str, "0");
-		return;
 	}
-	time_str[strlen(time_str) - 1] = '\0';
-	strcpy(timestamp_str, time_str);
-}
-
-void ltrim(char*& str)
-{
-	if (str == NULL)
-		return;
-
-	while (*str == ' ' || *str == '\t' || *str == '\n')
+	else
 	{
-		str++;
+		time_str[strlen(time_str) - 1] = '\0';
+		strcpy(timestamp_str, time_str);
 	}
-}
-void rtrim(char*& str)
-{
-	if (str == NULL)
-		return;
-
-	int len = strlen(str);
-	if (len == 0)
-		return;
-
-	char* end = str + len - 1;
-	while (end > str && (*end == ' ' || *end == '\t' || *end == '\n'))
-	{
-		end--;
-	}
-	*(end + 1) = '\0';
-}
-
-void rpad(char* str, const int buffSize, const char pad)
-{
-	if (str == NULL)
-		return;
-
-	int slen = strlen(str);
-	memset(str + slen, pad, buffSize - slen - 1);
-	str[buffSize - 1] = '\0';
 }

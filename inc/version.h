@@ -45,7 +45,7 @@
 		STR(XB_BIOS_TOOL_VER_BUILD)
 
 #define XB_BIOS_TOOL_NAME_STR	"XbTool v" \
-								XB_BIOS_TOOL_VER_STR " Copyright (c) " \
-								XB_BIOS_TOOL_AUTHOR_STR " 2024."
+								XB_BIOS_TOOL_VER_STR " Copyright (c) 2024 " \
+								XB_BIOS_TOOL_AUTHOR_STR
 
 #endif // !XB_BIOS_TOOL_VERSION_H

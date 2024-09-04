@@ -1,4 +1,4 @@
-// type_defs.h
+// str_util.cpp: implements various utility functions for manipulating strings.
 
 /* Copyright(C) 2024 tommojphillips
  *
@@ -19,16 +19,46 @@
 // Author: tommojphillips
 // GitHub: https:\\github.com\tommojphillips
 
-#ifndef  XB_TYPE_DEFS_H
-#define XB_TYPE_DEFS_H
+// std incl
+#include <cstring>
 
-#ifndef NULL
-#define NULL 0
-#endif
+// user incl
+#include "str_util.h"
 
-typedef unsigned long ULONG;
-typedef unsigned int UINT;
-typedef unsigned char UCHAR;
-typedef unsigned short USHORT;
+void ltrim(char*& str)
+{
+	if (str == NULL)
+		return;
 
-#endif // ! XB_BIOS_TYPE_DEFS_H
+	while (*str == ' ' || *str == '\t' || *str == '\n')
+	{
+		str++;
+	}
+}
+
+void rtrim(char*& str)
+{
+	if (str == NULL)
+		return;
+
+	int len = strlen(str);
+	if (len == 0)
+		return;
+
+	char* end = str + len - 1;
+	while (end > str && (*end == ' ' || *end == '\t' || *end == '\n'))
+	{
+		end--;
+	}
+	*(end + 1) = '\0';
+}
+
+void rpad(char* str, const int buffSize, const char pad)
+{
+	if (str == NULL)
+		return;
+
+	int slen = strlen(str);
+	memset(str + slen, pad, buffSize - slen - 1);
+	str[buffSize - 1] = '\0';
+}

@@ -20,77 +20,55 @@
 // GitHub: https:\\github.com\tommojphillips
 
 // std incl
-#include <memory>
+#include <stdio.h>
 
 // user incl
 #include "Mcpx.h"
-#include "bldr.h"
 #include "file.h"
-#include "xbmem.h"
+#include "sha1.h"
 
-int MCPX_ROM::load(const char* filename)
+int Mcpx::load(UCHAR* mcpxData)
 {
-	if (filename == NULL || data != NULL)
-		return 1;
+	data = mcpxData;
 
-	data = readFile(filename, NULL, MCPX_BLOCK_SIZE);
-	if (data == NULL)
-		return 1;
+	SHA1Context context;
+	SHA1Reset(&context);
+	SHA1Input(&context, data, MCPX_BLOCK_SIZE);
+	SHA1Result(&context, hash);
+	
+	// compare precomputed hashes
 
-	int result = verifyMCPX();
-
-	printf("mcpx file: %s ", filename);
-	switch (version)
+	// mcpx v1.0 
+	if (memcmp(hash, MCPX_V1_0_SHA1_HASH, 20) == 0)
 	{
-	case MCPX_V1_0:
-		printf("( v1.0 )\n");
-		break;
-	case MCPX_V1_1:
-		printf("( v1.1 )\n");
-		break;
-	default:
-		printf("\nError: MCPX ROM is invalid\n");
-		break;
-	}
-
-	return result;
-}
-int MCPX_ROM::verifyMCPX()
-{
-	// verify we got a valid mcpx rom. readFile() has already checked the size.
-	// create some constants to check against.
-
-	if (data == NULL)
-		return 1;
-
-	const UINT MCPX_CONST_ONE = 280018995;
-	const UINT MCPX_CONST_TWO = 3230587022;
-	const UINT MCPX_CONST_THREE = 3993153540;
-	const UINT MCPX_CONST_FOUR = 2160066559;
-
-	if (memcmp(data, &MCPX_CONST_ONE, 4) != 0 ||
-		memcmp(data + 4, &MCPX_CONST_TWO, 4) != 0 ||
-		memcmp(data + MCPX_BLOCK_SIZE - 4, &MCPX_CONST_THREE, 4) != 0)
-	{
-		return 1;
-	}
-
-	// valid mcpx rom
-
-	// mcpx v1.0 has a hardcoded signature at offset 0x187.
-	if (memcmp(data + 0x187, &BOOT_PARAMS_SIGNATURE, 4) == 0)
-	{
-		version = MCPX_ROM::MCPX_V1_0;
+		version = Mcpx::MCPX_V1_0;
 		sbkey = (data + 0x1A5);
 		return 0;
 	}
 
-	// verify the mcpx rom is v1.1
-	if (memcmp(data + 0xe0, &MCPX_CONST_FOUR, 4) == 0)
+	// mcpx v1.1
+	if (memcmp(hash, MCPX_V1_1_SHA1_HASH, 20) == 0)
 	{
-		version = MCPX_ROM::MCPX_V1_1;
-		sbkey = (data + MCPX_BLOCK_SIZE - 0x64);
+		version = Mcpx::MCPX_V1_1;
+		sbkey = (data + 0x19C);
 		return 0;
 	}
+
+	// mouse rev.0 
+	if (memcmp(hash, MOUSE_REV0_SHA1_HASH, 20) == 0)
+	{
+		version = Mcpx::MOUSE_V1_0;
+		sbkey = (data + 0x19C);
+		return 0;
+	}
+
+	// mouse rev.1
+	if (memcmp(hash, MOUSE_REV1_SHA1_HASH, 20) == 0)
+	{
+		version = Mcpx::MOUSE_V1_1;
+		sbkey = (data + 0x19C);
+		return 0;
+	}
+
 	return 1;
 }

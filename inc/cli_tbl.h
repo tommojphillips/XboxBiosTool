@@ -30,46 +30,58 @@
 #ifndef CLI_TBL_H
 #define CLI_TBL_H
 
-#ifndef CLI_MAX_SWITCH_LEN
-#define CLI_MAX_SWITCH_LEN 20
+#ifndef CLI_SWITCH_MAX_LEN
+#define CLI_SWITCH_MAX_LEN 20
 #endif
 
-#ifndef CLI_MAX_SWITCHES
-#define CLI_MAX_SWITCHES 32
+#define CLI_SWITCH_MAX_COUNT 64
+
+#ifndef CLI_SWITCH_MAX_COUNT
+#define CLI_SWITCH_MAX_COUNT 32
 #endif
 
-#define CLI_SIZE 32
-#define CLI_ARRAY_SIZE ((CLI_MAX_SWITCHES + CLI_SIZE - 1) / CLI_SIZE)
+#define CLI_SWITCH_BITS (sizeof(int) * 8)
+#define CLI_SWITCH_SIZE ((CLI_SWITCH_MAX_COUNT + CLI_SWITCH_BITS - 1) / CLI_SWITCH_BITS)
 
-enum CLI_COMMAND : char;
-enum CLI_SWITCH : char;
+typedef unsigned char CLI_SWITCH;
+typedef unsigned char CLI_COMMAND;
+
+const CLI_SWITCH SW_NONE = (CLI_SWITCH)0;
+const CLI_SWITCH SW_HELP = (CLI_SWITCH)1;
+const CLI_COMMAND CMD_NONE = (CLI_COMMAND)0;
+const CLI_COMMAND CMD_HELP = (CLI_COMMAND)1;
+
+#define CLI_COMMAND_START_INDEX 2
+#define CLI_SWITCH_START_INDEX 2
 
 enum CLI_CMD_ERROR : int {
-	CLI_SUCCESS,
+	CLI_SUCCESS = 0,
+
 	CLI_ERROR_NO_CMD,
 	CLI_ERROR_INVALID_CMD,
 	CLI_ERROR_UNKNOWN_CMD,
-	CLI_ERROR_INVALID_SW,
-	CLI_ERROR_INVALID_ARG,
+
 	CLI_ERROR_MISSING_SW,
-	CLI_ERROR_MISSING_ARG,
+	CLI_ERROR_INVALID_SW,
 	CLI_ERROR_UNKNOWN_SW,
+	
+	CLI_ERROR_MISSING_ARG,
+	CLI_ERROR_INVALID_ARG,
 };
 
-struct CMD_TBL {
+typedef struct {
 	const char* sw;
 	CLI_COMMAND type;
 	CLI_SWITCH requiredSwitches[7];
 	CLI_SWITCH inferredSwitches[4];
-};
-
-struct PARAM_TBL {
+} CMD_TBL;
+typedef struct {
 	enum PARAM_TYPE : char { NONE, STR, INT, BOOL, FLAG };
 	const char* sw;
 	void* var;
 	CLI_SWITCH swType;
 	PARAM_TYPE cmdType;
-};
+} PARAM_TBL;
 
 // parse the command line arguments
 // argc: the number of arguments
@@ -80,17 +92,22 @@ struct PARAM_TBL {
 // param_tbl: the parameter table
 // param_tbl_size: the size of the parameter table
 // returns: CLI_CMD_ERROR.
-int parseCli(int argc, char* argv[], const CMD_TBL*& cmd, int* flags, const CMD_TBL* cmd_tbl, const int cmd_tbl_size, const PARAM_TBL* param_tbl, const int param_tbl_size);
+int parseCli(int argc, char* argv[],
+	const CMD_TBL*& cmd,
+	const CMD_TBL* cmd_tbl,
+	const int cmd_tbl_size,
+	const PARAM_TBL* param_tbl,
+	const int param_tbl_size);
 
-void setFlag(const CLI_SWITCH sw, int* flags);
-void clearFlag(const CLI_SWITCH sw, int* flags);
-bool isFlagSet(const CLI_SWITCH sw, const int* flags);
-bool isFlagClear(const CLI_SWITCH sw, const int* flags);
+void setFlag(const CLI_SWITCH sw);
+void clearFlag(const CLI_SWITCH sw);
+bool isFlagSet(const CLI_SWITCH sw);
+bool isFlagClear(const CLI_SWITCH sw);
 
 // check if any of the flags are set in the switch array
 // sw: the SET switches. eg (1 << 19) | (1 << 20)
 // flags: the flags array
 // returns: true if any of the flags are set.
-bool isFlagSetAny(const int sw, const int* flags);
+bool isFlagSetAny(const int sw);
 
 #endif // XB_CLI_TBL_H

@@ -1,4 +1,4 @@
-// XcodeInterp.h
+// XcodeInterp.h: Implements an xcode interpreter.
 
 /* Copyright(C) 2024 tommojphillips
  *
@@ -19,16 +19,19 @@
 // Author: tommojphillips
 // GitHub: https:\\github.com\tommojphillips
 
-#ifndef XB_XCODE_INTERP_H
-#define XB_XCODE_INTERP_H
-
-// std incl
-#include<list>
+#ifndef XCODE_INTERP_H
+#define XCODE_INTERP_H
 
 // user incl
 #include "bldr.h"
 #include "type_defs.h"
-#include "xbmem.h"
+#include "loadini.h"
+
+#ifdef MEM_TRACKING
+#include "mem_tracking.h"
+#else
+#include <malloc.h>
+#endif
 
 const UINT SMB_BASE = 0xC000;
 const UINT NV2A_BASE = 0x0F000000;
@@ -46,7 +49,6 @@ const UINT MEMTEST_PATTERN3 = 0x55555555;
 
 typedef enum : UCHAR {
     XC_RESERVED =    0X01,
-
     XC_MEM_READ =    0X02,
     XC_MEM_WRITE =   0X03,
     XC_PCI_WRITE =   0X04,
@@ -64,61 +66,25 @@ typedef enum : UCHAR {
 } OPCODE;
 
 typedef struct {
-    const char* str;
-    UCHAR opcode;
-} OPCODE_VERSION_INFO;
-
-typedef struct {
-    const char* field;
-    const char* value;
-} DECODE_SETTING_MAP;
-
-typedef struct {
-    char* field;
-    int seq;
-    char* str;
-} DECODE_STR_SETTING_MAP;
-
-typedef struct {
-    char* format_str;
-
-    char* prefix_str;
-
-    DECODE_STR_SETTING_MAP format_map[5];
-
-    char* jmp_str;
-    char* no_operand_str;
-    char* num_str;
-    char* num_str_format;
-
-    bool label_on_new_line;
-    UINT opcodeMaxLen;
-    UINT labelMaxLen;
-    OPCODE_VERSION_INFO opcodes[XCODE_OPCODE_COUNT];
-} DECODE_SETTINGS;
-
-typedef struct {
     UINT offset;
-    char* name;
+    char name[20];
 } LABEL;
 
 typedef struct {
-    XCODE* xcode;
-    FILE* stream;
-    DECODE_SETTINGS settings;
-    std::list<LABEL*> labels;
-    UINT base;
-} DECODE_CONTEXT;
+    const char* str;
+    UCHAR field;
+} FIELD_MAP;
 
-// XcodeInterp class
-static const OPCODE_VERSION_INFO opcodeMap[] = {
+// Xcode interpreter
+
+static const FIELD_MAP opcodeMap[] = {
     { "xc_reserved",	XC_RESERVED },
     { "xc_mem_read",	XC_MEM_READ },
     { "xc_mem_write",	XC_MEM_WRITE },
     { "xc_pci_write",	XC_PCI_WRITE },
     { "xc_pci_read",	XC_PCI_READ },
     { "xc_and_or",		XC_AND_OR },
-    { "xc_use_result",	XC_USE_RESULT },
+    { "xc_result",      XC_USE_RESULT },
     { "xc_jne",			XC_JNE },
     { "xc_jmp",			XC_JMP },
     { "xc_accum",		XC_ACCUM },
@@ -140,7 +106,7 @@ public:
     ~XcodeInterp() {
         if (_data != NULL)
         {
-            xb_free(_data);
+            free(_data);
             _data = NULL;
         }
 	};
@@ -152,20 +118,9 @@ public:
     int interpretNext(XCODE*& xcode);
         
     XCODE* getPtr() const { return _ptr; };
+    UCHAR* getData() const { return _data; };
     UINT getOffset() const { return _offset; };
     INTERP_STATUS getStatus() const { return _status; };
-
-    //////////////////////////
-    // XCODE DECODER
-    //////////////////////////
-    
-    int initDecoder(const char* ini, DECODE_CONTEXT& context);
-    int loadDecodeSettings(const char* ini, DECODE_SETTINGS& settings) const;
-    int decodeXcode(DECODE_CONTEXT& context);
-
-    int getAddressStr(char* str, const OPCODE_VERSION_INFO* map, const char* num_str);
-    int getDataStr(char* str, const char* num_str);
-    int getCommentStr(char* str);
 
 private:
     UCHAR* _data;           // XCODE data
@@ -176,8 +131,9 @@ private:
 };
 
 int encodeX86AsMemWrites(UCHAR* data, UINT size, UCHAR*& buffer, UINT* xcodeSize);
-int getOpcodeStr(const OPCODE_VERSION_INFO* opcodes, UCHAR opcode, const char*& str);
 
-inline const OPCODE_VERSION_INFO* getOpcodeMap() { return opcodeMap; };
+int getOpcodeStr(const FIELD_MAP* opcodes, UCHAR opcode, const char*& str);
+const LOADINI_RETURN_MAP  getDecodeSettingsMap();
+inline const FIELD_MAP* getOpcodeMap() { return opcodeMap; };
 
-#endif // !XB_BIOS_XCODE_INTERP_H
+#endif // !XCODE_INTERP_H

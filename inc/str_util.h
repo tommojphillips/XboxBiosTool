@@ -1,5 +1,4 @@
-#ifndef XB_MAIN_H
-#define XB_MAIN_H
+// str_util.h: implements various utility functions for manipulating strings.
 
 /* Copyright(C) 2024 tommojphillips
  *
@@ -17,10 +16,19 @@
  * along with this program.If not, see < https://www.gnu.org/licenses/>.
 */
 
-void printHelp();
-int validateArgs();
-void cleanup();
+// Author: tommojphillips
+// GitHub: https:\\github.com\tommojphillips
 
-int main(int argc, char* argv[]);
+#ifndef STR_UTIL_H
+#define STR_UTIL_H
 
-#endif // !XB_BIOS_MAIN_H
+// trim left side of string.
+void ltrim(char*& str);
+
+// trim right side of string.
+void rtrim(char*& str);
+
+// pad right side of string.
+void rpad(char* str, const int buffSize, const char pad);
+
+#endif // !STR_UTIL_H

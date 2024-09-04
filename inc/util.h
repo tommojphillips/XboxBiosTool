@@ -25,7 +25,10 @@
 // user incl
 #include "type_defs.h"
 
+// pointer-of-struct bounds check
 #define IN_BOUNDS(struc, buff, size) ((UCHAR*)struc >= (UCHAR*)buff && (UCHAR*)struc + sizeof(*struc) < (UCHAR*)buff + size)
+// pointer-of-block bounds check
+#define IN_BOUNDS_BLOCK(block, blockSize, buff, buffSize) ((UCHAR*)block >= (UCHAR*)buff && (UCHAR*)block + blockSize < (UCHAR*)buff + buffSize)
 
 enum XB_ERROR_CODES : int {
 	ERROR_SUCCESS =			0,
@@ -56,14 +59,5 @@ void printData(UCHAR* data, int len, bool newLine = true);
 
 // get timestamp string.
 void getTimestamp(UINT timestamp, char* timestamp_str);
-
-// trim left side of string.
-void ltrim(char*& str);
-
-// trim right side of string.
-void rtrim(char*& str);
-
-// pad right side of string.
-void rpad(char* str, const int buffSize, const char pad);
 
 #endif //XBT_UTIL_H

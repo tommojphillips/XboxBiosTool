@@ -27,133 +27,158 @@
 // user incl
 #include "cli_tbl.h"
 
-void setParamValue(const PARAM_TBL* param, char* arg, int* flags);
+static int cli_flags[CLI_SWITCH_SIZE] = {};
 
-int parseCli(int argc, char* argv[], const CMD_TBL*& cmd, int* flags, const CMD_TBL* cmds, const int cmd_size, const PARAM_TBL* params, const int param_size)
+void setParamValue(const PARAM_TBL* param, char* arg);
+
+int getCmd(const CMD_TBL* cmds, const int cmd_size, const char* arg, const CMD_TBL** cmd)
+{
+	for (int i = 0; i < cmd_size / sizeof(CMD_TBL); i++)
+	{
+		if (strcmp(arg, cmds[i].sw) == 0)
+		{
+			*cmd = &cmds[i];
+			return 0;
+		}
+	}
+	return 1;
+}
+
+int parseCli(int argc, char* argv[], const CMD_TBL*& cmd, const CMD_TBL* cmds, const int cmd_size, const PARAM_TBL* params, const int param_size)
 {
 	int i;
 	int j;
 	int k;
 	int startIndex;
 	bool swNeedValue;
-
-	char arg[CLI_MAX_SWITCH_LEN] = {};
-
-	const int cmd_count = cmd_size / sizeof(CMD_TBL);
-	const int param_count = param_size / sizeof(PARAM_TBL);
-	
-	if (CLI_MAX_SWITCHES - 1 < param_count)
-	{
+	char arg[CLI_SWITCH_MAX_LEN] = {};
+		
+	if (CLI_SWITCH_MAX_COUNT - 1 < param_size / sizeof(PARAM_TBL)) 
 		return CLI_ERROR_INVALID_SW;
-	}
-
-	if (argc == 1)
-	{
+	if (argc == 1) 
 		return CLI_ERROR_NO_CMD;
-	}
-
-	if (strlen(argv[1]) < 2)
-	{
-		printf("Error: Invalid command. %s\n", argv[1]);
+	if (strlen(argv[1]) < 2) 
 		return CLI_ERROR_INVALID_CMD;
-	}
 
 	if (argv[1][0] != '-' && argv[1][0] != '/')
-		strncpy_s(arg, argv[1], CLI_MAX_SWITCH_LEN-1);
+		strncpy_s(arg, argv[1], CLI_SWITCH_MAX_LEN-1);
 	else
-		strncpy_s(arg, argv[1] + 1, CLI_MAX_SWITCH_LEN-1);
-	startIndex = 1;
-	for (i = 0; i < cmd_count; i++)
-	{
-		if (strcmp(arg, cmds[i].sw) != 0)
-			continue;
-
-		cmd = &cmds[i];
+		strncpy_s(arg, argv[1] + 1, CLI_SWITCH_MAX_LEN-1);
+	
+	if(getCmd(cmds, cmd_size, arg, &cmd) == 0)
 		startIndex = 2;
-		break;
-	}
+	else
+		startIndex = 1;
+
 	if (cmd == NULL || cmd->type == 0)
 	{
 		printf("Error: Unknown command. %s\n", arg);
 		return CLI_ERROR_UNKNOWN_CMD;
 	}
-
+		
 	for (i = startIndex; i < argc; i++)
 	{
+
+		// check for inferred switches
 		if (argv[i][0] != '-' && argv[i][0] != '/')
 		{
 			for (j = 0; j < sizeof(cmd->inferredSwitches) / sizeof(CLI_SWITCH); j++)
 			{
-				if (cmd->inferredSwitches[j] == 0)
-					break;
-				if (isFlagSet(cmd->inferredSwitches[j], flags))
-					continue;
-
-				for (k = 0; k < param_count; k++)
+				if (isFlagClear(cmd->inferredSwitches[j]))
 				{
-					if (params[k].swType != cmd->inferredSwitches[j])
-						continue;
-
-					setParamValue(&params[k], argv[i], flags);
-					break;
+					for (k = 0; k < param_size / sizeof(PARAM_TBL); k++)
+					{
+						if (params[k].swType == cmd->inferredSwitches[j])
+						{
+							setFlag(params[k].swType);
+							setParamValue(&params[k], argv[i]);
+							goto NextArg;
+						}
+					}
 				}
-				if (k < param_count)
-					break;
 			}
-			if (j >= sizeof(cmd->inferredSwitches) / sizeof(CLI_SWITCH))
+
+			// convert to '<command> -?' for help; user did the reverse '-? <command>'
+			if (cmd->type == CMD_HELP)
 			{
-				printf("Error: Invalid switch: %s\n", arg);
-				return CLI_ERROR_INVALID_SW;
+				getCmd(cmds, cmd_size, argv[i], &cmd);
+				setFlag(SW_HELP);
+				continue;
 			}
+
+			printf("Error: No corresponding switch defined for argument, '%s'.\n\nUsage: -<switch> <value>\n", argv[i]);
+			return CLI_ERROR_INVALID_ARG;
+
+		NextArg:
 			continue;
 		}
-
-		if (strlen(argv[i]) > CLI_MAX_SWITCH_LEN-1)
+		
+		/*if (strlen(argv[i]) > CLI_SWITCH_MAX_LEN - 1)
 		{
 			printf("Error: Invalid switch: %s\n", arg);
 			return CLI_ERROR_INVALID_SW;
-		}
+		}*/
 
 		arg[0] = '\0';
 		strcat_s(arg, argv[i] + 1);
 
-		for (j = 0; j < param_count; j++)
+		// check for explicit switches
+		for (j = 0; j < param_size / sizeof(PARAM_TBL); j++)
 		{
 			if (strcmp(arg, params[j].sw) != 0)
 				continue;
 
-			swNeedValue = (params[j].cmdType != PARAM_TBL::BOOL) && (params[j].cmdType != PARAM_TBL::FLAG);
-			if (swNeedValue && i + 1 >= argc)
+			setFlag(params[j].swType);
+
+			if (isFlagClear(SW_HELP))
 			{
-				printf("Error: '-%s' is missing an argument\n", arg);
-				return CLI_ERROR_MISSING_ARG;
+				swNeedValue = (params[j].cmdType != PARAM_TBL::BOOL) && (params[j].cmdType != PARAM_TBL::FLAG);
+				if (swNeedValue && i + 1 >= argc)
+				{
+					printf("Error: '-%s' switch is missing an argument\n\nUsage: -%s <value>\n", arg, arg);
+					return CLI_ERROR_MISSING_ARG;
+				}
+
+				if (swNeedValue && (argv[i + 1][0] == '-' || argv[i + 1][0] == '/'))
+				{
+					printf("Error: '-%s' switch has an invaild argument, '%s'\n\nUsage: -%s <value>\n", arg, argv[i + 1], arg);
+					return CLI_ERROR_INVALID_ARG;
+				}
+
+				setParamValue(&params[j], argv[i + 1]);
+
+				if (swNeedValue)
+					i++;
 			}
-
-			if (swNeedValue && (argv[i + 1][0] == '-' || argv[i + 1][0] == '/'))
-			{
-				printf("Error: '-%s' has an invaild argument\n", arg);
-				return CLI_ERROR_INVALID_ARG;
-			}
-
-			setParamValue(&params[j], argv[i + 1], flags);
-
-			if (swNeedValue)
-				i++;
-
 			break;
 		}
 
-		if (j >= param_count)
+		// convert to '<command> -?' for help; user did the reverse '-? <command>'
+		if (cmd->type == CMD_HELP)
 		{
-			printf("Error: Unknown switch: %s\n", arg);
+			getCmd(cmds, cmd_size, arg, &cmd);
+			setFlag(SW_HELP);
+			i++;
+			continue;
+		}
+
+		if (isFlagClear(SW_HELP) && j >= param_size / sizeof(PARAM_TBL))
+		{
+			printf("Error: Unknown switch, '-%s'\n", arg);
 			return CLI_ERROR_UNKNOWN_SW;
 		}
 	}
 
-	const int req_count = sizeof(cmd->requiredSwitches) / sizeof(cmd->requiredSwitches[0]);
-	for (i = 0; i < param_count; i++)
+	// skip required switches check for help switch '<command> -?'
+	if (isFlagSet(SW_HELP))
+		return 0;
+
+	// check for required switches
+	
+	bool missing = false;
+	for (i = 0; i < param_size / sizeof(PARAM_TBL); i++)
 	{
-		for (j = 0; j < req_count; j++)
+		for (j = 0; j < sizeof(cmd->requiredSwitches) / sizeof(cmd->requiredSwitches[0]); j++)
 		{
 			if (cmd->requiredSwitches[j] == 0)
 				break;
@@ -161,23 +186,24 @@ int parseCli(int argc, char* argv[], const CMD_TBL*& cmd, int* flags, const CMD_
 			if (params[i].swType != cmd->requiredSwitches[j])
 				continue;
 
-			if (isFlagClear(params[i].swType, flags))
+			if (isFlagClear(params[i].swType))
 			{
 				strcpy_s(arg, params[i].sw);
 
-				printf("Error: Missing switch: -%s\n", params[i].sw);
-				return CLI_ERROR_MISSING_SW;
+				printf("Error: Missing switch, '-%s'\n", params[i].sw);
+				missing = true;
 			}
 		}
 	}
 
+	if (missing)
+		return CLI_ERROR_MISSING_SW;
+	
 	return 0;
 }
 
-void setParamValue(const PARAM_TBL* param, char* arg, int* flags)
+void setParamValue(const PARAM_TBL* param, char* arg)
 {
-	setFlag(param->swType, flags);
-
 	if (param->var == NULL)
 		return;
 
@@ -203,25 +229,34 @@ void setParamValue(const PARAM_TBL* param, char* arg, int* flags)
 		break;
 	}
 }
-void setFlag(const CLI_SWITCH sw, int* flags)
+void setFlag(const CLI_SWITCH sw)
 {
-	flags[sw / CLI_SIZE] |= (1 << (sw % CLI_SIZE));
+	cli_flags[sw / CLI_SWITCH_BITS] |= (1 << (sw % CLI_SWITCH_BITS));
 }
-void clearFlag(const CLI_SWITCH sw, int* flags)
+void clearFlag(const CLI_SWITCH sw)
 {
-	flags[sw / CLI_SIZE] &= ~(1 << (sw % CLI_SIZE));
+	cli_flags[sw / CLI_SWITCH_BITS] &= ~(1 << (sw % CLI_SWITCH_BITS));
 }
-bool isFlagSet(const CLI_SWITCH sw, const int* flags)
+bool isFlagSet(const CLI_SWITCH sw)
 {
-	return (flags[sw / CLI_SIZE] & (1 << (sw % CLI_SIZE))) != 0;
+	return (cli_flags[sw / CLI_SWITCH_BITS] & (1 << (sw % CLI_SWITCH_BITS))) != 0;
 }
-bool isFlagClear(const CLI_SWITCH sw, const int* flags)
+bool isFlagClear(const CLI_SWITCH sw)
 {
-	return (flags[sw / CLI_SIZE] & (1 << (sw % CLI_SIZE))) == 0;
+	return (cli_flags[sw / CLI_SWITCH_BITS] & (1 << (sw % CLI_SWITCH_BITS))) == 0;
 }
 
-bool isFlagSetAny(const int sw, const int* flags)
+bool isFlagSetAny(const int sw)
 {
+	// check if any of the flags are set in the switch array.
+	// sw: the SET switches. eg (1 << 19) | (1 << 20)
+	// flags: the flags array
+	// returns: true if any of the flags are set.
+
+	// start with the highest switch
+	// remove current switch from the switch array
+	// loop until zero.
+
 	int k = sw;
 	int j;
 	int i;
@@ -234,7 +269,7 @@ rep:
 		i >>= 1;
 		j++;
 	}
-	if (isFlagSet((CLI_SWITCH)(j-1), flags))
+	if (isFlagSet((CLI_SWITCH)(j-1)))
 		return true;
 	else
 		k &= ~(1 << (j-1));

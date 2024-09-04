@@ -29,6 +29,7 @@
 #include "type_defs.h"
 #include "util.h"
 
+// x86 instruction map; sort by opcode length; largest first
 const X86_INSTR_MAP instrs[] = {
 	{ X86_INSTR_REG_PTR, 0x1D8B, "mov ebx", 2, 4 }, // mov ebx, ptr [123]
 	{ X86_INSTR_REG_PTR, 0x0D8B, "mov ecx", 2, 4 },
@@ -74,7 +75,7 @@ const X86_INSTR_MAP instrs[] = {
 	{ X86_INSTR_OP, 0xf, "hlt", 1, 0 },
 };
 
-int decodeX86(UCHAR* data, UINT size, FILE* stream)
+int decodeX86(UCHAR* data, UINT size, FILE* stream, UINT* codeSize)
 {
 	UINT i;
 	const UINT MAX_INSTR_SIZE = 6;
@@ -101,31 +102,40 @@ int decodeX86(UCHAR* data, UINT size, FILE* stream)
 		}
 
 		fprintf(stream, "%s\n", str_instr);
-	}	
+	}
+
+	if (codeSize != NULL)
+	{
+		*codeSize = i;
+	}
 
 	return result;
+}
+
+const X86_INSTR_MAP* getInstruction(const UCHAR* data)
+{
+	// iterate through the x86 instructions
+	for (int i = 0; i < sizeof(instrs) / sizeof(X86_INSTR_MAP); i++)
+	{
+		if (memcmp(data, (UCHAR*)&instrs[i].opcode, instrs[i].opcode_len) == 0)
+		{
+			return &instrs[i];
+		}
+	}
+	return NULL;
 }
 
 int parseInstruction(char* buf, UCHAR* data, UINT& offset)
 {
 	const X86_INSTR_MAP* instr = NULL;
-
-	// iterate through the x86 instructions
-	for (int i = 0; i < sizeof(instrs) / sizeof(X86_INSTR_MAP); i++)
-	{
-		if (memcmp(data + offset, (UCHAR*)&instrs[i].opcode, instrs[i].opcode_len) == 0)
-		{
-			instr = &instrs[i];
-			break;
-		}
-	}
-
+	UINT operand2 = 0;
+	
+	instr = getInstruction(data + offset);
 	if (instr == NULL)
 	{
 		return ERROR_INVALID_DATA;
 	}
 
-	UINT operand2 = 0;
 	memcpy(&operand2, data + offset + instr->opcode_len, instr->operrand_len > 4 ? 4 : instr->operrand_len);
 
 	const char* operand2_type;
@@ -141,8 +151,8 @@ int parseInstruction(char* buf, UCHAR* data, UINT& offset)
 			operand2_type = "dword ";
 			break;
 		default:
-		operand2_type = "";
-		break;
+			operand2_type = "";
+			break;
 	}
 
 	switch (instr->type)

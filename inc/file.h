@@ -13,8 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.If not, see < https://www.gnu.org/licenses/>.
-*/
+ * along with this program.If not, see < https://www.gnu.org/licenses/>. */
 
 // Author: tommojphillips
 // GitHub: https:\\github.com\tommojphillips
@@ -41,6 +40,9 @@ UCHAR* readFile(const char* filename, UINT* bytesRead, const UINT expectedSize =
 // bytesToWrite: the number of bytes to write to the file.
 // returns 0 if successful, 1 otherwise.
 int writeFile(const char* filename, void* ptr, const UINT bytesToWrite);
+
+// write to a file.
+int writeFileF(const char* filename, void* ptr, const UINT bytesToWrite, const char* name);
 
 // deletes a file.
 // filename: the absolute path to the file.

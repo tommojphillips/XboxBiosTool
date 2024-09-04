@@ -86,7 +86,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MEM_TRACKING;_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>
       </ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -101,6 +101,8 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <MultiProcessorCompilation>
       </MultiProcessorCompilation>
+      <AdditionalHeaderUnitDependencies>
+      </AdditionalHeaderUnitDependencies>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -121,7 +123,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>false</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MEM_TRACKING;_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerOutput>NoListing</AssemblerOutput>
@@ -152,17 +154,17 @@
     <ClCompile Include="src\file.cpp" />
     <ClCompile Include="src\loadini.cpp" />
     <ClCompile Include="src\lzx.cpp" />
-    <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Mcpx.cpp" />
     <ClCompile Include="src\nt_headers.cpp" />
     <ClCompile Include="src\rc4.cpp" />
     <ClCompile Include="src\rsa.cpp" />
     <ClCompile Include="src\sha1.cpp" />
+    <ClCompile Include="src\str_util.cpp" />
     <ClCompile Include="src\util.cpp" />
     <ClCompile Include="src\X86Interp.cpp" />
-    <ClCompile Include="src\xbmem.cpp" />
     <ClCompile Include="src\Bios.cpp" />
     <ClCompile Include="src\XbTool.cpp" />
+    <ClCompile Include="src\XcodeDecoder.cpp" />
     <ClCompile Include="src\XcodeInterp.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -170,20 +172,21 @@
     <ClInclude Include="inc\file.h" />
     <ClInclude Include="inc\loadini.h" />
     <ClInclude Include="inc\lzx.h" />
-    <ClInclude Include="inc\main.h" />
     <ClInclude Include="inc\Mcpx.h" />
+    <ClInclude Include="inc\mem_tracking.h" />
     <ClInclude Include="inc\rc4.h" />
     <ClInclude Include="inc\rsa.h" />
     <ClInclude Include="inc\sha1.h" />
+    <ClInclude Include="inc\str_util.h" />
     <ClInclude Include="inc\type_defs.h" />
     <ClInclude Include="inc\util.h" />
     <ClInclude Include="inc\version.h" />
     <ClInclude Include="inc\X86Interp.h" />
-    <ClInclude Include="inc\xbmem.h" />
     <ClInclude Include="inc\bldr.h" />
     <ClInclude Include="inc\help_strings.h" />
     <ClInclude Include="inc\Bios.h" />
     <ClInclude Include="inc\XbTool.h" />
+    <ClInclude Include="inc\XcodeDecoder.h" />
     <ClInclude Include="inc\XcodeInterp.h" />
     <ClInclude Include="inc\resource.h" />
     <ClInclude Include="inc\nt_headers.h" />

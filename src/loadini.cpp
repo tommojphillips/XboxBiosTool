@@ -25,38 +25,48 @@
 // user incl
 #include "loadini.h"
 #include "type_defs.h"
-#include "util.h"
-#include "xbmem.h"
+#include "str_util.h"
+
+#ifdef MEM_TRACKING
+#include "mem_tracking.h"
+#else
+#include <malloc.h>
+#endif
+
+#ifndef LOADINI_MAX_LINE_SIZE
+#define LOADINI_MAX_LINE_SIZE 128
+#endif
+#ifndef LOADINI_DELIM
+#define LOADINI_DELIM "="
+#endif
 
 // set setting value helper function
 void setSettingValue(char** setting, const char* value, UINT len);
 
 void setSettingValue(char** setting, const char* value, UINT len)
 {
-	if (*setting != NULL)  // setting already set, skip
+	if (setting == NULL || *setting != NULL)
 		return;
 
-	*setting = (char*)xb_alloc(len + 1);
-	if (*setting == NULL)
-		return;
-
-	strcpy(*setting, value);
+	*setting = (char*)malloc(len + 1);
+	if (*setting != NULL)
+	{
+		strcpy(*setting, value);
+	}
 }
 
-int loadini(FILE* stream, const LOADINI_SETTING_MAP* settings_map, UINT map_size)
+LOADINI_ERROR_CODE loadini(FILE* stream, const LOADINI_SETTING_MAP* settings_map, UINT map_size)
 {
 	UINT i = 0;
 	UINT len = 0;
-
-	const char delim[] = "=";
-	
-	char buf[128] = { 0 };
+		
+	char buf[LOADINI_MAX_LINE_SIZE] = { 0 };
 	char* line_ptr = NULL;
 	char* key = NULL;
 	char* value = NULL;
 
 	// parse next line
-	while (fgets(buf, sizeof(buf), stream) != NULL)
+	while (fgets(buf, LOADINI_MAX_LINE_SIZE, stream) != NULL)
 	{
 		line_ptr = buf;
 		ltrim(line_ptr);
@@ -67,23 +77,19 @@ int loadini(FILE* stream, const LOADINI_SETTING_MAP* settings_map, UINT map_size
 		// line-format: key=value
 
 		// get the key.
-		key = strtok(line_ptr, delim);
+		key = strtok(line_ptr, LOADINI_DELIM);
 		if (key == NULL)
 			continue;
 		ltrim(key);
 		rtrim(key);
 
 		// get the value
-		value = strtok(NULL, delim);
+		value = strtok(NULL, LOADINI_DELIM);
 		if (value == NULL)
 			continue;
 		len = strlen(value);
-		ltrim(value);		
+		ltrim(value);
 		rtrim(value);
-
-		// quote check
-		// walk the string and matching quotes
-
 		if (value[0] == '\"' || value[0] == '\'')
 		{
 			value++;
@@ -95,42 +101,26 @@ int loadini(FILE* stream, const LOADINI_SETTING_MAP* settings_map, UINT map_size
 			}
 		}
 
-
-		
-		/*if (value[0] == '\"' || value[0] == '\'')
-		{
-			value++;
-			len = strlen(value);
-			if (value[len - 1] == '\"' || value[len - 1] == '\'')
-				value[len - 1] = '\0';
-		}*/
-
 		// cmp key and set values.
-
 		for (i = 0; i < map_size / sizeof(LOADINI_SETTING_MAP); i++)
 		{
-			if (strcmp(key, settings_map[i].key) != 0)
+			if (strcmp(key, settings_map[i].s->key) != 0)
 				continue;
 
-			switch (settings_map[i].type)
+			switch (settings_map[i].s->type)
 			{
 			case LOADINI_SETTING_TYPE::STR:
-				setSettingValue((char**)settings_map[i].setting, value, len);
+				setSettingValue((char**)settings_map[i].var, value, len);
 				break;
 
 			case LOADINI_SETTING_TYPE::BOOL:
 				if (strcmp(value, "true") == 0)
 				{
-					*(bool*)settings_map[i].setting = true;
+					*(bool*)settings_map[i].var = true;
 				}
 				else if (strcmp(value, "false") == 0)
 				{
-					*(bool*)settings_map[i].setting = false;
-				}
-				else
-				{
-					printf("Error: invalid value for key: '%s'. value: '%s'\n", buf, value);
-					return LOADINI_ERROR_INVALID_DATA;
+					*(bool*)settings_map[i].var = false;
 				}
 				break;
 			}

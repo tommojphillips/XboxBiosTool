@@ -1,5 +1,11 @@
 //  sha1.h
 
+// GitHub: https://github.com/XboxDev/xbedump
+// 
+// credit to XboxDev, and the authors of xbedump
+// Michael Steil (mist64)
+// Franz
+
 #ifndef SHA1_H
 #define SHA1_H
 

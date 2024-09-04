@@ -1,3 +1,12 @@
+// sha1.cpp: defines functions for SHA-1 hashing
+
+// GitHub: https://github.com/XboxDev/xbedump
+// License: ??
+// 
+// credit to XboxDev, and the authors of xbedump
+// Michael Steil (mist64)
+// Franz
+
 /*  sha1.cpp: defines functions for SHA-1 hashing
  *
  *  Description:

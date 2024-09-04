@@ -1,4 +1,4 @@
-# Command Table
+# Commands
 | Command        | Description                                                                       |
 | -------------- | --------------------------------------------------------------------------------- |
 | `-?`           | Displays help message                                                             |
@@ -18,6 +18,7 @@
 #### General switches
 | Switch            | Description                                                  |
 | ----------------- | ------------------------------------------------------------ |
+| `-?`              | Get help about a specific command.                           |
 | `-enc-bldr`       | Assume the 2bl is unencrypted. Decryption will be skipped.   |
 | `-enc-krnl`       | Assume the kernel is unencrypted. Decryption will be skipped.|
 | `-key-bldr <path>`| The path to the 16-byte 2bl RC4 file                         |
@@ -59,11 +60,16 @@ The list command has some flags to dump out certain infomation in a BIOS.
 | ------------- | --------------------------------------------- |
 | `-nv2a`       | Dump init table magic values.                 |
 | `-datatbl`    | Dump ROM drive / slew calibration table data. |
-| `-dump-krnl`  | Decompress and dump kernel header info.       |
+| `-dump-krnl`  | Dump kernel header info.                      |
+| `-keys`       | Dump 2BL rc4 keys.                            |
 
 
 # Extract BIOS command
 The extract command extracts the kernel **compressed**. Thus it is possible to extract it either *encrypted* or *decrypted*. Make a note of what state it's in.
+
+| flag          | Description                                   |
+| ------------- | --------------------------------------------- |
+| `-keys`       | Extract 2BL rc4 keys to a file.               |
 
 
 # Build BIOS command
@@ -75,6 +81,7 @@ Build a BIOS from a 2BL, compressed kernel, uncompressed data section, init tabl
 | `-inittbl <path>`   | The init table file (req)                                 |
 | `-krnl <path>`      | The compressed kernel file (req)                          |
 | `-krnldata  <path>` | The uncompressed data section file (req)                  |
+| `-preldr <path>`    | The pre boot loader file                                  |
 | `-patchkeys`        | Use key switches to patch keys.                           |
 | `-eepromkey <path>` | eeprom key to patch into the 2BL                          |
 | `-certkey <path>`   | cert key to patch into the 2BL                            |
@@ -179,12 +186,12 @@ If decoding a file other than a BIOS or extracted init table, This might be diff
 | `format_str=` |                     |
 | ------------  | ------------------- |
 | `{offset}`    | the offset          |
-| `{op}`	      | the opcode string   |
-| `{addr}`	    | the address string  |
-| `{data}`	    | the data string     |
-| `{comment}`   |	the xcode comment   |
+| `{op}`	| the opcode string   |
+| `{addr}`	| the address string  |
+| `{data}`	| the data string     |
+| `{comment}`   | the xcode comment   |
  - EG: `format_str={offset}: {op} {addr} {data} {comment}`
- - EG: `xcode<{op}, {addr}, {data}> {comment}`
+ - EG: `format_str=xcode<{op}, {addr}, {data}> {comment}`
 --- 
 | `jmp_str=`  |               |
 | ---------   | ------------- |
@@ -194,17 +201,22 @@ If decoding a file other than a BIOS or extracted init table, This might be diff
 --- 
 | `num_str=`|         |
 | --------- | ------- |
-| `{num}`   | decimal |
 | `{hex}`   | hex     |
+| `{hex8}`  | hex8    |
 | `{HEX}`   | HEX     |
- - EG: `num_str={num}`
- - EG: `num_str=0{hex}h`
- - EG: `num_str=0x{hex}`
+| `{HEX8}`  | HEX8    |
+ - EG: `num_str=0x{HEX}`  -> 0xA
+ - EG: `num_str=0x{hex8}` -> 0x0000000a
 --- 
 | `label_on_new_line=` |      |
 | --------| ----------------- |
 | `true`  | label on new line |
 | `false` | label in front    |
+--- 
+| `pad=`  |                   |
+| --------| ----------------- |
+| `true`  | padding           |
+| `false` | no padding        |
 ---
 <details><summary>Settings example:</summary>
 
@@ -227,6 +239,9 @@ num_str=0{hex}h
 
 ; label on new line
 label_on_new_line=true
+
+; pad
+pad=true
 
 ; OPCODES
 xc_nop=nop

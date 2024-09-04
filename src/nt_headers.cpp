@@ -25,11 +25,7 @@
 
 // user incl
 #include "nt_headers.h"
-#include "xbmem.h"
 #include "util.h"
-
-void print_image_file_header(COFF_FILE_HEADER* file_header, bool basic);
-void print_image_optional_header(IMAGE_OPTIONAL_HEADER* optional_header, bool basic);
 
 void print_image_dos_header(IMAGE_DOS_HEADER* dos_header)
 {
@@ -158,42 +154,71 @@ void print_nt_headers(IMAGE_NT_HEADER* nt_header, bool basic)
 
 int dump_nt_headers(UCHAR* data, UINT size, bool basic)
 {
-    if (data == NULL)
+    IMAGE_NT_HEADER* nt = verify_nt_headers(data, size);
+    if (nt == NULL)
 	{
-		printf("Error: Invalid data\n");
-		return 1;
-	}
-    
-    IMAGE_DOS_HEADER* dosHeader = (IMAGE_DOS_HEADER*)data;    
-    if (IN_BOUNDS(dosHeader, data, size) == false)
-    {
-        printf("Error: DOS header out of bounds\n");
-        return 1;
-    }
-
-    if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE)
-    {
-        printf("Error: Invalid DOS signature\n");
-        return 1;
-    }
-
-    IMAGE_NT_HEADER* ntHeader = NULL;
-    ntHeader = (IMAGE_NT_HEADER*)(data + dosHeader->e_lfanew);
-    if (IN_BOUNDS(ntHeader, data, size) == false)
-    {
-        printf("Error: NT headers out of bounds\n");
-        return 1;
-    }
-
-    if (ntHeader->signature != IMAGE_NT_SIGNATURE)
-	{
-		printf("Error: Invalid PE signature\n");
 		return 1;
 	}
 
     printf("PE signature found\n");
 
-    print_nt_headers(ntHeader, basic);
+    print_nt_headers(nt, basic);
 
     return 0;
+}
+
+IMAGE_DOS_HEADER* verify_dos_header(UCHAR* data, UINT size)
+{
+    if (data == NULL)
+    {
+        printf("Error: Invalid data\n");
+        return NULL;
+    }
+
+    IMAGE_DOS_HEADER* dosHeader = (IMAGE_DOS_HEADER*)data;
+    if (IN_BOUNDS(dosHeader, data, size) == false)
+    {
+        printf("Error: DOS header out of bounds\n");
+        return NULL;
+    }
+
+    if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE)
+    {
+        printf("Error: Invalid DOS signature\n");
+        return NULL;
+    }
+
+    return dosHeader;
+}
+IMAGE_NT_HEADER* verify_nt_headers(UCHAR* data, UINT size)
+{
+    IMAGE_DOS_HEADER* dos = NULL;
+    IMAGE_NT_HEADER* nt = NULL;
+
+    if (data == NULL)
+    {
+        printf("Error: Invalid data\n");
+        return NULL;
+    }
+
+    dos = verify_dos_header(data, size);
+    if (dos == NULL)
+    {
+        return NULL;
+    }
+
+    nt = (IMAGE_NT_HEADER*)(data + dos->e_lfanew);
+    if (IN_BOUNDS(nt, data, size) == false)
+    {
+        printf("Error: NT headers out of bounds\n");
+        return NULL;
+    }
+
+    if (nt->signature != IMAGE_NT_SIGNATURE)
+    {
+        printf("Error: Invalid PE signature\n");
+        return NULL;
+    }
+
+    return nt;
 }
