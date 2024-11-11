@@ -19,45 +19,74 @@
 // Author: tommojphillips
 // GitHub: https:\\github.com\tommojphillips
 
-#ifndef XB_UTIL_H
-#define XB_UTIL_H
+#ifndef UTIL_H
+#define UTIL_H
 
-// user incl
-#include "type_defs.h"
+#include <stdint.h>
 
 // pointer-of-struct bounds check
-#define IN_BOUNDS(struc, buff, size) ((UCHAR*)struc >= (UCHAR*)buff && (UCHAR*)struc + sizeof(*struc) < (UCHAR*)buff + size)
+#define IN_BOUNDS(struc, buff, size) ((uint8_t*)struc >= (uint8_t*)buff && (uint8_t*)struc + sizeof(*struc) < (uint8_t*)buff + size)
+
 // pointer-of-block bounds check
-#define IN_BOUNDS_BLOCK(block, blockSize, buff, buffSize) ((UCHAR*)block >= (UCHAR*)buff && (UCHAR*)block + blockSize < (UCHAR*)buff + buffSize)
-
-enum XB_ERROR_CODES : int {
-	ERROR_SUCCESS =			0,
-	ERROR_FAILED =			1,
-
-	ERROR_BUFFER_OVERFLOW = 4,
-	ERROR_OUT_OF_MEMORY =	5,
-	ERROR_INVALID_DATA =	6,
-};
+#define IN_BOUNDS_BLOCK(block, blockSize, buff, buffSize) ((uint8_t*)block >= (uint8_t*)buff && (uint8_t*)block + blockSize < (uint8_t*)buff + buffSize)
 
 // console colors
-enum CON_COL : int { ERR = 0, OK = 1, MSG = 3, BLACK = 30, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE };
+#define CONSOLE_COLOR_ERR 0
+#define CONSOLE_COLOR_OK 1
+#define CONSOLE_COLOR_MSG 3
+#define CONSOLE_COLOR_BLACK 30
+#define CONSOLE_COLOR_RED 31
+#define CONSOLE_COLOR_RED 31
+#define CONSOLE_COLOR_GREEN 32
+#define CONSOLE_COLOR_YELLOW 33
+#define CONSOLE_COLOR_BLUE 34
+#define CONSOLE_COLOR_MAGENTA 35
+#define CONSOLE_COLOR_CYAN 36
+#define CONSOLE_COLOR_WHITE 37
 
-int getErrorCode();
-void setErrorCode(const int code);
+#define ERROR_SUCCESS 0
+#define ERROR_FAILED 1
+#define ERROR_BUFFER_OVERFLOW 4
+#define ERROR_OUT_OF_MEMORY 5
+#define ERROR_INVALID_DATA 6
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // set console color
-void setConsoleColor(const int col = -1);
-
-// std print to console with color
-void print(const CON_COL col, const char* format, ...);
-
-// print to buffer. format. {1} = arg1, {2} = arg2, etc.
-void print_f(char* buffer, const int bufferSize, const char* format, ...);
-
-// print a char array
-void printData(UCHAR* data, int len, bool newLine = true);
+void util_setConsoleColor(const int col);
+void util_setForegroundColor(const int col);
 
 // get timestamp string.
-void getTimestamp(UINT timestamp, char* timestamp_str);
+void util_getTimestampStr(const size_t timestamp, char* timestamp_str);
 
-#endif //XBT_UTIL_H
+// std print to console with color
+void uprintc(const int col, const char* format, ...);
+
+// print to buffer. format. {1} = arg1, {2} = arg2, etc.
+void uprintf(char* data, const size_t size, const char* format, ...);
+
+// print a byte array as hex; single line.
+// data: buffer
+// size: buffer size
+// new_line: output new line
+void uprinth(const uint8_t* data, const size_t size);
+
+// print byte array as ascii; single line.
+// data: buffer
+// size: buffer size
+// new_line: output new line
+void uprinta(const uint8_t* data, const size_t size, const int new_line);
+
+// print byte array as hex; multi line
+// data: buffer
+// size: buffer size
+// per_line: num of hex digits per line. eg 16. -> xx xx xx xx ... x16
+void uprinthl(const uint8_t* data, const size_t size, uint32_t per_line, const char* prefix, const int ascii);
+
+#ifdef __cplusplus
+};
+#endif
+
+#endif //UTIL_H

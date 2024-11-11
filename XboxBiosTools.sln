@@ -7,12 +7,18 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XbBiosTool", "XbBiosTool.vc
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug_NO_MEM_TRACKING|x86 = Debug_NO_MEM_TRACKING|x86
 		Debug|x86 = Debug|x86
+		Release_NO_MEM_TRACKING|x86 = Release_NO_MEM_TRACKING|x86
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.Debug_NO_MEM_TRACKING|x86.ActiveCfg = Debug_NO_MEM_TRACKING|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.Debug_NO_MEM_TRACKING|x86.Build.0 = Debug_NO_MEM_TRACKING|Win32
 		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.Debug|x86.ActiveCfg = Debug|Win32
 		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.Debug|x86.Build.0 = Debug|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.Release_NO_MEM_TRACKING|x86.ActiveCfg = Release_NO_MEM_TRACKING|Win32
+		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.Release_NO_MEM_TRACKING|x86.Build.0 = Release_NO_MEM_TRACKING|Win32
 		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.Release|x86.ActiveCfg = Release|Win32
 		{7845CC9D-7D7E-4C08-BCF9-7033B337BA91}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection

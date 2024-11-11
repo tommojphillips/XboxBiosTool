@@ -20,8 +20,10 @@
 // GitHub: https:\\github.com\tommojphillips
 
 // std incl
-#include <cstdio>
-#include <cstring>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <malloc.h>
 
 // user incl
 #include "XcodeInterp.h"
@@ -30,16 +32,14 @@
 #include "str_util.h"
 #include "loadini.h"
 
-#ifdef MEM_TRACKING
+#ifndef NO_MEM_TRACKING
 #include "mem_tracking.h"
-#else
-#include <malloc.h>
 #endif
 
 #define IS_NEG_TRUE(x, y) (y < 0 ? true : x == y)
 
 #define XC_WRITE_MASK(i, xc_cmd, xc_addr, addr_mask, xc_data, data_mask) \
-	(((UCHAR*)(_ptr+i)) >= _data) && ((_ptr+i)->opcode == xc_cmd && \
+	(((uint8_t*)(_ptr+i)) >= _data) && ((_ptr+i)->opcode == xc_cmd && \
 	((_ptr+i)->addr & addr_mask) == xc_addr && \
 	IS_NEG_TRUE(((_ptr+i)->data  & data_mask), xc_data))
 
@@ -81,7 +81,7 @@ static const DECODE_SETTING_MAP num_str_fields[] = {
 	{ "{HEX}", "%X" },
 	{ "{HEX8}", "%08X" }
 };
-static const FIELD_MAP formatMap[] = {
+static const FIELD_MAP format_map[] = {
 	{ "{offset}", DECODE_FIELD_OFFSET },
 	{ "{op}", DECODE_FIELD_OPCODE },
 	{ "{addr}", DECODE_FIELD_ADDRESS },
@@ -98,21 +98,21 @@ static const LOADINI_SETTING settings_map[] = {
 	{ "pad", LOADINI_SETTING_TYPE::BOOL },
 	{ "opcode_use_result", LOADINI_SETTING_TYPE::BOOL },
 
-	{ opcodeMap[0].str, LOADINI_SETTING_TYPE::STR },
-	{ opcodeMap[1].str, LOADINI_SETTING_TYPE::STR },
-	{ opcodeMap[2].str, LOADINI_SETTING_TYPE::STR },
-	{ opcodeMap[3].str, LOADINI_SETTING_TYPE::STR },
-	{ opcodeMap[4].str, LOADINI_SETTING_TYPE::STR },
-	{ opcodeMap[5].str, LOADINI_SETTING_TYPE::STR },
-	{ opcodeMap[6].str, LOADINI_SETTING_TYPE::STR },
-	{ opcodeMap[7].str, LOADINI_SETTING_TYPE::STR },
-	{ opcodeMap[8].str, LOADINI_SETTING_TYPE::STR },
-	{ opcodeMap[9].str, LOADINI_SETTING_TYPE::STR },
-	{ opcodeMap[10].str, LOADINI_SETTING_TYPE::STR },
-	{ opcodeMap[11].str, LOADINI_SETTING_TYPE::STR },
-	{ opcodeMap[12].str, LOADINI_SETTING_TYPE::STR },
-	{ opcodeMap[13].str, LOADINI_SETTING_TYPE::STR },
-	{ opcodeMap[14].str, LOADINI_SETTING_TYPE::STR }
+	{ xcode_opcode_map[0].str, LOADINI_SETTING_TYPE::STR },
+	{ xcode_opcode_map[1].str, LOADINI_SETTING_TYPE::STR },
+	{ xcode_opcode_map[2].str, LOADINI_SETTING_TYPE::STR },
+	{ xcode_opcode_map[3].str, LOADINI_SETTING_TYPE::STR },
+	{ xcode_opcode_map[4].str, LOADINI_SETTING_TYPE::STR },
+	{ xcode_opcode_map[5].str, LOADINI_SETTING_TYPE::STR },
+	{ xcode_opcode_map[6].str, LOADINI_SETTING_TYPE::STR },
+	{ xcode_opcode_map[7].str, LOADINI_SETTING_TYPE::STR },
+	{ xcode_opcode_map[8].str, LOADINI_SETTING_TYPE::STR },
+	{ xcode_opcode_map[9].str, LOADINI_SETTING_TYPE::STR },
+	{ xcode_opcode_map[10].str, LOADINI_SETTING_TYPE::STR },
+	{ xcode_opcode_map[11].str, LOADINI_SETTING_TYPE::STR },
+	{ xcode_opcode_map[12].str, LOADINI_SETTING_TYPE::STR },
+	{ xcode_opcode_map[13].str, LOADINI_SETTING_TYPE::STR },
+	{ xcode_opcode_map[14].str, LOADINI_SETTING_TYPE::STR }
 };
 static const LOADINI_RETURN_MAP cmap = { settings_map, sizeof(settings_map), sizeof(settings_map) / sizeof(LOADINI_SETTING_MAP) };
 
@@ -124,7 +124,7 @@ static const LOADINI_RETURN_MAP cmap = { settings_map, sizeof(settings_map), siz
 // len: length of input string
 // m: max length of output buffer
 // return 0 if found, 1 if not found, -1 if error
-int ll(char* output, char* str, UINT i, UINT* j, UINT len, UINT m);
+int ll(char* output, char* str, uint32_t i, uint32_t* j, uint32_t len, uint32_t m);
 
 // output: output buffer
 // str: input string
@@ -132,16 +132,16 @@ int ll(char* output, char* str, UINT i, UINT* j, UINT len, UINT m);
 // j: end index
 // len: length of input string
 // return 0 if found, 1 if not found, -1 if error
-int ll2(char* output, char* str, UINT i, UINT& j, UINT len);
+int ll2(char* output, char* str, uint32_t i, uint32_t& j, uint32_t len);
 
-int XcodeDecoder::load(UCHAR* data, UINT size, UINT base, const char* ini)
+int XcodeDecoder::load(uint8_t* data, uint32_t size, uint32_t base, const char* ini)
 {
 	// set up the xcode decoder.
 	// load the interpreter, decode settings and context.
 	// parse xcodes for labels.
 
 	int result = 0;
-	UINT lbi;
+	uint32_t lbi;
 	bool isLabel = false;
 	static const char* label_format = "lb_%02d";
 
@@ -150,8 +150,7 @@ int XcodeDecoder::load(UCHAR* data, UINT size, UINT base, const char* ini)
 		return 1;
 
 	context = createDecodeContext();
-	if (context == NULL)
-	{
+	if (context == NULL) {
 		return ERROR_OUT_OF_MEMORY;
 	}
 
@@ -160,8 +159,7 @@ int XcodeDecoder::load(UCHAR* data, UINT size, UINT base, const char* ini)
 	memset(context->str_decode, 0, sizeof(context->str_decode));
 
 	result = loadSettings(ini, &context->settings);
-	if (result != 0)
-	{
+	if (result != 0) {
 		return result;
 	}
 
@@ -171,8 +169,7 @@ int XcodeDecoder::load(UCHAR* data, UINT size, UINT base, const char* ini)
 
 	lbi = 0;
 	interp.reset();
-	while (interp.interpretNext(context->xcode) == 0)
-	{
+	while (interp.interpretNext(context->xcode) == 0) {
 		if (context->xcode->opcode != XC_JMP && context->xcode->opcode != XC_JNE)
 			continue;
 
@@ -183,14 +180,12 @@ int XcodeDecoder::load(UCHAR* data, UINT size, UINT base, const char* ini)
 	// initialize labels; NOTE. More than likely over allocated as labels can be referenced more than once within the xcode table.
 
 	context->labels = (LABEL*)malloc(sizeof(LABEL) * lbi);
-	if (context->labels == NULL)
-	{
+	if (context->labels == NULL) {
 		return ERROR_OUT_OF_MEMORY;
 	}
 
 	context->settings.labelMaxLen = 0;
-	while (lbi > 0)
-	{
+	while (lbi > 0) {
 		context->settings.labelMaxLen++;
 		lbi /= 10;
 	}
@@ -198,28 +193,24 @@ int XcodeDecoder::load(UCHAR* data, UINT size, UINT base, const char* ini)
 
 	lbi = 0;
 	interp.reset();
-	while (interp.interpretNext(context->xcode) == 0)
-	{
+	while (interp.interpretNext(context->xcode) == 0) {
 		if (context->xcode->opcode != XC_JMP && context->xcode->opcode != XC_JNE)
 			continue;
 
 		// check if offset is already a label
 		isLabel = false;
-		for (UINT lb = 0; lb < lbi; lb++)
-		{
+		for (uint32_t lb = 0; lb < lbi; lb++) {
 			LABEL* label = &context->labels[lb];
 			if (label == NULL)
 				continue;
-			if (label->offset == context->xcode->data)
-			{
+			if (label->offset == context->xcode->data) {
 				isLabel = true;
 				break;
 			}
 		}
 
 		// label does not exist. create one.
-		if (!isLabel)
-		{
+		if (!isLabel) {
 			LABEL* label = &context->labels[lbi];
 			sprintf(label->name, label_format, lbi);
 			label->offset = context->xcode->data;
@@ -236,10 +227,10 @@ int XcodeDecoder::load(UCHAR* data, UINT size, UINT base, const char* ini)
 int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 {
 	char* value = NULL;
-	UINT len = 0;
-	UINT i = 0;
-	UINT j = 0;
-	UCHAR k = 0;
+	uint32_t len = 0;
+	uint32_t i = 0;
+	uint32_t j = 0;
+	uint8_t k = 0;
 	int result = 0;
 	FILE* stream = NULL;
 	char buf[128] = {};
@@ -272,65 +263,54 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 		{ &cmap.s[22], &settings->opcodes[14].str }
 	};
 
-	if (ini != NULL)
-	{
+	if (ini != NULL) {
 		stream = fopen(ini, "r");
-		if (stream != NULL) // only load ini file if it exists
-		{
+		if (stream != NULL) { // only load ini file if it exists
 			printf("settings file: %s\n", ini);
 			result = loadini(stream, var_map, cmap.size);
 			fclose(stream);
-			if (result != 0) // convert to error code
-			{
+			if (result != 0) { // convert to error code
 				result = 1;
 				goto Cleanup;
 			}
 		}
-		else
-		{
+		else {
 			printf("settings: default\n");
 		}
 	}
 
 	// default format_str
-	if (settings->format_str == NULL)
-	{		
+	if (settings->format_str == NULL) {		
 		settings->format_str = (char*)malloc(strlen(default_format_str) + 1);
-		if (settings->format_str == NULL)
-		{
+		if (settings->format_str == NULL) {
 			result = ERROR_OUT_OF_MEMORY;
 			goto Cleanup;
 		}
 		strcpy(settings->format_str, default_format_str);
 	}
+
 	len = strlen(settings->format_str);
 	k = 1;
-	for (i = 0; i < len; i++)
-	{
+	
+	for (i = 0; i < len; i++) {
 		result = ll2(buf, settings->format_str, i, j, len);
-		if (result == ERROR_INVALID_DATA)
-		{
+		if (result == ERROR_INVALID_DATA) {
 			goto Cleanup;
 		}
-		else if (result != 0)
-		{
+		else if (result != 0) {
 			result = 0;
 
-			if (i == 0) // if first entry
-			{
-				if (j > 1) // if entry is not empty
-				{
+			if (i == 0) { // if first entry
+				if (j > 1) { // if entry is not empty
 					settings->prefix_str = (char*)malloc(j + 1);
-					if (settings->prefix_str == NULL)
-					{
+					if (settings->prefix_str == NULL) {
 						result = ERROR_OUT_OF_MEMORY;
 						goto Cleanup;
 					}
 					strcpy(settings->prefix_str, buf);
 					i = j - 1;
 				}
-				else
-				{
+				else {
 					settings->prefix_str = NULL;
 				}
 			}
@@ -338,16 +318,13 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 			continue;
 		}
 
-		for (j = 0; j < sizeof(settings->format_map) / sizeof(DECODE_STR_SETTING_MAP); j++)
-		{
-			if (strstr(buf, formatMap[j].str) != NULL)
-			{
+		for (j = 0; j < sizeof(settings->format_map) / sizeof(DECODE_STR_SETTING_MAP); j++) {
+			if (strstr(buf, format_map[j].str) != NULL) {
 				result = ll(NULL, buf, 0, NULL, strlen(buf), 2);
 				memcpy(buf, "%s", 2);
 
 				settings->format_map[j].str = (char*)malloc(strlen(buf) + 1);
-				if (settings->format_map[j].str == NULL)
-				{
+				if (settings->format_map[j].str == NULL) {
 					result = ERROR_OUT_OF_MEMORY;
 					goto Cleanup;
 				}
@@ -358,46 +335,37 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 				break;
 			}
 		}
-		if (j == sizeof(settings->format_map) / sizeof(DECODE_STR_SETTING_MAP))
-		{
+		if (j == sizeof(settings->format_map) / sizeof(DECODE_STR_SETTING_MAP)) {
 			result = ERROR_INVALID_DATA;
 			goto Cleanup;
 		}
 	}
 
 	// jmp_str
-	if (settings->jmp_str != NULL)
-	{
+	if (settings->jmp_str != NULL) {
 		len = strlen(settings->jmp_str);
-		for (i = 0; i < len; i++)
-		{
+		for (i = 0; i < len; i++) {
 			result = ll(buf, settings->jmp_str, i, &j, len, 2);
-			if (result == ERROR_INVALID_DATA) // parse error
-			{
+			if (result == ERROR_INVALID_DATA) { // parse error
 				goto Cleanup;
 			}
-			else if (result != 0) // no '{' found, skip
-			{
+			else if (result != 0) { // no '{' found, skip
 				result = 0;
 				continue;
 			}
 
-			if (strcmp(buf, "{label}") == 0)
-			{
+			if (strcmp(buf, "{label}") == 0) {
 				memcpy(settings->jmp_str + i, "%s", 2);
 			}
-			else
-			{
+			else {
 				result = ERROR_INVALID_DATA;
 				goto Cleanup;
 			}
 		}
 	}
-	else
-	{
+	else {
 		settings->jmp_str = (char*)malloc(6);
-		if (settings->jmp_str == NULL)
-		{
+		if (settings->jmp_str == NULL) {
 			result = ERROR_OUT_OF_MEMORY;
 			goto Cleanup;
 		}
@@ -405,31 +373,24 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 	}
 
 	// num_str
-	if (settings->num_str != NULL)
-	{
+	if (settings->num_str != NULL) {
 		len = strlen(settings->num_str);
-		for (i = 0; i < len; i++)
-		{
+		for (i = 0; i < len; ++i) {
 			result = ll(buf, settings->num_str, i, &j, len, 2);
-			if (result == ERROR_INVALID_DATA) // parse error
-			{
+			if (result == ERROR_INVALID_DATA) { // parse error
 				goto Cleanup;
 			}
-			else if (result != 0) // no '{' found
-			{
+			else if (result != 0) { // no '{' found
 				result = 0;
 				continue;
 			}
 
 			memcpy(settings->num_str + i, "%s", 2);
 
-			for (j = 0; j < sizeof(num_str_fields) / sizeof(DECODE_SETTING_MAP); j++)
-			{
-				if (strcmp(buf, num_str_fields[j].field) == 0)
-				{
+			for (j = 0; j < sizeof(num_str_fields) / sizeof(DECODE_SETTING_MAP); ++j) {
+				if (strcmp(buf, num_str_fields[j].field) == 0) {
 					settings->num_str_format = (char*)malloc(strlen(settings->num_str) - 2 + 8 + 1); // +8 for digits
-					if (settings->num_str_format == NULL)
-					{
+					if (settings->num_str_format == NULL) {
 						result = ERROR_OUT_OF_MEMORY;
 						goto Cleanup;
 					}
@@ -438,8 +399,7 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 				}
 			}
 
-			if (j == sizeof(num_str_fields) / sizeof(DECODE_SETTING_MAP))
-			{
+			if (j == sizeof(num_str_fields) / sizeof(DECODE_SETTING_MAP)) {
 				result = ERROR_INVALID_DATA;
 				goto Cleanup;
 			}
@@ -448,8 +408,7 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 	else
 	{
 		settings->num_str = (char*)malloc(3);
-		if (settings->num_str == NULL)
-		{
+		if (settings->num_str == NULL) {
 			result = ERROR_OUT_OF_MEMORY;
 			goto Cleanup;
 		}
@@ -457,23 +416,19 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 	}
 
 	// set default num_str_format
-	if (settings->num_str_format == NULL)
-	{
+	if (settings->num_str_format == NULL) {
 		settings->num_str_format = (char*)malloc(5);
-		if (settings->num_str_format == NULL)
-		{
+		if (settings->num_str_format == NULL) {
 			result = ERROR_OUT_OF_MEMORY;
 			goto Cleanup;
 		}
-		strcpy(settings->num_str_format, "%x");
+		strcpy(settings->num_str_format, "%08x");
 	}
 
 	// set default comment_prefix
-	if (settings->comment_prefix == NULL)
-	{
+	if (settings->comment_prefix == NULL) {
 		settings->comment_prefix = (char*)malloc(3);
-		if (settings->comment_prefix == NULL)
-		{
+		if (settings->comment_prefix == NULL) {
 			result = ERROR_OUT_OF_MEMORY;
 			goto Cleanup;
 		}
@@ -483,13 +438,12 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 	// opcodes
 	settings->opcodeMaxLen = 0;
 	k = 0;
-	for (i = 0; i < XCODE_OPCODE_COUNT; i++)
-	{
-		UCHAR opcode = 0;
+	for (i = 0; i < XC_OPCODE_COUNT; ++i) {
+		uint8_t opcode = 0;
 		const char* str = NULL;
 
 		// find next valid opcode (range 0-255)
-		while ((opcode = k) < 255 && getOpcodeStr(opcodeMap, k++, str) != 0);
+		while ((opcode = k) < 255 && getOpcodeStr(xcode_opcode_map, k++, str) != 0);
 
 		if (str == NULL)
 		{
@@ -555,21 +509,19 @@ int XcodeDecoder::decodeXcodes()
 
 int XcodeDecoder::decode()
 {
-	UINT len;
-	UINT fmt_len;
-	UINT op_len = 0;
-	UINT operand_len = 0;
-	UINT no_operand_len = 0;
-	UINT jmp_len = 0;
+	uint32_t len;
+	uint32_t fmt_len;
+	uint32_t op_len = 0;
+	uint32_t operand_len = 0;
+	uint32_t no_operand_len = 0;
+	uint32_t jmp_len = 0;
 	
 	char str[64] = {};
 	char str_tmp[64] = {};
 
-	for (UINT lb = 0; lb < context->labelCount; lb++)
-	{
+	for (uint32_t lb = 0; lb < context->labelCount; lb++) {
 		LABEL* label = &context->labels[lb];
-		if (label->offset == interp.getOffset() - sizeof(XCODE))
-		{
+		if (label->offset == interp.getOffset() - sizeof(XCODE)) {
 			sprintf(str, "%s:", label->name);
 			if (context->settings.label_on_new_line)
 				strcat(str, "\n");
@@ -585,15 +537,12 @@ int XcodeDecoder::decode()
 	str[0] = '\0';
 
 	// prefix
-	if (context->settings.prefix_str != NULL)
-	{
+	if (context->settings.prefix_str != NULL) {
 		strcat(context->str_decode, context->settings.prefix_str);
 	}
 
-	for (UINT seq = 0; seq < sizeof(context->settings.format_map) / sizeof(DECODE_STR_SETTING_MAP); seq++)
-	{
-		for (UINT j = 0; j < sizeof(context->settings.format_map) / sizeof(DECODE_STR_SETTING_MAP); j++)
-		{
+	for (uint32_t seq = 0; seq < sizeof(context->settings.format_map) / sizeof(DECODE_STR_SETTING_MAP); seq++) {
+		for (uint32_t j = 0; j < sizeof(context->settings.format_map) / sizeof(DECODE_STR_SETTING_MAP); j++) {
 			if (context->settings.format_map[j].seq != seq + 1)
 				continue;
 			if (context->settings.format_map[j].str == NULL)
@@ -601,8 +550,7 @@ int XcodeDecoder::decode()
 
 			len = strlen(context->str_decode);
 			fmt_len = strlen(context->settings.format_map[j].str) - 2;
-			if (context->settings.no_operand_str != NULL)
-			{
+			if (context->settings.no_operand_str != NULL) {
 				no_operand_len = strlen(context->settings.no_operand_str) + fmt_len + 1;
 			}
 			op_len = context->settings.opcodeMaxLen + fmt_len + 1;
@@ -612,8 +560,7 @@ int XcodeDecoder::decode()
 			str[0] = '\0';
 			memset(str_tmp, 0, sizeof(str_tmp));
 
-			switch (context->settings.format_map[j].type)
-			{
+			switch (context->settings.format_map[j].type) {
 			case DECODE_FIELD_OFFSET:
 				sprintf(str_tmp, context->settings.format_map[j].str, "%04x");
 				sprintf(str, str_tmp, context->xcodeBase + interp.getOffset() - sizeof(XCODE));
@@ -624,34 +571,32 @@ int XcodeDecoder::decode()
 				if (getOpcodeStr(context->settings.opcodes, context->xcode->opcode, str_opcode) != 0)
 					return 1;
 				sprintf(str, context->settings.format_map[j].str, str_opcode);
-				if (context->settings.pad)
-				{
+				if (context->settings.pad) {
 					rpad(str, op_len, ' ');
 				}
 				break;
 
-			case DECODE_FIELD_ADDRESS:				
-				switch (context->xcode->opcode)
-				{
-					case XC_JMP:
-					{	if (context->settings.no_operand_str != NULL)
-						{
+			case DECODE_FIELD_ADDRESS:	
+				switch (context->xcode->opcode) {
+					case XC_JMP: {
+						if (context->settings.no_operand_str != NULL) {
 							strcpy(str_tmp, context->settings.no_operand_str);
 						}
-						else
-						{
-							str_tmp[0] = '\0';
-						}
-						break;
-					}
+						else {
+							for (uint32_t lb = 0; lb < context->labelCount; lb++) {
+								LABEL* label = &context->labels[lb];
+								if (label->offset == context->xcode->data) {
+									sprintf(str_tmp, context->settings.jmp_str, label->name);
+									break;
+								}
+							}//str_tmp[0] = '\0';
+						}						
+					} break;
 
-					case XC_USE_RESULT:
-					{
-						if (context->settings.opcode_use_result)
-						{
+					case XC_USE_RESULT: {
+						if (context->settings.opcode_use_result) {
 							const char* opcode_str;
-							if (getOpcodeStr(context->settings.opcodes, (UCHAR)context->xcode->addr, opcode_str) == 0)
-							{
+							if (getOpcodeStr(context->settings.opcodes, (uint8_t)context->xcode->addr, opcode_str) == 0) {
 								strcpy(str_tmp, opcode_str);
 								break;
 							}
@@ -659,15 +604,14 @@ int XcodeDecoder::decode()
 					}
 					// fall through
 
-					default:
-					{	sprintf(str_tmp, context->settings.num_str_format, context->xcode->addr);
+					default: {
+						sprintf(str_tmp, context->settings.num_str_format, context->xcode->addr);
 						break;
 					}
 				}
 
 				sprintf(str, context->settings.format_map[j].str, str_tmp);
-				if (context->settings.pad)
-				{
+				if (context->settings.pad) {
 					if (context->settings.opcode_use_result && operand_len < op_len)
 						operand_len = op_len;
 					if (operand_len < no_operand_len)
@@ -677,48 +621,42 @@ int XcodeDecoder::decode()
 				break;
 
 			case DECODE_FIELD_DATA:
-				if (context->xcode->opcode == XC_JMP || context->xcode->opcode == XC_JNE)
-				{
-					for (UINT lb = 0; lb < context->labelCount; lb++)
-					{
-						LABEL* label = &context->labels[lb];
-						if (label->offset == context->xcode->data)
-						{
-							sprintf(str_tmp, context->settings.jmp_str, label->name);
-							break;
+				switch (context->xcode->opcode) {
+					case XC_MEM_READ:
+					case XC_IO_READ:
+					case XC_PCI_READ:
+					case XC_EXIT:
+						if (context->settings.no_operand_str != NULL) {
+							strcpy(str_tmp, context->settings.no_operand_str);
 						}
-					}
-				}
-				else
-				{
-					switch (context->xcode->opcode)
-					{
-						case XC_MEM_READ:
-						case XC_IO_READ:
-						case XC_PCI_READ:
-						case XC_EXIT:
-							if (context->settings.no_operand_str != NULL)
-							{
-								strcpy(str_tmp, context->settings.no_operand_str);
-							}
-							else
-							{
-								str_tmp[0] = '\0';
-							}
-							break;
+						else {
+							str_tmp[0] = '\0';
+						}
+						break;
 
-						case XC_JNE:
-						case XC_JMP:
-							break;
+					case XC_JMP:
+						if (context->settings.no_operand_str != NULL)
+							goto MakeLabel;
+						break;
 
-						default:
-							sprintf(str_tmp, context->settings.num_str_format, context->xcode->data);
-							break;
-					}
+					case XC_JNE:
+						MakeLabel:
+						for (uint32_t lb = 0; lb < context->labelCount; lb++) {
+							LABEL* label = &context->labels[lb];
+							if (label->offset == context->xcode->data) {
+								sprintf(str_tmp, context->settings.jmp_str, label->name);
+								break;
+							}
+						}
+						break;
+
+					default:
+						sprintf(str_tmp, context->settings.num_str_format, context->xcode->data);
+						break;
 				}
+
 				sprintf(str, context->settings.format_map[j].str, str_tmp);
-				if (context->settings.pad)
-				{
+				if (context->settings.pad) {
 					if (operand_len < jmp_len)
 						operand_len = jmp_len;
 					if (operand_len < no_operand_len)
@@ -728,18 +666,16 @@ int XcodeDecoder::decode()
 				break;
 
 			case DECODE_FIELD_COMMENT:
-				UINT prefixLen = strlen(context->settings.comment_prefix);
+				uint32_t prefixLen = strlen(context->settings.comment_prefix);
 				getCommentStr(str_tmp + prefixLen);
-				if (str_tmp[prefixLen] != '\0')
-				{
+				if (str_tmp[prefixLen] != '\0') {
 					memcpy(str_tmp, context->settings.comment_prefix, prefixLen);
 				}
 				sprintf(str, context->settings.format_map[j].str, str_tmp);
 				break;
 			}
 
-			if (len + strlen(str) > sizeof(context->str_decode))
-			{
+			if (len + strlen(str) > sizeof(context->str_decode)) {
 				return ERROR_BUFFER_OVERFLOW;
 			}
 
@@ -761,8 +697,8 @@ int XcodeDecoder::getCommentStr(char* str)
 	// -1 = dont care about field
 
 	XCODE* _ptr = interp.getPtr();
-	UINT _offset = interp.getOffset();
-	UCHAR* _data = interp.getData();
+	uint32_t _offset = interp.getOffset();
+	uint8_t* _data = interp.getData();
 
 	XC_WRITE_COMMENT("smbus read status", XC_IO_READ, SMB_BASE + 0x00, -1);
 	XC_WRITE_COMMENT("smbus clear status", XC_IO_WRITE, SMB_BASE + 0x00, 0x10);
@@ -819,20 +755,22 @@ int XcodeDecoder::getCommentStr(char* str)
 	XC_WRITE_COMMENT("set nv clk 155 MHz ( rev == A1 )", XC_MEM_WRITE, NV2A_BASE + NV_CLK_REG, 0x11701);
 
 	XC_WRITE_STATEMENT(XC_MEM_WRITE, NV2A_BASE + NV_CLK_REG, -1,
-		UINT base = 16667;
-	UINT nvclk = base * ((_ptr->data & 0xFF00) >> 8);
-	nvclk /= 1 << ((_ptr->data & 0x70000) >> 16);
-	nvclk /= _ptr->data & 0xFF; nvclk /= 1000;
-	sprintf(str + strlen(str), "set nv clk %dMHz (@ %.3fMHz)", nvclk, (float)(base / 1000.00f)));
+		uint32_t base = 16667;
+		uint32_t nvclk = base * ((_ptr->data & 0xFF00) >> 8);
+		nvclk /= 1 << ((_ptr->data & 0x70000) >> 16);
+		nvclk /= _ptr->data & 0xFF; nvclk /= 1000;
+		sprintf(str + strlen(str), "set nv clk %dMHz (@ %.3fMHz)", nvclk, (float)(base / 1000.00f)));
 
 	// nv gpu revision
 	XC_WRITE_COMMENT_NEXT_XCODE("get nv rev",
 		XC_MEM_READ, NV2A_BASE, 0,
 		XC_AND_OR, 0xFF, 0);
+
 	XC_WRITE_COMMENT_LAST_2_XCODE("jmp if nv rev >= A2 ( >= DVT4 )",
 		XC_JNE, 0xA1, -1,
 		XC_AND_OR, 0xFF, 0,
 		XC_MEM_READ, NV2A_BASE, 0);
+
 	XC_WRITE_COMMENT_LAST_2_XCODE("jmp if nv rev < A2 ( < DVT4 )",
 		XC_JNE, 0xA2, -1,
 		XC_AND_OR, 0xFF, 0,
@@ -873,55 +811,52 @@ int XcodeDecoder::getCommentStr(char* str)
 		XC_AND_OR, 0xFFFFFFFF, 0x400,
 		XC_PCI_READ, MCPX_LEG_24, 0);
 
-	XC_WRITE_COMMENT("visor", XC_MEM_WRITE, 0, -1);
+	XC_WRITE_COMMENT("visor attack prep", XC_MEM_WRITE, 0x00000000, -1);
+	XC_WRITE_COMMENT("TEA attack prep", XC_MEM_WRITE, 0x007fd588, -1);
 
 	XC_WRITE_COMMENT("quit xcodes", XC_EXIT, 0x806, 0);
 
 	return 0;
 }
 
-int ll(char* output, char* str, UINT i, UINT* j, UINT len, UINT m)
+int ll(char* output, char* str, uint32_t i, uint32_t* j, uint32_t len, uint32_t m)
 {
 	if (str[i] != '{')
 		return 1;
 
-	UINT k = i + 1;
-	while (k < len && str[k] != '}')
-	{
+	uint32_t k = i + 1;
+	while (k < len && str[k] != '}') {
 		k++;
 	}
-	if (j != NULL)
-	{
+
+	if (j != NULL) {
 		*j = k;
 	}
 
-	if (str[k] != '}')
-	{
+	if (str[k] != '}') {
 		return ERROR_INVALID_DATA;
 	}
 
-	if (output != NULL)
-	{
+	if (output != NULL) {
 		memcpy(output, str + i, k - i + 1);
 		output[k - i + 1] = '\0';
 	}
 
-	if (m > 0)
-	{
+	if (m > 0) {
 		memmove(str + i + m, str + k + 1, len - k);
 	}
 
 	return 0;
 }
-int ll2(char* output, char* str, UINT i, UINT& j, UINT len)
+int ll2(char* output, char* str, uint32_t i, uint32_t& j, uint32_t len)
 {
-	if (str[i] != '{')
-	{
+	if (str[i] != '{') {
 		j = i;
-		while (j < len && str[j] != '{')
-		{
+		
+		while (j < len && str[j] != '{') {
 			j++;
 		}
+
 		memcpy(output, str + i, j - i);
 		output[j - i] = '\0';
 
@@ -929,21 +864,20 @@ int ll2(char* output, char* str, UINT i, UINT& j, UINT len)
 	}
 
 	j = i;
-	while (j < len && str[j] != '}')
-	{
+	while (j < len && str[j] != '}') {
 		j++;
 	}
-	if (str[j] != '}')
-	{
+
+	if (str[j] != '}') {
 		return ERROR_INVALID_DATA;
 	}
-	UINT k = j;
-	while (k + 1 < len && str[k + 1] != '{')
-	{
+
+	uint32_t k = j;
+	while (k + 1 < len && str[k + 1] != '{') {
 		k++;
 	}
-	if (k + 1 < len)
-	{
+
+	if (k + 1 < len) {
 		j = k;
 	}
 

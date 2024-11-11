@@ -22,27 +22,29 @@
 #define XB_FILE_H
 
 // std incl
-#include <cstdio>
+#include <stdint.h>
+#include <stdio.h>
 
-// user incl
-#include "type_defs.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // read a file. allocates memory for the buffer.
 // filename: the absolute path to the file.
 // bytesRead: if not NULL, will store the number of bytes read.
 // expectedSize: if not -1, will check the file size against this value and return NULL if they don't match.
 // returns the buffer if successful, NULL otherwise.
-UCHAR* readFile(const char* filename, UINT* bytesRead, const UINT expectedSize = 0);
+uint8_t* readFile(const char* filename, uint32_t* bytesRead, const uint32_t expectedSize);
 
 // write to a file.
 // filename: the absolute path to the file.
 // ptr: the buffer to write from.
 // bytesToWrite: the number of bytes to write to the file.
 // returns 0 if successful, 1 otherwise.
-int writeFile(const char* filename, void* ptr, const UINT bytesToWrite);
+int writeFile(const char* filename, void* ptr, const uint32_t bytesToWrite);
 
 // write to a file.
-int writeFileF(const char* filename, void* ptr, const UINT bytesToWrite, const char* name);
+int writeFileF(const char* filename, void* ptr, const uint32_t bytesToWrite);
 
 // deletes a file.
 // filename: the absolute path to the file.
@@ -53,6 +55,10 @@ int deleteFile(const char* filename);
 // file: the file to get the size of.
 // fileSize: if not NULL, will store the file size.
 // returns 0 if successful, 1 otherwise.
-int getFileSize(FILE* file, UINT* fileSize);
+int getFileSize(FILE* file, uint32_t* fileSize);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif

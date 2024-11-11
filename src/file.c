@@ -1,4 +1,4 @@
-// File.cpp: File handling functions
+// File.c: File handling functions
 
 /* Copyright(C) 2024 tommojphillips
  *
@@ -19,19 +19,20 @@
 // Author: tommojphillips
 // GitHub: https:\\github.com\tommojphillips
 
-#include "file.h"
-#include "type_defs.h"
+#include <stdint.h>
+#include <stdbool.h>
 
-#ifdef MEM_TRACKING
+#include "file.h"
+#ifndef NO_MEM_TRACKING
 #include "mem_tracking.h"
 #else
 #include <malloc.h>
 #endif
 
-UCHAR* readFile(const char* filename, UINT* bytesRead, const UINT expectedSize)
+uint8_t* readFile(const char* filename, uint32_t* bytesRead, const uint32_t expectedSize)
 {
 	FILE* file = NULL;
-	UINT size = 0;
+	uint32_t size = 0;
 
 	if (filename == NULL)
 		return NULL;
@@ -39,7 +40,7 @@ UCHAR* readFile(const char* filename, UINT* bytesRead, const UINT expectedSize)
 	file = fopen(filename, "rb");
 	if (file == NULL)
 	{
-		printf("Error: Could not open file: %s\n", filename);
+		printf("Error: could not open file: %s\n", filename);
 		return NULL;
 	}
 
@@ -47,16 +48,16 @@ UCHAR* readFile(const char* filename, UINT* bytesRead, const UINT expectedSize)
 
 	if (expectedSize != 0 && size != expectedSize)
 	{
-		printf("Error: Invalid file size. Expected %d bytes. Got %d bytes\n", expectedSize, size);
+		printf("Error: invalid file size. Expected %u bytes. Got %u bytes\n", expectedSize, size);
 		fclose(file);
 		return NULL;
 	}
 
-	UCHAR* data = (UCHAR*)malloc(size);
+	uint8_t* data = (uint8_t*)malloc(size);
 	if (data != NULL)
 	{
 		fread(data, 1, size, file);
-		if (bytesRead != NULL) // only set bytesRead if not NULL
+		if (bytesRead != NULL)
 		{
 			*bytesRead = size;
 		}
@@ -66,10 +67,10 @@ UCHAR* readFile(const char* filename, UINT* bytesRead, const UINT expectedSize)
 	return data;
 }
 
-int writeFile(const char* filename, void* ptr, const UINT bytesToWrite)
+int writeFile(const char* filename, void* ptr, const uint32_t bytesToWrite)
 {
 	FILE* file = NULL;
-	UINT bytesWritten = 0;
+	uint32_t bytesWritten = 0;
 
 	if (filename == NULL)
 		return 1;
@@ -86,14 +87,12 @@ int writeFile(const char* filename, void* ptr, const UINT bytesToWrite)
 
 	return 0;
 }
-int writeFileF(const char* filename, void* ptr, const UINT bytesToWrite, const char* name)
+int writeFileF(const char* filename, void* ptr, const uint32_t bytesToWrite)
 {
-	static const char SUCCESS_OUT[] = "Wrote %s ( %.2f %s )\n";
+	static const char SUCCESS_OUT[] = "wrote %s ( %.2f %s )\n";
 	static const char FAIL_OUT[] = "Error failed to write %s\n";
-	static const char WRITE_OUT[] = "Writing %s to %s\n";
 
 	static const char* units[] = { "bytes", "kb", "mb", "gb" };
-	//static const char* units[] = { "bytes", "kb", };
 
 	int result;
 	float bytesF;
@@ -107,8 +106,7 @@ int writeFileF(const char* filename, void* ptr, const UINT bytesToWrite, const c
 		result++;
 	}
 	sizeSuffix = units[result];
-	
-	printf(WRITE_OUT, name, filename);
+
 	result = writeFile(filename, ptr, bytesToWrite);
 	if (result == 0)
 	{
@@ -116,12 +114,13 @@ int writeFileF(const char* filename, void* ptr, const UINT bytesToWrite, const c
 	}
 	else
 	{
-		printf(FAIL_OUT, name);
+		printf(FAIL_OUT, filename);
 	}
+
 	return result;
 }
 
-int getFileSize(FILE* file, UINT* fileSize)
+int getFileSize(FILE* file, uint32_t* fileSize)
 {
 	if (file == NULL)
 		return 1;

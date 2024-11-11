@@ -21,54 +21,79 @@
 
 // std incl
 #include <stdio.h>
+#include <string.h>
+#include <malloc.h>
 
 // user incl
 #include "Mcpx.h"
-#include "file.h"
 #include "sha1.h"
 
-int Mcpx::load(UCHAR* mcpxData)
-{
-	data = mcpxData;
+#ifndef NO_MEM_TRACKING
+#include "mem_tracking.h"
+#endif
 
+void initMcpx(Mcpx* mcpx)
+{
+	mcpx->version = Mcpx::UNK;
+	mcpx->data = NULL;
+	mcpx->sbkey = NULL;
+	memset(mcpx->hash, 0, SHA1_DIGEST_LEN);
+}
+void freeMcpx(Mcpx* mcpx)
+{
+	if (mcpx->data != NULL) 
+	{
+		free(mcpx->data);
+		mcpx->data = NULL;
+	}
+
+	mcpx->sbkey = NULL;
+	mcpx->version = Mcpx::UNK;
+	memset(mcpx->hash, 0, SHA1_DIGEST_LEN);
+}
+int loadMcpx(Mcpx* mcpx, uint8_t* mcpxData) 
+{
+	mcpx->data = mcpxData;
+
+	// hash the mcpx
 	SHA1Context context;
 	SHA1Reset(&context);
-	SHA1Input(&context, data, MCPX_BLOCK_SIZE);
-	SHA1Result(&context, hash);
-	
+	SHA1Input(&context, mcpx->data, MCPX_BLOCK_SIZE);
+	SHA1Result(&context, mcpx->hash);
+
 	// compare precomputed hashes
 
 	// mcpx v1.0 
-	if (memcmp(hash, MCPX_V1_0_SHA1_HASH, 20) == 0)
+	if (memcmp(mcpx->hash, MCPX_V1_0_SHA1_HASH, SHA1_DIGEST_LEN) == 0)
 	{
-		version = Mcpx::MCPX_V1_0;
-		sbkey = (data + 0x1A5);
+		mcpx->version = Mcpx::MCPX_V1_0;
+		mcpx->sbkey = (mcpx->data + 0x1A5);
 		return 0;
 	}
 
 	// mcpx v1.1
-	if (memcmp(hash, MCPX_V1_1_SHA1_HASH, 20) == 0)
+	if (memcmp(mcpx->hash, MCPX_V1_1_SHA1_HASH, SHA1_DIGEST_LEN) == 0)
 	{
-		version = Mcpx::MCPX_V1_1;
-		sbkey = (data + 0x19C);
+		mcpx->version = Mcpx::MCPX_V1_1;
+		mcpx->sbkey = (mcpx->data + 0x19C);
 		return 0;
 	}
 
 	// mouse rev.0 
-	if (memcmp(hash, MOUSE_REV0_SHA1_HASH, 20) == 0)
+	if (memcmp(mcpx->hash, MOUSE_REV0_SHA1_HASH, SHA1_DIGEST_LEN) == 0)
 	{
-		version = Mcpx::MOUSE_V1_0;
-		sbkey = (data + 0x19C);
+		mcpx->version = Mcpx::MOUSE_V1_0;
+		mcpx->sbkey = (mcpx->data + 0x19C);
 		return 0;
 	}
 
 	// mouse rev.1
-	if (memcmp(hash, MOUSE_REV1_SHA1_HASH, 20) == 0)
+	if (memcmp(mcpx->hash, MOUSE_REV1_SHA1_HASH, SHA1_DIGEST_LEN) == 0)
 	{
-		version = Mcpx::MOUSE_V1_1;
-		sbkey = (data + 0x19C);
+		mcpx->version = Mcpx::MOUSE_V1_1;
+		mcpx->sbkey = (mcpx->data + 0x19C);
 		return 0;
 	}
-
-	return 1;
+	return 0;
 }
+

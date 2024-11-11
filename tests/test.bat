@@ -5,30 +5,28 @@ cls
 
 setlocal enabledelayedexpansion
 
-REM XBIOS ERROR CODES
-
-REM 0: ERROR_SUCCESS
-REM 1: ERROR_GENERAL_FAILURE
-
-REM 4: ERROR_BUFFER_OVERFLOW
-REM 5: ERROR_OUT_OF_MEMORY
-REM 6: ERROR_INVALID_DATA
-
-
 if "%~1" == "-?" goto :help
 if "%~1" == "/?" goto :help
 
-set "enable_logs=0"
-
 :setup
+    
+    title xbios testing
+
+    REM ensure we got (cmpsrc.exe) on the PATH.
+    where "cmpsrc.exe" 2>nul || (
+        echo tommojphillips' "cmpsrc.exe" not found.
+	echo https://github.com/tommojphillips/CompareSrc/releases/
+        exit /b 1
+    )
+
     REM ensure we we in the correct directory
     if NOT "%CD%\" == "%~dp0" (
         echo Change directory to %~dp0
         exit /b 1
     )
 
-    set error_flag=0
-
+    set "error_flag=0"
+    
     set "exe=..\bin\xbios.exe"
 
     set "MCPX_ROM_1_0=-mcpx mcpx\mcpx_1.0.bin"
@@ -37,16 +35,19 @@ set "enable_logs=0"
     if not exist "mcpx" mkdir mcpx
     if not exist "bios" mkdir bios
 
+    if not exist "bios\preldr" mkdir bios\preldr    
     if not exist "bios\custom" mkdir bios\custom
+    if not exist "bios\custom_512kb_noenc" mkdir bios\custom_512kb_noenc
 
     if not exist "bios\og_1_0" mkdir bios\og_1_0
     if not exist "bios\og_1_1" mkdir bios\og_1_1
     if not exist "bios\512kb" mkdir bios\512kb
     if not exist "bios\img" mkdir bios\img
-
-    if not exist "decode.ini" echo. > decode.ini
-    if not exist "decode2.ini" echo. > decode2.ini
     if not exist "logs\" mkdir logs
+    
+    set "x3_preldr=bios\preldr\x3preldr.bin"
+    
+    if not exist "decode.ini" echo. > decode.ini
 
 :cleanup_test_files
     echo Cleaning up test files...
@@ -78,7 +79,12 @@ set "enable_logs=0"
     if not exist "!exe!" (
         echo '!exe!' not found
         exit /b 1
-    )    
+    )
+
+    if not exist "!x3_preldr!" (
+        echo bone stock x3 preldr not found. Used to verify preldr was extracted correctly. ^( for BIOSes ^>= 4817 ^)
+        exit /b 1
+    )
 
 :run_tests
     set jobs_passed=0
@@ -116,6 +122,11 @@ set "enable_logs=0"
     call :do_test "-ls noexist.bin" 1
     call :do_test "-ls !exe!" 1
     call :do_test "-nocommand blah" 1
+    call :do_test "-ls very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_long_file_name.bin" 1
+    call :do_test "-ls_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_long_command.bin bios.bin" 1
+
+    REM ensure we got help for ALL commands
+    call :do_test "-? -help-all" 0
 
 REM run original tests for bios less than 4817
 :mcpx_1_0_bios_tests   
@@ -126,19 +137,37 @@ REM run original tests for bios less than 4817
         set arg_name=%%~nf
 
         call :do_test "-split !arg!" 0 "!arg_name!"
+
         REM note this test expects bios to be 1MB
         call :do_test "-combine !arg_name!_bank1.bin !arg_name!_bank2.bin !arg_name!_bank3.bin !arg_name!_bank4.bin" 0 "!arg_name!"
-        call :do_test "-split bios.bin" 0 "!arg_name!"
-        call :do_test "-decomp-krnl bios_bank1.bin %MCPX_ROM_1_0%" 0 "!arg_name!"
-        call :do_test "-decomp-krnl bios_bank2.bin %MCPX_ROM_1_0%" 0 "!arg_name!"
-        call :do_test "-decomp-krnl bios_bank3.bin %MCPX_ROM_1_0%" 0 "!arg_name!"
-        call :do_test "-decomp-krnl bios_bank4.bin %MCPX_ROM_1_0%" 0 "!arg_name!"
+           
+        call :cmp_file "!arg_name!_bank1.bin" "!arg_name!_bank2.bin"
+        call :cmp_file "!arg_name!_bank1.bin" "!arg_name!_bank3.bin"
+        call :cmp_file "!arg_name!_bank1.bin" "!arg_name!_bank4.bin"
+        
+        call :do_test "-ls !arg! -bootable !mcpx_rom! !extra_args!" 0 "!arg_name!"
     )
 if "!test_group!" == "-1.0" goto :exit
 
 REM run original tests for bios greater than or equal to 4817
 :mcpx_1_1_bios_tests
     call :run_og_test "bios\og_1_1" "%MCPX_ROM_1_1%"
+
+    for %%f in (bios\og_1_1\*.bin) do (
+        set "arg=%%f"
+        set arg_name=%%~nf
+                
+        REM test extracting preldr. cmp preldr.
+        call :do_test "-extr !arg! %MCPX_ROM_1_1% -preldr preldr.bin" 0
+        
+        REM compare preldr with REAL preldr. ensure we extracting it exactly as intended.
+        call :cmp_file "preldr.bin" "!x3_preldr!"
+
+        REM test get16
+        call :do_test "-get16 !arg! %MCPX_ROM_1_1%" 0
+        
+        call :do_test "-ls !arg! -bootable !mcpx_rom! !extra_args!" 0 "!arg_name!"
+    )
 if "!test_group!" == "-1.1" goto :exit
 
 REM run original tests for 512kb bios (less than 4817)
@@ -151,24 +180,29 @@ REM run original tests for 512kb bios (less than 4817)
 
         call :do_test "-split !arg! -romsize 512" 0 "!arg_name!"
         call :do_test "-combine !arg_name!_bank1.bin !arg_name!_bank2.bin" 0 "!arg_name!"
-        call :do_test "-split bios.bin -romsize 512" 0 "!arg_name!"
-        call :do_test "-decomp-krnl bios_bank1.bin %MCPX_ROM_1_0% -romsize 512" 0 "!arg_name!"
-        call :do_test "-decomp-krnl bios_bank2.bin %MCPX_ROM_1_0% -romsize 512" 0 "!arg_name!"        
+        
+        call :cmp_file "!arg_name!_bank1.bin" "!arg_name!_bank2.bin"
     )
 if "!test_group!" == "-512" goto :exit
 
 :custom_bios_tests
-    REM test custom bios
+    
+    REM custom bios decoding and visor simulation
     for %%f in (bios\custom\*.bin) do (
         set "arg=%%f"
         set arg_name=%%~nf
-        REM test custom bios decoding and visor simulation
-
+        
         call :do_test "-xcode-decode !arg!" 0 "!arg_name!"
-        call :do_test "-xcode-decode -ini decode.ini !arg!" 0 "!arg_name!"
-        call :do_test "-xcode-decode -ini decode2.ini !arg!" 0 "!arg_name!"
         call :do_test "-xcode-sim !arg!" 0 "!arg_name!"
+        call :do_test "-xcode-sim !arg! -d -out mem_sim.bin" 0 "!arg_name!"
+        call :do_test "-disasm mem_sim.bin" 0 "!arg_name!"
+        
+        call :do_test "-ls !arg! -bootable !mcpx_rom! !extra_args!" 0 "!arg_name!"
     )
+
+    REM custom bios that need 512kb and w/ no bldr (2bl) encryption (x2)
+    call :run_og_test "bios\custom_512kb_noenc" "" "-romsize 512 -enc-bldr -enc-krnl"
+
 if "!test_group!" == "-custom" goto :exit
 
 :img_tests
@@ -191,27 +225,17 @@ if "!test_group!" == "-img" goto :exit
         REM ask user to if they want to see the log
 :ask_log
         set "view_log=n"
-        if !enable_logs! neq 1 (
-            set /p "view_log=Rerun? (y/n): "
-            if /i "!view_log!" == "y" (
-                cls                
-                echo !exe! !cur_job!
-                !exe! !cur_job!
-                echo.
-                goto :ask_log
-            )
-        ) else (
-            if exist !end_log! (
-                set /p "view_log=View log? (y/n): "
-                if /i "!view_log!" == "y" (
-                    cls
-                    echo !exe! !cur_job!
-                    type !end_log!
-                )
-            )
-        )
+        set /p "view_log=Rerun? (y/n): "
+        if /i "!view_log!" == "y" (
+            cls                
+            echo !cur_job!
+            !cur_job!
+            echo.
+            goto :ask_log
+        )        
         exit /b 1
-    ) else ( 
+    ) else (
+        echo.
         echo !jobs_passed!/!jobs_total! tests passed.
     )
 
@@ -221,11 +245,11 @@ if "!test_group!" == "-img" goto :exit
 :do_test
     if NOT !error_flag! == 0 exit /b 0
 
-    set "cur_job=%~1"
+    set "cur_job=!exe! %~1"
     set "expected_error=%~2"
     set "job_name=%~3"
 
-    if "!cur_job!" == "" exit /b 0
+    if "%~1" == "" exit /b 0
 
     REM get cmd from cur_job
     for /f "tokens=1 delims= " %%a in ("!cur_job!") do set "cmd=%%a"
@@ -238,23 +262,40 @@ if "!test_group!" == "-img" goto :exit
     echo.
     echo Test !jobs_total! '!cur_job!'
 
-    if !enable_logs! neq 1 (
-        set "end_log="
-        !exe! !cur_job! > nul 2> nul
-    ) else (
-        if "!job_name!" == "" ( set "job_name=last_test" ) else ( set "job_name=!cmd!_!job_name!" )
-        set "end_log=logs\!job_name!.log"
-        !exe! !cur_job! > !end_log! 2>&1
-    )    
+    !cur_job! > nul 2> nul
     set last_error=!errorlevel!
-
     if !errorlevel! neq !expected_error! (
         set error_flag=!last_error!
         exit /b 0
     )
-    echo Pass.
 
     set /a jobs_passed+=1
+    echo Pass.
+    
+    exit /b 0
+
+:cmp_file
+    REM check files match using cmpsrc.exe
+	if NOT !error_flag! == 0 exit /b 0
+
+    set /a jobs_total+=1
+    set expected_error=0
+    set "cur_job=cmpsrc -f %~1 %~2 -c"
+    
+    echo.
+    echo Test !jobs_total! '!cur_job!'
+
+    !cur_job!
+    
+    set last_error=!errorlevel!
+    if !errorlevel! neq !expected_error! (
+        set error_flag=!last_error!        
+        echo.
+        exit /b 0
+    )
+    
+    set /a jobs_passed+=1
+    echo Pass.
     
     exit /b 0
 
@@ -279,18 +320,35 @@ if "!test_group!" == "-img" goto :exit
         set arg_name=%%~nf
         REM test all original bios are decryptable using specified mcpx rom
 
-        call :do_test "-decomp-krnl !arg! !mcpx_rom! !extra_args! -out !arg_name!_krnl.img" 0 "!arg_name!"
         call :do_test "-ls !arg! !mcpx_rom! !extra_args!" 0 "!arg_name!"
-        call :do_test "-ls !arg! -nv2a -datatbl -dump-krnl !mcpx_rom! !extra_args!" 0 "!arg_name!"
-        call :do_test "-xcode-decode !arg! !extra_args!" 0 "!arg_name!"
-        call :do_test "-xcode-decode -ini decode.ini !arg!" 0 "!arg_name!"
-        call :do_test "-xcode-decode -ini decode2.ini !arg!" 0 "!arg_name!"
+        call :do_test "-ls !arg! -nv2a" 0 "!arg_name!"
+        call :do_test "-ls !arg! -datatbl" 0 "!arg_name!"
+        call :do_test "-ls !arg! -dump-krnl !mcpx_rom! !extra_args!" 0 "!arg_name!"
+        
+        call :do_test "-xcode-decode !arg!" 0 "!arg_name!"
 
         REM test extracting bios 
-        call :do_test "-extr !arg! !mcpx_rom! !extra_args!" 0
+        call :do_test "-extr !arg! !mcpx_rom! !extra_args! -krnl krnl.bin" 0
+        
+        REM decompress extracted krnl.
+        call :do_test "-decompress krnl.bin -out krnl_decompressed.img" 0 "!arg_name!"
+
+        REM cmp decompressed files
+        call :cmp_file "krnl_decompressed.img" "krnl.img"
+
+        REM compress decompressed extracted krnl.
+        call :do_test "-compress krnl_decompressed.img -out krnl_compressed.bin" 0 "!arg_name!"
+
+        REM cmp compressed files.
+        call :cmp_file "krnl.bin" "krnl_compressed.bin"
+        
         REM build that extracted bios ; replicate to 1mb ; encrypt kernel; encrypting with mcpx 1.0
         call :do_test "-bld -bldr bldr.bin -inittbl inittbl.bin -krnl krnl.bin -krnldata krnl_data.bin %MCPX_ROM_1_0% -enc-krnl !extra_args! -binsize 1024 -out bios.bin" 0
+        
         REM test built bios; running -ls calls most things in the program.
         call :do_test "-ls bios.bin %MCPX_ROM_1_0% !extra_args!" 0
+	
+	  REM compare decompressed kernel with an already decompressed kernel image to ensure we havent fucked anything up.
+        call :cmp_file "krnl.img" "bios\img\!arg_name!_krnl.img"
     )
     exit /b 0

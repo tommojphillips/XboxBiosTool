@@ -1,17 +1,19 @@
 xbios.exe 25.07.2024 - tommojphillips
 
--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
  /?
 # Display help
 
  /ls
 # Dump bios info to console. boot params, sizes, signatures, keys, nv2a tbl, etc.
- -bios <path>    - The bios file (req)
+ -in <path>      - The bios file (req)
  -romsize <size> - The rom size in Kb. valid opts: 256, 512, 1024
  -nv2a           - List nv2a table
  -datatbl        - List rom data table
  -dump-krnl      - dump kernel (nt) image info to console
-
+ -keys           - List Rc4 keys (eeprom, cert, bfm, kernel ) + sb key from mcpx, preldr key (if apl)
+ -bootable       - Check if BIOS is bootable. Checks if and how BIOS gets to 2BL. (visor hack or mcpx validation)
+                   Use '-d' to dump 2BL if found.
  /xcode-sim
 # Simulate mem-write xcodes and parse x86 instructions. (visor sim)
  -in <path>      - The input file (req)
@@ -23,38 +25,37 @@ xbios.exe 25.07.2024 - tommojphillips
 # Decode xcodes from a bios file or extracted init tbl. currently only supports retail opcodes.
  -in <path>      - The input file (req)
  -d              - Write decoded xcodes to a .txt. Use -out to set output file.
+ -ini		     - The decode settings file; use to set/change format of decode output.
 
  /extr
 # Extract the 2bl, compressed krnl, uncompressed krnl data, init table
- -bios <path>       - The bios file (req)
-
- -bldr <path>       - The boot loader file
- -krnl <path>       - The kernel file
- -krnldata <path>   - The kernel data section file
- -inittbl <path>    - The init table file
-
+ -in <path>         - The bios file (req)
+ -keys		        - Extract RC4 keys from the BIOS. (eeprom, cert, bfm, kernel ) + sb key from mcpx, preldr key (if apl)
+ 
+ -bldr <path>       - 2bl file path; use to specify output file
+ -krnl <path>       - Compressed kernel file path; use to specify output file
+ -krnldata <path>   - kernel section data file path; use to specify output file
+ -inittbl <path>    - init table file path; use to specify output file
+ -preldr <path>	    - preldr file path; use to specify output file
+ 
  /bld
 # Build a bios from a 2bl, compressed krnl, uncompressed krnl data, init table
  -bldr <path>       - The boot loader file (req).
  -krnl <path>       - The kernel file (req).
  -krnldata <path>   - The kernel data section file (req).
  -inittbl <path>    - The init table file (req).
-
+ -preldr <path>	    - The preldr file. only use for testing.
  -out <path>        - The output file.
  -romsize <size>    - The rom size in Kb. valid opts: 256, 512, 1024.
  -binsize <size>    - The bin size in Kb. valid opts: 256, 512, 1024.
- -patchkeys         - Use key switches to patch keys.
  -certkey <path>    - Path to the cert key file.
  -eepromkey <path>  - Path to the eeprom key file.
  -bfm               - build a boot-from-media bios.
  -enc-krnl          - If provided, encrypts the kernel with the kernel key in the 2bl (if found).
+ -hackinittbl       - hack the inittbl size (inittblsize=0)
+ -hacksignature     - hack 2BL boot signature (signature=0xFFFFFFFF)
+ -nobootparams      - don't modify/update the boot params.
 
- /decomp-krnl
-# Decompress and extract a kernel image from a bios.
- -bios <path>    - The bios file (req)
- -out <path>     - The output file
- -patchkeys      - Use key switches to patch keys.
- -pubkey <path>  - Path to the pub key file.
 
  /split
 # Split a bios into banks. Eg: bios.bin 1Mb -> bios.bin 4x 256Kb
@@ -65,6 +66,7 @@ xbios.exe 25.07.2024 - tommojphillips
 # Combine banks into a single bios. Eg: bios.bin x4 256Kb -> bios.bin 1Mb
 * bank arguments are inferred. eg -> -combine bank1.bin bank2.bin
 * banks are combined in the order they are specified.
+ -bank[1-4]	     - The bank file
  -out <path>     - The output file
 
  /x86-encode
@@ -74,10 +76,36 @@ xbios.exe 25.07.2024 - tommojphillips
  -out <path>     - The output file
 
  /dump-img
-# Dump nt image info to console. PE header etc.
- -in <path>      - The input file (req)
+# Dump pe image info to console. PE header etc.
+ -in <path>      - The image file (req)
 
--------------------------------------------------------------------------------------------------------------------------------
+ /replicate
+# replicate a bios 
+ -in <path>      - The bios file (req)
+ -binsize        - The output file size.
+ -romsize        - The rom size; BIOS is replicated from romsize upto binsize.
+ -out <path>     - The output file
+
+ /compress
+# Compress lzx a file
+ -in <path>      - The input file (req)
+ -out <path>     - The output file (req)
+
+ /decompress
+# Decompress lzx a file
+ -in <path>      - The input file (req)
+ -out <path>     - The output file (req)
+
+ /get16
+# Get Preldr 16; get first 16 bytes of the 2bl in a bios with a preldr
+ -in <path>     - The input file
+
+ /disasm
+# disasemable x86 code
+ -in <path>       - The input file. (req) 
+ -base <offset>   - The base offset to start disasm.
+
+--------------------------------------------------------------------------------------------------------------------------------
 Switches:
 
  -key-bldr  <path>
@@ -109,7 +137,7 @@ Switches:
 # The size of the bios file (total size. of the bios file.)
 * Cannot be less then romsize.
 
--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
 Original bios kernel version / build timestamp
 
 # 3944:         Fri Sep 21 11:43:41 2001 UTC
@@ -129,7 +157,7 @@ Original bios kernel version / build timestamp
 
 # x2.5035: 	Sun Jun 05 15:20:55 2005 UTC
 
--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
 init table version
 
 < 0x40: Old DVT 3 Boxes with NV2A A02 old metal 7 (NVCLK 155, CPU 665)
@@ -138,15 +166,69 @@ init table version
 > 0x46: DVT6
 
 --------------------------------------------------------------------------------------------------------------------------------
-Machine code:  --->  Xcodes:              --->              Assembly:
-  0000: B8 ED 0B F0    0000: xc_mem_write 0x00, 0xF00BEDB8    mov eax, 0xfff00bed
-  0004: FF FF E0 90    0009: xc_mem_write 0x04, 0x90E0FFFF    jmp eax
-                                                              nop
-Byte code:
+X86 to Xcodes
+
+Machine code: (8 bytes)
+  0000: B8 ED 0B F0
+  0004: FF FF E0 90
+
+Xcodes:              --->              Assembly:
+  0000: mem_write 0x00, 0xf00bedb8    mov eax, 0xfff00bed
+  0009: mem_write 0x04, 0x90e0ffff    jmp eax
+                                      nop
+
+Byte code: (18 bytes)
     0000: 03 00 00 00                                                                                   
     0004: 00 B8 ED 0B
     0008: F0 03 04 00
     000C: 00 00 FF FF
     0010: E0 90
 
- 8 bytes -> 18 bytes.
+8 bytes -> 18 bytes.
+That is a factor of 2.25x increase in code size.
+--------------------------------------------------------------------------------------------------------------------------------
+ /get16 -try it yourself.
+Brute forcing the first 16 bytes of the 2BL from BIOSes with a preldr.
+# the first 16 bytes of the 2BL is zeroed during the build process to prevent rc4 attacks
+# the original (unencrypted) 16 bytes consists of the 2bl loader params which holds a pointer to the 2bl entry point (4 bytes) and some zero space.
+# we know what the original versions of these bytes are. calculated from offsets within the preldr. it's just 2bl entry offset + 2bl base.
+
+--------------------------------------------------------------------------------------------------------------------------------
+CALULATED BYTES: -> BC 01 09 00 00 00 00 00 00 00 00 00 00 00 00 00
+--------------------------------------------------------------------------------------------------------------------------------
+
+pseudo code:
+ # 2 loops: 
+ #  1: loop 0 - num_guessing
+ #  2: loop 0 - 255 
+ # 
+ # get test_byte; 
+ # copy test_byte to test_index. 
+ # decrypt 2bl. 
+ # compare test_byte to known_byte at test_index.
+ # if match; save test_byte. increment test_index;
+ # revert 2bl state to encrypted. 
+ # do it until we are at num_guessing
+
+There's only 4080 combinations at worst
+--------------------------------------------------------------------------------------------------------------------------------
+output:
+
+90
+90 13
+90 13 6F
+90 13 6F 1D
+90 13 6F 1D 1B
+90 13 6F 1D 1B E9
+90 13 6F 1D 1B E9 91
+90 13 6F 1D 1B E9 91 D9
+90 13 6F 1D 1B E9 91 D9 15
+90 13 6F 1D 1B E9 91 D9 15 FD
+90 13 6F 1D 1B E9 91 D9 15 FD E9
+90 13 6F 1D 1B E9 91 D9 15 FD E9 0A
+90 13 6F 1D 1B E9 91 D9 15 FD E9 0A 82
+90 13 6F 1D 1B E9 91 D9 15 FD E9 0A 82 60
+90 13 6F 1D 1B E9 91 D9 15 FD E9 0A 82 60 78
+90 13 6F 1D 1B E9 91 D9 15 FD E9 0A 82 60 78 6B
+
+--------------------------------------------------------------------------------------------------------------------------------

@@ -22,17 +22,18 @@
 #ifndef XCODE_DECODER_H
 #define XCODE_DECODER_H
 
+#include <stdint.h>
+
 // user incl
 #include "XcodeInterp.h"
-#include "type_defs.h"
 
-#ifdef MEM_TRACKING
+#ifndef NO_MEM_TRACKING
 #include "mem_tracking.h"
 #else
 #include <malloc.h>
 #endif
 
-typedef enum : UCHAR {
+typedef enum : uint8_t {
     DECODE_FIELD_OFFSET,
     DECODE_FIELD_OPCODE,
     DECODE_FIELD_ADDRESS,
@@ -45,7 +46,7 @@ typedef struct {
 } DECODE_SETTING_MAP;
 typedef struct {
     DECODE_FIELD type;
-    UINT seq;
+    uint32_t seq;
     char* str;
 } DECODE_STR_SETTING_MAP;
 
@@ -63,9 +64,9 @@ typedef struct {
     bool pad;
     bool opcode_use_result;
 
-    UINT opcodeMaxLen;
-    UINT labelMaxLen;
-    FIELD_MAP opcodes[XCODE_OPCODE_COUNT];
+    uint32_t opcodeMaxLen;
+    uint32_t labelMaxLen;
+    FIELD_MAP opcodes[XC_OPCODE_COUNT];
 } DECODE_SETTINGS;
 inline void initDecodeSettings(DECODE_SETTINGS* settings) {
     settings->format_str = NULL;
@@ -89,7 +90,7 @@ inline void initDecodeSettings(DECODE_SETTINGS* settings) {
         settings->format_map[i].seq = 0;
     }
 
-    for (int i = 0; i < XCODE_OPCODE_COUNT; i++) {
+    for (int i = 0; i < XC_OPCODE_COUNT; i++) {
         settings->opcodes[i].str = NULL;
         settings->opcodes[i].field = 0;
     }
@@ -128,7 +129,7 @@ inline void destroyDecodeSettings(DECODE_SETTINGS* settings) {
             free(settings->format_map[i].str);
         }
     }
-    for (int i = 0; i < XCODE_OPCODE_COUNT; i++) {
+    for (int i = 0; i < XC_OPCODE_COUNT; i++) {
         if (settings->opcodes[i].str != NULL) {
             free((char*)settings->opcodes[i].str);
         }
@@ -141,10 +142,10 @@ typedef struct {
     LABEL* labels;
     XCODE* xcode;
     FILE* stream;
-    UINT labelCount;
-    UINT xcodeCount;
-    UINT xcodeSize;
-    UINT xcodeBase;
+    uint32_t labelCount;
+    uint32_t xcodeCount;
+    uint32_t xcodeSize;
+    uint32_t xcodeBase;
     char str_decode[128];
 } DECODE_CONTEXT;
 inline void initDecodeContext(DECODE_CONTEXT* context) {
@@ -201,7 +202,7 @@ public:
     // data: the xcode data. xcodes should start at data[base].
     // size: the size of the xcode data.
     // ini: the ini file. [OPTIONAL]. if not provided, default settings are used. NULL if not needed.
-    int load(UCHAR* data, UINT size, UINT base, const char* ini);
+    int load(uint8_t* data, uint32_t size, uint32_t base, const char* ini);
     int decodeXcodes();
     int decode();
 

@@ -1,4 +1,4 @@
-// Bios.h
+// Bios.h: handling An Xbox BIOS.
 
 /* Copyright(C) 2024 tommojphillips
  *
@@ -22,286 +22,277 @@
 #ifndef XB_BIOS_H
 #define XB_BIOS_H
 
+#include <stdint.h>
+
 // user incl
 #include "Mcpx.h"
-#include "type_defs.h"
+#include "file.h"
 #include "bldr.h"
 #include "rsa.h"
 #include "sha1.h"
 
-#ifdef MEM_TRACKING
+#ifndef NO_MEM_TRACKING
 #include "mem_tracking.h"
 #else
 #include <malloc.h>
 #endif
 
-const UINT MAX_BIOS_SIZE = 0x100000;	// 1MB max bios size
-const UINT KD_DELAY_FLAG = 0x80000000;	// flag for bfm kernel.
+#define MIN_BIOS_SIZE 0x40000                                                    // Min bios file/rom size in bytes
+#define MAX_BIOS_SIZE 0x100000                                                   // Max bios file/rom size in bytes
+#define KD_DELAY_FLAG 0x80000000                                                 // Kernel Delay Flag
 
-const UINT BLDR_BLOCK_SIZE = 24576;     // bldr block size in bytes
-const UINT PRELDR_BLOCK_SIZE = 10752;   // preldr block size in bytes
-const UINT PRELDR_ROM_DIGEST_SIZE = 384;// preldr rom digest size in bytes
-const UINT PRELDR_BASE = (0xFFFFFFFF - MCPX_BLOCK_SIZE - PRELDR_BLOCK_SIZE + 1); // base address for the preldr
+#define ROM_DIGEST_SIZE 0x100                                                    // rom digest size in bytes
 
-const UINT DEFAULT_ROM_SIZE = 256;      // default rom size in Kb
-const UINT BLDR_RELOC = 0x00400000;     // relocation address for the bldr
-const UINT BLDR_BASE = 0x00090000; 	    // base address for the bldr
+#define PRELDR_BLOCK_SIZE 0x2A00                                                 // preldr block size in bytes
+#define PRELDR_PARAMS_SIZE 0x80                                                  // preldr params size in bytes
+#define PRELDR_SIZE (PRELDR_BLOCK_SIZE - ROM_DIGEST_SIZE - PRELDR_PARAMS_SIZE)   // preldr size in bytes
+#define PRELDR_NONCE_SIZE 0x10                                                   // preldr nonce size in bytes
+#define PRELDR_REAL_BASE (0xFFFFFFFF - MCPX_BLOCK_SIZE - PRELDR_BLOCK_SIZE + 1)  // preldr rom base address
 
-const UINT BOOT_SIGNATURE = 2018801994U; // J y T x
+#define BLDR_BLOCK_SIZE 0x6000                                                   // 2BL block size in bytes
+#define BLDR_RELOC 0x00400000                                                    // 2BL relocation base address
+#define BLDR_BASE 0x00090000                                                     // 2BL boot base address
+#define BLDR_REAL_BASE (0xFFFFFFFF - MCPX_BLOCK_SIZE - BLDR_BLOCK_SIZE + 1)      // 2BL rom base address
 
-enum BIOS_STATUS : int {
-	BIOS_LOAD_STATUS_SUCCESS = 0,	// success; the bios is loaded.
-	BIOS_LOAD_STATUS_INVALID_BLDR,	// success; but the bldr is invalid.
+#define BOOT_SIGNATURE 2018801994U // J y T x
 
-	// errors after here are fatal. and process should stop working with bios		
-	
-	BIOS_LOAD_STATUS_FAILED,		// error occurred while loading the bios.
-	BIOS_LOAD_STATUS_FAILED_INVALID_ROMSIZE,
-	BIOS_LOAD_STATUS_FAILED_INVALID_BINSIZE,
-};
+// BIOS load status codes
+#define	BIOS_LOAD_STATUS_SUCCESS		0 // success; the bios is loaded.
+#define	BIOS_LOAD_STATUS_INVALID_BLDR	1 // success; but the bldr is invalid.
+#define	BIOS_LOAD_STATUS_FAILED			2 // ERROR
 
-enum PRELDR_STATUS : int {
-	PRELDR_STATUS_OK = 0,		// preldr found and is valid and was used to load and decrypt the 2bl.
-	PRELDR_STATUS_INVALID_BLDR, // preldr found but the bldr is invalid.
-	PRELDR_STATUS_NOT_FOUND,	// preldr not found. old bios (mcpx v1.0) or not a valid bios.
-
-	// errors after here are fatal. and process should stop working with preldr
-	
-	PRELDR_STATUS_ERROR,		// error occurred while processing the preldr.
-};
+// Preldr status codes
+#define	PRELDR_STATUS_BLDR_DECRYPTED	0 // found and was used to load and decrypt the 2bl.
+#define PRELDR_STATUS_FOUND				1 // found but was not used to load the 2bl.
+#define PRELDR_STATUS_NOT_FOUND			2 // not found. old bios (mcpx v1.0) or not a valid bios.
+#define PRELDR_STATUS_ERROR				3 // ERROR
 
 // Preldr structure
 typedef struct Preldr {
-	UCHAR* data;
+	uint8_t* data;
 	PRELDR_PARAMS* params;
-	PRELDR_ENTRY* entry;
-	PUBLIC_KEY* pubkey;
-	UINT* bldrEntryOffset;
-	UCHAR* romDigest;
-	UCHAR* nonce;
-	UCHAR bldrKey[SHA1_DIGEST_LEN];
-	
-	PRELDR_STATUS status;
-	USHORT jmpInstr;
-	UINT jmpOffset;
-
-	Preldr() {
-		reset();
-	};
-	~Preldr() {
-		reset();
-	};
-
-	void reset() {
-		data = NULL;
-		params = NULL;
-		entry = NULL;
-		pubkey = NULL;
-		bldrEntryOffset = NULL;
-		romDigest = NULL;
-		nonce = NULL;
-		
-		memset(bldrKey, 0, 20);
-		
-		status = PRELDR_STATUS_ERROR;
-		jmpInstr = 0;
-		jmpOffset = 0;
-	};
+	PRELDR_FUNC_PTRS* funcs;
+	uint8_t* pubkey;
+	uint8_t* funcBlock;
+	uint8_t* entryPoint;
+	uint8_t* nonce;
+	uint8_t bldrKey[SHA1_DIGEST_LEN];
+	int status;
 } Preldr;
+
+inline void initPreldr(Preldr* preldr) {
+	memset(preldr, 0, sizeof(Preldr));
+	preldr->status = PRELDR_STATUS_ERROR;
+}
 
 // 2BL structure
 typedef struct Bldr {
-	UCHAR* data;
+	uint8_t* data;
 	BLDR_ENTRY* entry;
+	uint8_t* bfmKey;
 	BLDR_KEYS* keys;
 	BOOT_PARAMS* bootParams;
 	BOOT_LDR_PARAM* ldrParams;
-
-	UINT entryPointOffset;
-	UINT keysOffset;
-
+	uint32_t entryOffset;
+	uint32_t keysOffset;
 	bool encryptionState;
+	bool krnlSizeValid;
+	bool krnlDataSizeValid;
+	bool inittblSizeValid;
 	bool signatureValid;
 	bool bootParamsValid;
-
-	Bldr() {
-		reset();
-	};
-	~Bldr() {
-		reset();
-	};
-
-	void reset() {
-		data = NULL;
-		entry = NULL;
-		keys = NULL;
-		bootParams = NULL;
-		ldrParams = NULL;
-		entryPointOffset = 0;
-		keysOffset = 0;
-		encryptionState = false;
-	};
 } Bldr;
 
-// Bios Parameters
+inline void initBldr(Bldr* bldr) {
+	memset(bldr, 0, sizeof(Bldr));
+};
+
+// Bios load parameters
 typedef struct BiosParams {	
-	Mcpx* mcpx;	// the instance of mcpx rom class, instance itself cannot be NULL. but the data can be.
-	UINT romsize;	// the size of the rom in kb.
-	UCHAR* keyBldr;	// the rc4 key for the bldr. (16 bytes) NULL if not required.
-	UCHAR* keyKrnl;	// the rc4 key for the kernel. (16 bytes) NULL if not required.
-	bool encBldr;	// if true, the bldr is not encrypted. (will not be decrypted)
-	bool encKrnl;	// if true, the kernel is not encrypted. (will not be decrypted)
-
-	BiosParams(Mcpx* mcpx, UINT romsize, UCHAR* keyBldr, UCHAR* keyKrnl, bool encBldr, bool encKrnl) {
-		this->mcpx = mcpx;
-		this->romsize = romsize;
-		this->keyBldr = keyBldr;
-		this->keyKrnl = keyKrnl;
-		this->encBldr = encBldr;
-		this->encKrnl = encKrnl;
-	};
-	BiosParams() {
-		reset();
-	};
-	~BiosParams() {
-		reset();
-	};
-
-	void reset() {
-		romsize = 0;
-		keyBldr = NULL;
-		keyKrnl = NULL;
-		mcpx = NULL;
-	};
+	uint32_t romsize;
+	uint8_t* keyBldr;
+	uint8_t* keyKrnl;
+	Mcpx* mcpx;
+	bool encBldr;
+	bool encKrnl;
+	bool loadonly;
 } BiosParams;
 
+inline void initBiosParams(BiosParams* params) {
+	memset(params, 0, sizeof(BiosParams));
+};
+
+inline void initBiosParams(BiosParams* params, Mcpx* mcpx, uint8_t* keyBldr, uint8_t* keyKrnl,
+	const uint32_t romsize, const bool encBldr, const bool encKrnl) {
+	params->romsize = romsize;
+	params->keyBldr = keyBldr;
+	params->keyKrnl = keyKrnl;
+	params->mcpx = mcpx;
+	params->encBldr = encBldr;
+	params->encKrnl = encKrnl;
+	params->loadonly = false;
+};
+
+// Bios build parmeters 
+typedef struct BiosBuildParams {
+	uint8_t* inittbl;
+	uint8_t* preldr;
+	uint8_t* bldr;
+	uint8_t* krnl;
+	uint8_t* krnlData;
+	uint32_t preldrSize;
+	uint32_t bldrSize; 
+	uint32_t inittblSize;
+	uint32_t krnlSize;
+	uint32_t krnlDataSize;
+	bool bfm;
+	bool hackinittbl;
+	bool hacksignature;
+	bool nobootparams;
+} BiosBuildParams;
+
+inline void initBiosBuildParams(BiosBuildParams* params) {
+	memset(params, 0, sizeof(BiosBuildParams));
+};
+inline void freeBiosBuildParams(BiosBuildParams* params) {
+	if (params->preldr != NULL)	{
+		free(params->preldr);
+		params->preldr = NULL;
+	}
+	if (params->bldr != NULL) {
+		free(params->bldr);
+		params->bldr = NULL;
+	}
+	if (params->inittbl != NULL) {
+		free(params->inittbl);
+		params->inittbl = NULL;
+	}
+	if (params->krnl != NULL) {
+		free(params->krnl);
+		params->krnl = NULL;
+	}
+	if (params->krnlData != NULL) {
+		free(params->krnlData);
+		params->krnlData = NULL;
+	}
+};
+
+// Bios
 class Bios {
 public:
+	BiosParams params;
+	uint8_t* data;
+	uint32_t size;
+	Bldr bldr;
+	Preldr preldr;
+	INIT_TBL* initTbl;
+	ROM_DATA_TBL* dataTbl;
+	uint8_t* krnl;
+	uint8_t* krnlData;
+	uint8_t* romDigest;
+	int availableSpace;
+	uint8_t* decompressedKrnl;
+	uint32_t decompressedKrnlSize;
+	bool kernelEncryptionState;
+
 	Bios() {
-		reset();
+		resetValues();
 	};
 	~Bios() {
 		unload();
 	};
 
-	// unload the bios from memory. this will free all allocated memory and reset for reuse.
-	inline void unload() {
-		if (data != NULL)
-		{
-			free(data);
-		}
-		if (decompressedKrnl != NULL)
-		{
-			free(decompressedKrnl);
-		}		
+	// reset bios; reset values.
+	inline void resetValues() {
+		initBiosParams(&params);
+		initPreldr(&preldr);
+		initBldr(&bldr);
 
-		reset();
-
-		preldr.reset();
-		bldr.reset();
-	};
-	
-	// load the bios from a file.
-	int loadFromFile(const char* filename, BiosParams biosParams);
-
-	// load the bios from a buffer.
-	int loadFromData(const UCHAR* data, const UINT size, BiosParams biosParams);
-
-	// build the bios from a preldr, 2bl, inittbl, krnl and krnl section data.
-	int build(UCHAR* in_preldr, UINT in_preldrSize,
-		UCHAR* in_2bl, UINT in_2blSize,
-		UCHAR* in_inittbl, UINT in_inittblSize,
-		UCHAR* in_krnl, UINT in_krnlSize,
-		UCHAR* in_krnlData, UINT in_krnlDataSize,
-		UINT binsize, bool bfm, BiosParams biosParams);
-
-	int saveBiosToFile(const char* filename);
-	int saveBldrBlockToFile(const char* filename);
-	int saveBldrToFile(const char* filename, const UINT size);
-	int saveKernelToFile(const char* filename);
-	int saveKernelDataToFile(const char* filename);
-	int saveKernelImgToFile(const char* filename);
-	int saveInitTblToFile(const char* filename);
-
-	int decompressKrnl();
-	void checkForPreldr();
-	int convertToBootFromMedia();
-	int replicateBios(UINT binsize);
-
-	UCHAR* getBios() const { return data; };
-	UINT getBiosSize() const { return size; };
-	BiosParams* getParams() { return &params; };
-	
-	Bldr* getBldr() { return &bldr; };
-	UINT getBldrSize() const { return BLDR_BLOCK_SIZE; };
-
-	Preldr* getPreldr() { return &preldr; };
-	UINT getPreldrSize() const { return PRELDR_BLOCK_SIZE; };
-
-	INIT_TBL* getInitTbl() const { return initTbl; };
-	ROM_DATA_TBL* getDataTbl() const { return dataTbl; };
-
-	UCHAR* getKrnl() const { return krnl; };
-	UCHAR* getKrnlData() const { return krnlData; };
-	UCHAR* getDecompressedKrnl() const { return decompressedKrnl; };
-	UINT getDecompressedKrnlSize() const { return decompressedKrnlSize; };
-	UINT getAvailableSpace() const { return availableSpace; };
-	UINT getTotalSpaceAvailable() const { return totalSpaceAvailable; };
-
-	bool isKernelEncrypted() const { return kernelEncryptionState; };
-	
-private:	
-	UCHAR* data;				// allocated bios data
-	UINT size;					// the size of the data.
-	UINT buffersize;			// the size of the allocated BUF for the bios.
-
-	Bldr bldr;					// bldr struct
-	
-	INIT_TBL* initTbl;			// pointer to init tbl
-	ROM_DATA_TBL* dataTbl;		// pointer to drv slw data tbl
-	
-	UCHAR* krnl;				// pointer to compressed kernel	
-	UCHAR* krnlData;			// pointer to uncompressed kernel section data
-
-	UCHAR* decompressedKrnl;	// allocated decompressed kernel
-	UINT decompressedKrnlSize;	// decompressed kernel size
-	
-	Preldr preldr;				// preldr struct
-	
-	BiosParams params;			// bios params
-
-	UINT totalSpaceAvailable;	// the total space available in the bios. this is the size of the bios minus the bldr BLOCK
-	UINT availableSpace;		// the available space in the bios. 
-
-	bool kernelEncryptionState;
-		
-	int load(UCHAR* buff, const UINT buffSize, const BiosParams biosParams);
-	void getOffsets();
-	void getOffsets2(const UINT krnlSize, const UINT krnlDataSize);
-	int validateBldr();
-	void symmetricEncDecBldr(const UCHAR* key, const UINT keyLen);
-	void symmetricEncDecKernel();
-
-	inline void reset() {
-		// allocated memory
 		data = NULL;
-		decompressedKrnl = NULL;
-
-		// sizes
 		size = 0;
-		totalSpaceAvailable = 0;
-		availableSpace = 0;
-		decompressedKrnlSize = 0;
-
-		kernelEncryptionState = false;
 
 		initTbl = NULL;
 		dataTbl = NULL;
 		krnl = NULL;
 		krnlData = NULL;
+		romDigest = NULL;
+		availableSpace = -1;
+
+		decompressedKrnl = NULL;
+		decompressedKrnlSize = 0;
+		kernelEncryptionState = false;
 	};
+
+	// unload the bios. reset values and free memory.
+	inline void unload() {
+		if (data != NULL) {
+			free(data);
+		}
+
+		if (decompressedKrnl != NULL) {
+			free(decompressedKrnl);
+		}
+
+		resetValues();
+	};
+	
+	// load bios from memory.
+	int load(uint8_t* buff, const uint32_t binsize, const BiosParams* biosParams);
+
+	// load bios from file.
+	int loadFromFile(const char* filename, const BiosParams* biosParams);
+		
+	// build bios. 
+	int build(BiosBuildParams* buildParams, uint32_t binsize, BiosParams* biosParams);
+
+	// initialize bios and calculate offsets and pointers.
+	int init(uint8_t* buff, const uint32_t binsize, const BiosParams* biosParams);
+		
+	// calculate initial offsets for the bios. based on params.
+	// sets up bldr and preldr structs, initTbl and dataTbl pointers.
+	// Should be invoked when the bios is loaded.
+	void getOffsets();
+	
+	// calculate offsets and pointers. base on bios data.
+	// sets up 2bl, krnl and krnlData pointers.
+	// Should be invoked when the 2bl is valid. (not encrypted).
+	void getOffsets2();
+	
+	// validate the 2BL boot param sizes and romsize.
+	int validateBldrBootParams();
+
+	// validate the preldr and decrypt the 2bl.
+	// sets up the preldr struct and decrypts the 2bl.
+	void validatePreldrAndDecryptBldr();
+
+	// symmetric encryption and decryption for the 2BL.
+	void symmetricEncDecBldr(const uint8_t* key, const uint32_t len);
+
+	// symmetric encryption and decryption for the kernel.
+	void symmetricEncDecKernel();
+
+	// decompress the kernel image from the bios.
+	// stores results in decompressedKrnl pointer and decompressedKrnlSize.
+	// returns 0 if successful,
+	int decompressKrnl();
+
+	// replicate the bios with a new size.
+	// buffSize: the new size of the bios.
+	// returns 0 if successful,
+	int replicateBios(uint32_t buffSize);
+
+	// preldr decrypt preldr public key.
+	int preldrDecryptPublicKey();
+
+	// print current state of the bios.
+	int printState();
+	
+	inline int saveKernelToFile(const char* filename) { return writeFileF(filename, krnl, bldr.bootParams->krnlSize); };
+	inline int saveKernelDataToFile(const char* filename) { return writeFileF(filename, krnlData, bldr.bootParams->krnlDataSize); };
 };
 
-int checkBiosSize(const UINT size);
+int checkBiosSize(const uint32_t size);
+int validateRequiredSpace(const uint32_t requiredSpace, uint32_t* size);
+int replicateData(uint32_t from, uint32_t to, uint8_t* buffer, uint32_t buffersize);
 
 #endif // !XB_BIOS_H

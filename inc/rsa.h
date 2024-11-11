@@ -22,24 +22,52 @@
 #ifndef RSA_H
 #define RSA_H
 
-#include "type_defs.h"
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define RSA_ERROR_SUCCESS		0
+#define RSA_ERROR               1
+#define RSA_ERROR_INVALID_DATA	2
+
+#define RSA_MOD_SIZE(rsa_header) ((rsa_header)->bits / 8U)
+#define RSA_MOD_BUFFER_SIZE(rsa_header) ((rsa_header)->mod_size)
+#define RSA_PUBKEY_SIZE(rsa_header) (sizeof(RSA_HEADER) + RSA_MOD_SIZE((RSA_HEADER*)rsa_header))
+#define RSA_PUBKEY_BUFFER_SIZE(rsa_header) (sizeof(RSA_HEADER) + RSA_MOD_BUFFER_SIZE(rsa_header))
 
 // The rsa header structure
-typedef struct {
-    char magic[4];
-    UINT modSize;
-    UINT bits;
-    UINT maxBytes;
-    UINT exponent;
+typedef struct _RSA_HEADER {
+    char magic[4];     // (RSA1/RSA2) rsa magic
+    uint32_t mod_size;  // modulus buffer size in bytes
+    uint32_t bits;      // modulus size in bits
+    uint32_t max_bytes; // max bytes to be encrypted
+    uint32_t exponent;  // public exponent
 } RSA_HEADER;
 
 // The public key structure
-typedef struct {
-    RSA_HEADER header;
-    UCHAR modulus[264];
+typedef struct _PUBLIC_KEY {
+    RSA_HEADER header;  // rsa header structure
+    uint8_t* modulus;   // pointer to the modulus.
 } PUBLIC_KEY;
 
-PUBLIC_KEY* rsaVerifyPublicKey(UCHAR* data);
-int rsaPrintPublicKey(PUBLIC_KEY* pubkey);
+// verify rsa1 public key at offset
+// data: input buffer
+// size: size of the buffer
+// offset: the offset to verify the pub key at.
+// pubkey: output pub key (points to the public key in data)
+int rsa_verifyPublicKey(uint8_t* data, uint32_t size, uint32_t offset, PUBLIC_KEY** pubkey);
+
+// find a rsa1 public key in the buffer.
+// data: input buffer
+// size: size of the buffer
+// pubkey: output pub key (points to the public key in data)
+// offset: output offset where the pub key was found.
+int rsa_findPublicKey(uint8_t* data, uint32_t size, PUBLIC_KEY** pubkey, uint32_t* offset);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif // !RSA_H

@@ -33,7 +33,7 @@ void setParamValue(const PARAM_TBL* param, char* arg);
 
 int getCmd(const CMD_TBL* cmds, const int cmd_size, const char* arg, const CMD_TBL** cmd)
 {
-	for (int i = 0; i < cmd_size / sizeof(CMD_TBL); i++)
+	for (int i = 0; i < (int)(cmd_size / sizeof(CMD_TBL)); i++)
 	{
 		if (strcmp(arg, cmds[i].sw) == 0)
 		{
@@ -86,7 +86,7 @@ int parseCli(int argc, char* argv[], const CMD_TBL*& cmd, const CMD_TBL* cmds, c
 			{
 				if (isFlagClear(cmd->inferredSwitches[j]))
 				{
-					for (k = 0; k < param_size / sizeof(PARAM_TBL); k++)
+					for (k = 0; k < (int)(param_size / sizeof(PARAM_TBL)); k++)
 					{
 						if (params[k].swType == cmd->inferredSwitches[j])
 						{
@@ -123,7 +123,7 @@ int parseCli(int argc, char* argv[], const CMD_TBL*& cmd, const CMD_TBL* cmds, c
 		strcat_s(arg, argv[i] + 1);
 
 		// check for explicit switches
-		for (j = 0; j < param_size / sizeof(PARAM_TBL); j++)
+		for (j = 0; j < (int)(param_size / sizeof(PARAM_TBL)); j++)
 		{
 			if (strcmp(arg, params[j].sw) != 0)
 				continue;
@@ -162,7 +162,7 @@ int parseCli(int argc, char* argv[], const CMD_TBL*& cmd, const CMD_TBL* cmds, c
 			continue;
 		}
 
-		if (isFlagClear(SW_HELP) && j >= param_size / sizeof(PARAM_TBL))
+		if (isFlagClear(SW_HELP) && j >= (int)(param_size / sizeof(PARAM_TBL)))
 		{
 			printf("Error: Unknown switch, '-%s'\n", arg);
 			return CLI_ERROR_UNKNOWN_SW;
@@ -176,7 +176,7 @@ int parseCli(int argc, char* argv[], const CMD_TBL*& cmd, const CMD_TBL* cmds, c
 	// check for required switches
 	
 	bool missing = false;
-	for (i = 0; i < param_size / sizeof(PARAM_TBL); i++)
+	for (i = 0; i < (int)(param_size / sizeof(PARAM_TBL)); i++)
 	{
 		for (j = 0; j < sizeof(cmd->requiredSwitches) / sizeof(cmd->requiredSwitches[0]); j++)
 		{

@@ -1,4 +1,4 @@
-// rsa.cpp:
+// str_util.c: implements various utility functions for manipulating strings.
 
 /* Copyright(C) 2024 tommojphillips
  *
@@ -20,42 +20,43 @@
 // GitHub: https:\\github.com\tommojphillips
 
 // std incl
-#include <cstdio>
-#include <memory.h>
+#include <string.h>
 
 // user incl
-#include "rsa.h"
-#include "type_defs.h"
+#include "str_util.h"
 
-PUBLIC_KEY* rsaVerifyPublicKey(UCHAR* data)
+void ltrim(char** str)
 {
-	// verify the public key header.
+	if (str == NULL)
+		return;
 
-	static const RSA_HEADER RSA1_HEADER = { { 'R', 'S', 'A', '1' }, 264, 2048, 255, 65537 };
-
-	if (memcmp(data, &RSA1_HEADER, sizeof(RSA_HEADER)) != 0)
-	{
-		return NULL;
+	while ((*str)[0] == ' ' || (*str)[0] == '\t' || (*str)[0] == '\n') {
+		str++;
 	}
-
-	return (PUBLIC_KEY*)data;
 }
 
-int rsaPrintPublicKey(PUBLIC_KEY* pubkey)
+void rtrim(char** str)
 {
-	const int bytesPerLine = 16;
-	char line[bytesPerLine * 3 + 1] = { 0 };
+	if (str == NULL)
+		return;
 
-	for (int i = 0; i < sizeof(pubkey->modulus); i += bytesPerLine)
-	{
-		for (UINT j = 0; j < bytesPerLine; j++)
-		{
-			if (i + j >= sizeof(pubkey->modulus))
-				break;
-			sprintf(line + (j * 3), "%02X ", pubkey->modulus[i + j]);
-		}
-		printf("%s\n", line);
+	int len = strlen(*str);
+	if (len == 0)
+		return;
+
+	char* end = *str + len - 1;
+	while (end > *str && (end[0] == ' ' || end[0] == '\t' || end[0] == '\n')) {
+		end--;
 	}
+	*(end + 1) = '\0';
+}
 
-	return 0;
+void rpad(char* str, const int buffSize, const char pad)
+{
+	if (str == NULL)
+		return;
+
+	int slen = strlen(str);
+	memset(str + slen, pad, buffSize - slen - 1);
+	str[buffSize - 1] = '\0';
 }

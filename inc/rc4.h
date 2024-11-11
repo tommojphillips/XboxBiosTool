@@ -19,14 +19,27 @@
 // Author: tommojphillips
 // GitHub: https:\\github.com\tommojphillips
 
-#ifndef _RC4_H
-#define _RC4_H
+#ifndef RC4_H
+#define RC4_H
 
-#include "type_defs.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-void rc4_key(UCHAR* s, const UCHAR* key, const UINT len);
-void rc4(UCHAR* s, UCHAR* data, const UINT len);
+#include "stdint.h"
 
-void symmetricEncDec(UCHAR* data, const UINT len, const UCHAR* key, const UINT keyLen);
+typedef struct _RC4_CONTEXT {
+    uint8_t k;
+    uint8_t j;
+    uint8_t t;
+    uint8_t s[256];
+} RC4_CONTEXT;
 
+void rc4_key(RC4_CONTEXT* context, const uint8_t* key, const size_t len);
+void rc4(RC4_CONTEXT* context, uint8_t* data, const size_t size);
+void symmetricEncDec(uint8_t* data, const size_t size, const uint8_t* key, const size_t key_len);
+
+#ifdef __cplusplus
+};
+#endif
 #endif // _RC4_H

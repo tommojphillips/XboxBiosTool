@@ -44,7 +44,7 @@
 		STR(XB_BIOS_TOOL_VER_PATCH) "." \
 		STR(XB_BIOS_TOOL_VER_BUILD)
 
-#define XB_BIOS_TOOL_NAME_STR	"XbTool v" \
+#define XB_BIOS_TOOL_NAME_STR	"Xbox Bios Tools v" \
 								XB_BIOS_TOOL_VER_STR " Copyright (c) 2024 " \
 								XB_BIOS_TOOL_AUTHOR_STR
 

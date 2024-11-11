@@ -22,67 +22,17 @@
 #ifndef XB_BLDR_H
 #define XB_BLDR_H
 
-#include "type_defs.h"
+#include <stdint.h>
 
-const UINT KEY_SIZE = 16;
+#define XB_KEY_SIZE 16
 
-// The init table structure.
-typedef struct {
-    UINT ptr1;
-    UINT ptr2;
-    UINT header;
-    UINT val1;
-    UINT val2;
-    UINT val3;
-    UINT val4;
-    UINT val5;
-    UINT val6;
-    UINT val7;
-    UINT val8;
-    UINT val9;
-    UINT val10;
-    UINT vals[14];
-    USHORT revision;
-    USHORT val11;
-    UINT val12;
-    UINT val13;
-    USHORT init_tbl_identifier;
-    USHORT kernel_ver;
-    UINT data_tbl_offset;
-} INIT_TBL; static_assert(sizeof(INIT_TBL) == 128, "INIT_TBL struct size is not 128 bytes");
-
-#pragma pack(push, 1)
-// XCODE operand struct.
-typedef struct {
-    UCHAR opcode;   // al
-    UINT addr;      // ebx
-    UINT data;      // ecx
-} XCODE; static_assert(sizeof(XCODE) == 9, "XCODE struct size is not 9 bytes");
-#pragma pack(pop)
-
-// The boot parameters structure.
-typedef struct {
-    UINT krnlDataSize;  // size of the kernel data section (uncompressed)
-    UINT inittblSize;   // size of the init table	
-    UINT signature;
-    UINT krnlSize;      // size of the kernel (compressed)
-    UCHAR digest[20];   // the ROM digest.
-} BOOT_PARAMS;
-
-// The loader parameters structure.
-typedef struct {
-    UINT bldrEntryPoint;    // 32bit entry point
-    char cli[64];           // command line
-} BOOT_LDR_PARAM;
-
-typedef struct {
-    UCHAR countA;
-    UCHAR countB;
+typedef struct _DRW_SLW_COUNTS {
+    uint8_t countA;
+    uint8_t countB;
 } DRV_SLW_COUNTS;
 
-// drive / slew calibration parameters
-typedef struct {
-    USHORT max_m_clk;
+typedef struct _DRV_SLW_CAL_PARAMS {
+    uint16_t max_m_clk;
     DRV_SLW_COUNTS slowest;
     DRV_SLW_COUNTS slow;
     DRV_SLW_COUNTS standard;
@@ -90,69 +40,125 @@ typedef struct {
     DRV_SLW_COUNTS fastest;
 } DRV_SLW_CAL_PARAMS;
 
-// drive / slew pad parameters
-typedef struct {
-    UCHAR adr_drv_fall;
-    UCHAR adr_drv_rise;
-
-    UCHAR adr_slw_fall;
-    UCHAR adr_slw_rise;
-
-    UCHAR clk_drv_fall;
-    UCHAR clk_drv_rise;
-
-    UCHAR clk_slw_fall;
-    UCHAR clk_slw_rise;
-
-    UCHAR dat_drv_fall;
-    UCHAR dat_drv_rise;
-
-    UCHAR dat_slw_fall;
-    UCHAR dat_slw_rise;
-
-    UCHAR dqs_drv_fall;
-    UCHAR dqs_drv_rise;
-
-    UCHAR dqs_slw_fall;
-    UCHAR dqs_slw_rise;
-
-    UCHAR dat_inb_delay;
-    UCHAR clk_ic_delay;
-    UCHAR dqs_inb_delay;
-
+typedef struct _DRV_SLW_PAD_PARAMS {
+    uint8_t adr_drv_fall;
+    uint8_t adr_drv_rise;
+    uint8_t adr_slw_fall;
+    uint8_t adr_slw_rise;
+    uint8_t clk_drv_fall;
+    uint8_t clk_drv_rise;
+    uint8_t clk_slw_fall;
+    uint8_t clk_slw_rise;
+    uint8_t dat_drv_fall;
+    uint8_t dat_drv_rise;
+    uint8_t dat_slw_fall;
+    uint8_t dat_slw_rise;
+    uint8_t dqs_drv_fall;
+    uint8_t dqs_drv_rise;
+    uint8_t dqs_slw_fall;
+    uint8_t dqs_slw_rise;
+    uint8_t dat_inb_delay;
+    uint8_t clk_ic_delay;
+    uint8_t dqs_inb_delay;
 } DRV_SLW_PAD_PARAMS;
 
-// data table as found in the bios
-typedef struct {
-    DRV_SLW_CAL_PARAMS cal;         // calibration parameters
-    DRV_SLW_PAD_PARAMS samsung[5];  // samsung memory parameters
-    DRV_SLW_PAD_PARAMS micron[5];   // micron memory parameters
+// init table structure.
+typedef struct _INIT_TBL {
+    uint32_t ptr1;
+    uint32_t ptr2;
+    uint32_t header;
+    uint32_t val1;
+    uint32_t val2;
+    uint32_t val3;
+    uint32_t val4;
+    uint32_t val5;
+    uint32_t val6;
+    uint32_t val7;
+    uint32_t val8;
+    uint32_t val9;
+    uint32_t val10;
+    uint32_t vals[14];
+    uint16_t revision;
+    uint16_t val11;
+    uint32_t val12;
+    uint32_t val13;
+    uint16_t init_tbl_identifier;
+    uint16_t kernel_ver;
+    uint32_t data_tbl_offset;
+} INIT_TBL;
+
+// rom table structure.
+typedef struct _ROM_DATA_TBL {
+    DRV_SLW_CAL_PARAMS cal;
+    DRV_SLW_PAD_PARAMS samsung[5];
+    DRV_SLW_PAD_PARAMS micron[5];
 } ROM_DATA_TBL;
 
-// The bldr keys structure as found in the bios
-typedef struct {
-    UCHAR bfmKey[KEY_SIZE];     // bfm key; this is used for re-encryption of the 2bl to restore it's original state
-    UCHAR eepromKey[KEY_SIZE];  // eeprom key
-    UCHAR certKey[KEY_SIZE];    // certificate key
-    UCHAR krnlKey[KEY_SIZE];    // kernel key
+// xcode structure.
+#pragma pack(push, 1)
+typedef struct _XCODE {
+    uint8_t opcode;
+    uint32_t addr;
+    uint32_t data;
+} XCODE;
+#pragma pack(pop)
+
+// loader parameters structure.
+typedef struct _BOOT_LDR_PARAMS {
+    uint32_t bldrEntryPoint;
+    char cli[64];
+} BOOT_LDR_PARAM;
+
+// boot params structure.
+typedef struct _BOOT_PARAMS {
+    uint32_t krnlDataSize;
+    uint32_t inittblSize;
+    uint32_t signature;
+    uint32_t krnlSize;
+    uint8_t digest[20];
+} BOOT_PARAMS;
+
+// 2BL keys structure
+typedef struct _BLDR_KEYS {
+    uint8_t eepromKey[XB_KEY_SIZE];
+    uint8_t certKey[XB_KEY_SIZE];
+    uint8_t krnlKey[XB_KEY_SIZE];
 } BLDR_KEYS;
 
-// The bldr entry structure as found in the bios
-typedef struct {
-    UINT keysPtr;          // rc4 crypto keys pointer
-    UINT bfmEntryPoint;    // bldr entry point
+// 2BL entry structure
+typedef struct _BLDR_ENTRY {
+    uint32_t keysPtr;
+    uint32_t bfmEntryPoint;
 } BLDR_ENTRY;
 
-typedef struct {
-    UINT jmpInstr;		// jmp opcode + rel offset
-    UINT reserved1;
-    UINT funcBlockPtr;	// address to sha func block. should equal PRELDR_ENTRY::funcBlockPtr
-    UINT reserved2;
+// Preldr parameters structure
+#pragma pack(push, 1)
+typedef struct _PRELDR_PARAMS {
+    uint8_t jmpOpcode;
+    uint32_t jmpOffset;
+    uint8_t pad[3];
+    uint32_t funcBlockPtr;
 } PRELDR_PARAMS;
+#pragma pack(pop)
 
-typedef struct {
-    UINT pubKeyPtr;		// address to the encrypted public key in the preldr	
-    UINT funcBlockPtr;	// address to sha func block. should equal PRELDR_PARAMS::funcBlockPtr
+// Preldr pointers structure
+typedef struct _PRELDR_FUNC_PTRS {
+    uint32_t pubKeyPtr;
+    uint32_t funcBlockPtr;
+} PRELDR_FUNC_PTRS;
+
+// Preldr function block structure
+typedef struct _PRELDR_FUNC_BLOCK {
+    uint32_t shaInitFuncPtr;
+    uint32_t shaUpdateFuncPtr;
+    uint32_t shaResultFuncPtr;
+    uint32_t verifyDigestFuncPtr;
+} PRELDR_FUNC_BLOCK;
+
+// Preldr entry structure
+typedef struct _PRELDR_ENTRY {
+    uint32_t bldrEntryOffset;
+    uint32_t bfmEntryPoint;
 } PRELDR_ENTRY;
 
-#endif // !XBT_BLDR_H
+#endif // !XB_BLDR_H

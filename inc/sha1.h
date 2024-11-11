@@ -9,34 +9,40 @@
 #ifndef SHA1_H
 #define SHA1_H
 
-#include "type_defs.h"
+#include <stdint.h>
 
-const UINT SHA1_DIGEST_LEN = 20;
+#define SHA1_DIGEST_LEN 20
 
-enum {
-    SHA_STATUS_SUCCESS = 0, // Success
-    SHA_STATUS_STATE_NULL,
-    SHA_STATUS_INPUT_TOO_LONG, // Data too long
-    SHA_STATUS_STATE_ERROR,
-};
+/* error codes */
+#define SHA_STATUS_SUCCESS 0
+#define SHA_STATUS_STATE_NULL 1
+#define SHA_STATUS_INPUT_TOO_LONG 2
+#define SHA_STATUS_STATE_ERROR 3
 
 // SHA-1 context
-typedef struct _SHA1Context
-{
-    UINT intermediate_hash[SHA1_DIGEST_LEN / 4U]; // Digest
+typedef struct _SHA1Context {
+    uint32_t intermediate_hash[SHA1_DIGEST_LEN / 4U]; // Digest
 
-    UINT length_low;    // Message length in bits
-    UINT length_high;
+    uint32_t length_low;    // Message length in bits
+    uint32_t length_high;
 
-    short block_index;  // Index into message block array
-    UCHAR block[64];    // 512-bit message blocks
+    short block_index;    // Index into message block array
+    uint8_t block[64];    // 512-bit message blocks
 
     int computed;       // Is the digest computed?
     int corrupted;      // Is the message digest corrupted?
 } SHA1Context;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int SHA1Reset(SHA1Context* context);
-int SHA1Input(SHA1Context* context, const UCHAR* message, UINT len);
-int SHA1Result(SHA1Context* context, UCHAR digest[SHA1_DIGEST_LEN]);
+int SHA1Input(SHA1Context* context, const uint8_t* message, uint32_t len);
+int SHA1Result(SHA1Context* context, uint8_t digest[SHA1_DIGEST_LEN]);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif // _SHA1_H_

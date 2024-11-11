@@ -20,7 +20,8 @@
 // GitHub: https:\\github.com\tommojphillips
 
 // std incl
-#include <cstdio>
+#include <stdint.h>
+#include <stdio.h>
 #include <memory.h>
 
 // user incl
@@ -92,7 +93,7 @@ void print_image_file_header(COFF_FILE_HEADER* file_header, bool basic)
     default: machine_str = "unk"; break;
     }
 
-    getTimestamp(file_header->datetimeStamp, datetime);
+    util_getTimestampStr(file_header->datetimeStamp, datetime);
 
     printf("\nFile Header:\nMachine:\t%s ( %X )\nTimestamp:\t%s UTC\n", machine_str, file_header->machine, datetime);
 
@@ -152,7 +153,7 @@ void print_nt_headers(IMAGE_NT_HEADER* nt_header, bool basic)
     print_image_optional_header(&nt_header->optional_header, basic);
 }
 
-int dump_nt_headers(UCHAR* data, UINT size, bool basic)
+int dump_nt_headers(uint8_t* data, uint32_t size, bool basic)
 {
     IMAGE_NT_HEADER* nt = verify_nt_headers(data, size);
     if (nt == NULL)
@@ -167,7 +168,7 @@ int dump_nt_headers(UCHAR* data, UINT size, bool basic)
     return 0;
 }
 
-IMAGE_DOS_HEADER* verify_dos_header(UCHAR* data, UINT size)
+IMAGE_DOS_HEADER* verify_dos_header(uint8_t* data, uint32_t size)
 {
     if (data == NULL)
     {
@@ -190,7 +191,7 @@ IMAGE_DOS_HEADER* verify_dos_header(UCHAR* data, UINT size)
 
     return dosHeader;
 }
-IMAGE_NT_HEADER* verify_nt_headers(UCHAR* data, UINT size)
+IMAGE_NT_HEADER* verify_nt_headers(uint8_t* data, uint32_t size)
 {
     IMAGE_DOS_HEADER* dos = NULL;
     IMAGE_NT_HEADER* nt = NULL;

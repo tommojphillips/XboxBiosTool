@@ -22,13 +22,21 @@
 #ifndef STR_UTIL_H
 #define STR_UTIL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // trim left side of string.
-void ltrim(char*& str);
+void ltrim(char** str);
 
 // trim right side of string.
-void rtrim(char*& str);
+void rtrim(char** str);
 
 // pad right side of string.
 void rpad(char* str, const int buffSize, const char pad);
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif // !STR_UTIL_H

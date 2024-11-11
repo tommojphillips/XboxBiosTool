@@ -20,14 +20,14 @@
 // GitHub: https:\\github.com\tommojphillips
 
 // std incl
-#include <cstring>
+#include <stdint.h>
+#include <string.h>
 
 // user incl
 #include "loadini.h"
-#include "type_defs.h"
 #include "str_util.h"
 
-#ifdef MEM_TRACKING
+#ifndef NO_MEM_TRACKING
 #include "mem_tracking.h"
 #else
 #include <malloc.h>
@@ -41,9 +41,9 @@
 #endif
 
 // set setting value helper function
-void setSettingValue(char** setting, const char* value, UINT len);
+void setSettingValue(char** setting, const char* value, uint32_t len);
 
-void setSettingValue(char** setting, const char* value, UINT len)
+void setSettingValue(char** setting, const char* value, uint32_t len)
 {
 	if (setting == NULL || *setting != NULL)
 		return;
@@ -55,10 +55,10 @@ void setSettingValue(char** setting, const char* value, UINT len)
 	}
 }
 
-LOADINI_ERROR_CODE loadini(FILE* stream, const LOADINI_SETTING_MAP* settings_map, UINT map_size)
+LOADINI_ERROR_CODE loadini(FILE* stream, const LOADINI_SETTING_MAP* settings_map, uint32_t map_size)
 {
-	UINT i = 0;
-	UINT len = 0;
+	uint32_t i = 0;
+	uint32_t len = 0;
 		
 	char buf[LOADINI_MAX_LINE_SIZE] = { 0 };
 	char* line_ptr = NULL;
@@ -69,7 +69,7 @@ LOADINI_ERROR_CODE loadini(FILE* stream, const LOADINI_SETTING_MAP* settings_map
 	while (fgets(buf, LOADINI_MAX_LINE_SIZE, stream) != NULL)
 	{
 		line_ptr = buf;
-		ltrim(line_ptr);
+		ltrim(&line_ptr);
 
 		if (line_ptr[0] == ';')
 			continue;
@@ -80,16 +80,16 @@ LOADINI_ERROR_CODE loadini(FILE* stream, const LOADINI_SETTING_MAP* settings_map
 		key = strtok(line_ptr, LOADINI_DELIM);
 		if (key == NULL)
 			continue;
-		ltrim(key);
-		rtrim(key);
+		ltrim(&key);
+		rtrim(&key);
 
 		// get the value
 		value = strtok(NULL, LOADINI_DELIM);
 		if (value == NULL)
 			continue;
 		len = strlen(value);
-		ltrim(value);
-		rtrim(value);
+		ltrim(&value);
+		rtrim(&value);
 		if (value[0] == '\"' || value[0] == '\'')
 		{
 			value++;

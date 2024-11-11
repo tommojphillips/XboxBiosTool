@@ -1,48 +1,62 @@
-# Commands
-| Command        | Description                                                                       |
-| -------------- | --------------------------------------------------------------------------------- |
-| `-?`           | Displays help message                                                             |
-| `-ls`          | Dump BIOS infomation. Eg: boot params, sizes, signatures, keys, tables, etc.      |
-| `-split`       | Split a BIOS into banks.                                                          |
-| `-combine`     | Combine multiple BIOSes into a single BIOS.                                       |
-| `-extr`        | Extract the 2BL, compressed kerrnel, kernel data, init table from a BIOS          |
-| `-bld`         | Build a BIOS from a 2BL, compressed kernel, uncompressed data section, init table |
-| `-decomp-krnl` | Decompress and extract the kernel from a BIOS.                                    |
-| `-xcode-sim`   | Simulate mem-write xcodes and parse x86 machine code. (*visor sim*)               |
-| `-xcode-decode`| Decode Xcodes from a BIOS file, extracted init table.                             |
-| `-x86-encode`  | Encode x86 machine code as Xcode mem-writes. (*visor*)                            |
-| `-dump-img`    | Dump PE image header info. Eg: A decompressed kernel, xbox exe. etc               |
+
+A command-line tool for extracting components of An Original Xbox BIOS.
+
+## Commands
+| Command        | Description |
+| -------------- | ----------- |
+| `-?`           | Displays help message |
+| `-ls`          | Dump BIOS infomation. |
+| `-extr`        | Extract components from a BIOS. |
+| `-bld`         | Build a BIOS. |
+| `-split`       | Split a BIOS into banks. |
+| `-combine`     | Combine multiple BIOSes into a single BIOS. |
+| `-replicate`   | replicate a BIOS. |
+| `-xcode-sim`   | Simulate mem-write xcodes and parse x86 machine code. (*visor sim*) |
+| `-xcode-decode`| Decode Xcodes from a BIOS or init table. |
+| `-x86-encode`  | Encode x86 machine code as Xcode mem-writes. (*visor*) |
+| `-dump-img`    | Dump PE image header info. |
+| `-compress`    | compress a file using lzx. |
+| `-decompress`  | decompress a file using lzx. |
+| `-disasm`      | disasm x86 instructions from a file. |
 
 
-# Switches
-#### General switches
-| Switch            | Description                                                  |
-| ----------------- | ------------------------------------------------------------ |
-| `-?`              | Get help about a specific command.                           |
-| `-enc-bldr`       | Assume the 2bl is unencrypted. Decryption will be skipped.   |
-| `-enc-krnl`       | Assume the kernel is unencrypted. Decryption will be skipped.|
-| `-key-bldr <path>`| The path to the 16-byte 2bl RC4 file                         |
-| `-key-krnl <path>`| The path to the 16-byte kernel RC4 file                      |
-| `-mcpx <path>`    | The path to the MCPX ROM. Used for en/decrypting the 2BL.    |
-| `-romsize`        | How much space is available for the BIOS, (256, 512, 1024)   |
+## Switches
+| Switch            | Description |
+| ----------------- | ----------- |
+| `-?`              | Get help about a specific command.                                |
+| `-enc-bldr`       | Assume the 2BL is unencrypted. Decryption will be skipped.        |
+| `-enc-krnl`       | Assume the kernel is unencrypted. Decryption will be skipped.     |
+| `-key-bldr <path>`| 16-byte 2BL RC4 file.                                             |
+| `-key-krnl <path>`| 16-byte kernel RC4 file.                                          |
+| `-mcpx <path>`    | MCPX ROM file. Used for en/decrypting the 2BL.                    |
+| `-romsize`        | How much space is available for the BIOS in kb, (256, 512, 1024). |
+| `-binsize`        | Total space of the file or flash in kb. (256, 512, 1024).         |
 
+## Notes / Comments
+- Supports all Original Xbox BIOSes.
+- There is *no guarantee* that this program will work correctly with modified BIOSes.
 
-# Notes / Comments
-Supports all Original Xbox BIOSes.
+| Terminology |          | Desc                              |
+| ----------- | -------- | --------------------------------- |
+| `FBL`       | `preldr` | `1st stage boot loader`           |
+| `2BL`       | `bldr`   | `2nd stage boot loader`           |
+| `MCPX`      |          | `southbridge secret rom`          |
 
-There is *no guarantee* that all commands will work with modified BIOSes. However, The Init table and Xcodes are at a hardcoded offset in every BIOS. So, commands such as, `-xcode-decode` and `-xcode-sim` should work with all BIOSes. The `-xcode-sim` command is specifically designed for modified BIOSes.
+## Encryption / Decryption  
+ An Original Xbox BIOS contains RC4 keys in the 2BL. 
+ 2BL needs to be decrypted to locate the kernel key.
 
-The preldr is currently mangled during the process of 2BL decryption.
+Provide 2BL key file or a MCPX ROM to decrypt the 2BL.
+- Use  `-key-bldr <path>` to specify the 2BL key from a key file. 
+  This is prioritized over the mcpx rom file.
+- Use  `-mcpx <path>` to specify the 2BL from the MCPX ROM file.
 
-# Encryption / Decryption  
-An Original Xbox BIOS contains RC4 keys in the 2BL.
+If the 2BL has been decrypted, you will see a message like `Decrypting 2BL..`
 
-Provide a key file or a MCPX ROM to decrypt the 2BL.
-- Use  `-key-bldr <path>` to specify the 2BL key.
-- Use  `-mcpx <path>` to specify the MCPX ROM.
-
-The kernel key can then be located in the decrypted 2BL and used to decrypt the compressed kernel.
-- Use `-key-krnl <path>` to specify a kernel key from file.
+The kernel key can then be located in the decrypted 2BL and 
+used to decrypt the compressed kernel image.
+- Use `-key-krnl <path>` to specify a kernel key from file. 
+  This is prioritized over the key found in the 2BL.
 - Use `-enc-krnl` if you dont want the kernel decrypted.
 
 If the kernel has been decrypted, you will see a message like `Decrypting Kernel..`
@@ -52,95 +66,89 @@ It depends on the version. The decryption process differs between BIOS versions.
 - Use MCPX v1.0 for < 4817 kernel
 - Use MCPX v1.1 for >= 4817 kernel
 
-
-# List BIOS command
+## List BIOS command
 The list command has some flags to dump out certain infomation in a BIOS.
 
-| flag          | Description                                   |
-| ------------- | --------------------------------------------- |
-| `-nv2a`       | Dump init table magic values.                 |
-| `-datatbl`    | Dump ROM drive / slew calibration table data. |
-| `-dump-krnl`  | Dump kernel header info.                      |
-| `-keys`       | Dump 2BL rc4 keys.                            |
+| flag          | Description |
+| ------------- | ----------- |
+| `-dump-krnl`  | dump kernel image header info. |
+| `-nv2a`       | dump init table magic values. |
+| `-datatbl`    | dump ROM drive / slew calibration table data. |
+| `-keys`       | dump rc4, rsa keys. |
+| `-bootable`   | run checks to see if and how a BIOS gets to 2BL. |
 
+## Extract BIOS command
+Extract components from a BIOS file 
+- `2BL`
+- `Preldr (FBL)`
+- `init table`
+- `decompressed kernel image (.img)`
+- `compressed kernel image (.bin)`
+- `uncompressed kernel section data`
+- `rc4 keys` 
+- `rsa keys`
 
-# Extract BIOS command
-The extract command extracts the kernel **compressed**. Thus it is possible to extract it either *encrypted* or *decrypted*. Make a note of what state it's in.
+| flag        | Description |
+| ----------- | ----------- |
+| `-keys`     | Extract rc4, rsa keys to a file. |
 
-| flag          | Description                                   |
-| ------------- | --------------------------------------------- |
-| `-keys`       | Extract 2BL rc4 keys to a file.               |
-
-
-# Build BIOS command
+## Build BIOS command
 Build a BIOS from a 2BL, compressed kernel, uncompressed data section, init table.
 
-| switches            | Description                                               |
-| ----------          | --------------------------------------------------------- |
-| `-bldr <path>`      | The boot loader file (req)                                |
-| `-inittbl <path>`   | The init table file (req)                                 |
-| `-krnl <path>`      | The compressed kernel file (req)                          |
-| `-krnldata  <path>` | The uncompressed data section file (req)                  |
-| `-preldr <path>`    | The pre boot loader file                                  |
-| `-patchkeys`        | Use key switches to patch keys.                           |
-| `-eepromkey <path>` | eeprom key to patch into the 2BL                          |
-| `-certkey <path>`   | cert key to patch into the 2BL                            |
-| `-binsize <size>`   | The file size. The BIOS is replicated upto this value.    |
-| `-bfm`              | Build a boot from media BIOS;                             |
-| `-enc-krnl`         | Locate the kernel key in 2BL and use it for encryption.   |
+| switches       | Description |
+| -------------- | ----------- |
+| `-bldr <path>` | The 2BL file (req) |
+| `-inittbl <path>` | The init table file (req) |
+| `-krnl <path>` | The compressed kernel file (req) |
+| `-krnldata  <path>` | The uncompressed data section file (req) |
+| `-preldr <path>` | The preldr (FBL) file |
+| `-romsize <size>` | romsize in kb. |
+| `-binsize <size>` | binsize in kb. |
+| `-enc-krnl` | locate the kernel key in 2BL and use it for encryption. |
+| `-bfm` | build a boot from media BIOS; |
+| `-hackinittbl` | hack initbl size (inittblsize = 0). |
+| `-hacksignature` | hack 2bl boot signature (signature = 0xFFFFFFFF). |
+| `-nobootparams` | dont update boot params. |
 ---
 `-enc-krnl` works backwards with this command. Explictly provide the flag *if you want the kernel encrypted* with the kernel key located in the 2BL.
 
-This command currently only supports *compressed kernel files* because an *LZ compression* algorithm has not been implemented.
+This command *currently* only supports *compressed kernel files*.
 
 You will need to supply a *compressed kernel file* and an *uncompressed data section file*. The `-extr` command can obtain these files.
 
-
-# Decompress kernel command
-Decompress and extract the kernel from a BIOS.
-
-| switches            | Description                 |
-| ----------          | --------------------------- |
-| `-patchkeys`        | Patch keys flag.            |
-| `-pubkey <path>`    | The path to the public key. |
-
-### Extract public key
-If `-pubkey <path>` is provided, extract the *RSA1 PUBLIC KEY* from the decompressed kernel.
-
-### Patch public key
-If `-patchkeys` and `-pubkey <path>` is provided, overwrite the *RSA1 PUBLIC KEY* using the file.
-
-
-# X86 encode command
+## X86 encode command
 Encode x86 *machine code* as Xcodes that write to RAM.
 
-| switches            | Description                                                   |
-| ----------          | ------------------------------------------------------------- |
-| `-in <path>`        | Path to x86 byte code. eg. custom_bldr_x86.bin                |
-| `-out <path>`       | Specify output file. Defaults to xcodes.bin                   |
+| switches   | Description |
+| ---------- | ----------- |
+| `-in <path>`  | path to x86 byte code. eg. custom_bldr_x86.bin |
+| `-out <path>` | specify output file. Defaults to xcodes.bin |
 ---
   - Start address of mem-write is 0. Each write is increment by 4 bytes.
   - Code size increases by a factor of x2.25.
 ```
-Assembly:
- mov eax, 0xfff00bed
- jmp eax
+X86:            --->    Xcodes:
+ mov eax, 0xfff00bed      xc_mem_write 0x00, 0xf00bedb8
+ jmp eax                  xc_mem_write 0x04, 0x90e0ffff
  nop
 
-Machine code:   --->    Xcodes:
-  0000: B8 ED 0B F0       0000: xc_mem_write 0x00, 0xf00bedb8
-  0004: FF FF E0 90       0009: xc_mem_write 0x04, 0x90e0ffff
+Machine code:   --->    Byte code:
+  0000: B8 ED 0B F0       0000: 03 00 00 00
+  0004: FF FF E0 90       0004: 00 F0 0B ED
+                          0008: B8 03 00 00
+                          000C: 00 04 90 E0
+                          0010: FF FF
 ```
 
 
-# Xcode (visor) sim command
+## Xcode (visor) sim command
 Simulate mem-write xcodes and parse x86 machine code. (visor sim)
-| switches            | Description                                                   | Default |
-| ----------          | ------------------------------------------------------------- | ------- |
-| `-simsize`          | Size of the sim space in bytes.                               | `32`    | 
-| `-xcodebase <addr>` | Base address of xcodes.                                       | `128`   |
-| `-nomaxsize`        | Do not limit the size of the xcode file.                      |         |
-| `-d`                | Write to a file. Use `-out` to specify output file.           |         |
+| switches   | Description | Default |
+| ---------- | ----------- | ------- |
+| `-simsize` | size of the sim space in bytes. | `32` | 
+| `-base <addr>` | base address of xcodes. | `128` |
+| `-nomaxsize` | dont limit the size of the xcode file. | `true` |
+| `-d` | write to a file. Use `-out` to specify output file.| `false` |
 
 <details><summary>Example output:</summary>
 
@@ -168,18 +176,19 @@ Assembly:
 
 ---
 
-# Xcode decode command
+## Xcode decode command
 Decode Xcodes from a BIOS file, extracted init table.
 
-| switches            | Description                                                 | Default |
-| ----------          | ----------------------------------------------------------- | ------- |
-| `-ini <path>`       | Decode settings file.                                       |         |
-| `-xcodebase <addr>` | Base address for xcodes.                                    | `128`   |
-| `-nomaxsize`        | Do not limit the size of the xcode file.                    |         |
-| `-d`                | Write xcodes to a file. Use `-out` to specify output file.  |         |
+| switches | Description | Default |
+| -------- | ----------- | ------- |
+| `-ini <path>` | decode settings file. | |
+| `-base <addr>` | base address for xcodes. | `0x80` |
+| `-nomaxsize` | dont limit the size of the xcode file. | `true` |
+| `-d` | write xcodes to a file. Use `-out` to specify output file. | `false` |
 ---
-If decoding a file other than a BIOS or extracted init table, This might be different. Use `-xcodebase <addr>` to specify.
- ## Decode settings
+If decoding a file other than a BIOS or extracted init table, The `base` of the xcodes might be different. Use `-base <addr>` to specify.
+
+ ### Decode settings
  Use decode settings to specify the decode format.
 
 --- 
@@ -223,7 +232,7 @@ If decoding a file other than a BIOS or extracted init table, This might be diff
 ```ini
 ; decode.ini:
 ; This file is used to configure the xcode decoder.
-; ------------------------------------------------------------------------------
+; -------------------------------------------------
 
 ; format xcode string
 format_str=xcode<{op}, {addr}, {data}> {comment}
@@ -261,8 +270,6 @@ xc_use_result=use_result
 xc_exit=quit
 ```
 </details>
-
----
 
 <details><summary>Example output:</summary>
 
@@ -325,5 +332,4 @@ lb_27:
         xcode<mem_write, 000000004h, 090e0ffffh>
         xcode<quit, 000000806h, 0h> ; quit xcodes
 ```
-
 </details>

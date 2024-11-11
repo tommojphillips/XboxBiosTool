@@ -20,31 +20,48 @@
 // GitHub: https:\\github.com\tommojphillips
 
 // std incl
-#include <cstdlib>
-#include <cstring>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <malloc.h>
 
 // user incl
 #include "XcodeInterp.h"
 #include "file.h"
-#include "type_defs.h"
 #include "str_util.h"
 
 #include "util.h" // error codes. MOVE
 
-#ifdef MEM_TRACKING
+#ifndef NO_MEM_TRACKING
 #include "mem_tracking.h"
-#else
-#include <malloc.h>
 #endif
 
-int XcodeInterp::load(UCHAR* data, UINT size)
+const FIELD_MAP xcode_opcode_map[] = {
+	{ "xc_reserved",	XC_RESERVED },
+	{ "xc_mem_read",	XC_MEM_READ },
+	{ "xc_mem_write",	XC_MEM_WRITE },
+	{ "xc_pci_write",	XC_PCI_WRITE },
+	{ "xc_pci_read",	XC_PCI_READ },
+	{ "xc_and_or",		XC_AND_OR },
+	{ "xc_result",      XC_USE_RESULT },
+	{ "xc_jne",			XC_JNE },
+	{ "xc_jmp",			XC_JMP },
+	{ "xc_accum",		XC_ACCUM },
+	{ "xc_io_write",	XC_IO_WRITE },
+	{ "xc_io_read",		XC_IO_READ },
+	{ "xc_nop_f5",		XC_NOP_F5 },
+	{ "xc_exit",		XC_EXIT },
+	{ "xc_nop_80",		XC_NOP_80 }
+};
+
+int XcodeInterp::load(uint8_t* data, uint32_t size)
 {
 	if (_data != NULL)
 	{
 		return 1;
 	}
 
-	_data = (UCHAR*)malloc(size);
+	_data = (uint8_t*)malloc(size);
 	if (_data == NULL)
 	{
 		return ERROR_OUT_OF_MEMORY;
@@ -57,14 +74,12 @@ int XcodeInterp::load(UCHAR* data, UINT size)
 
 	return 0;
 }
-
 void XcodeInterp::reset()
 {
 	_offset = 0;
 	_status = DATA_OK;
 	_ptr = (XCODE*)_data;
 }
-
 int XcodeInterp::interpretNext(XCODE*& xcode)
 {
 	if (_data == NULL)
@@ -99,28 +114,29 @@ int XcodeInterp::interpretNext(XCODE*& xcode)
 	return 0;
 }
 
-int encodeX86AsMemWrites(UCHAR* data, UINT size, UCHAR*& buffer, UINT* xcodeSize)
+int encodeX86AsMemWrites(uint8_t* data, uint32_t size, uint8_t*& buffer, uint32_t* xcodeSize)
 {
-	const UINT allocSize = sizeof(XCODE) * 10;
+	const uint32_t allocSize = sizeof(XCODE) * 10;
 
-	buffer = (UCHAR*)malloc(allocSize);
+	buffer = (uint8_t*)malloc(allocSize);
 	if (buffer == NULL)
 		return ERROR_OUT_OF_MEMORY;
 
-	UINT nSize = allocSize;
-	UINT offset = 0;
+	uint32_t nSize = allocSize;
+	uint32_t offset = 0;
 	XCODE xcode = { XC_MEM_WRITE, 0, 0 };
 
-	for (UINT i = 0; i < size; i+=4)
-	{
-		xcode.addr = i;
-		xcode.data = *(UINT*)(data + i);
+	if (size % 4 != 0) {
+		return 1;
+	}
 
-		if (offset + sizeof(XCODE) > nSize)
-		{
-			UCHAR* new_buffer = (UCHAR*)realloc(buffer, nSize + allocSize);
-			if (new_buffer == NULL)
-			{
+	for (uint32_t i = 0; i < size; i+=4) {
+		xcode.addr = i;
+		xcode.data = *(uint32_t*)(data + i);
+
+		if (offset + sizeof(XCODE) > nSize) {
+			uint8_t* new_buffer = (uint8_t*)realloc(buffer, nSize + allocSize);
+			if (new_buffer == NULL) {
 				return ERROR_OUT_OF_MEMORY;
 			}
 			buffer = new_buffer;
@@ -131,20 +147,16 @@ int encodeX86AsMemWrites(UCHAR* data, UINT size, UCHAR*& buffer, UINT* xcodeSize
 		offset += sizeof(XCODE);
 	}
 	
-	if (xcodeSize != NULL) 
-	{
+	if (xcodeSize != NULL) {
 		*xcodeSize = offset;
 	}
 
 	return 0;
 }
-
-int getOpcodeStr(const FIELD_MAP* opcodes, UCHAR opcode, const char*& str)
+int getOpcodeStr(const FIELD_MAP* opcodes, uint8_t opcode, const char*& str)
 {
-	for (UINT i = 0; i < XCODE_OPCODE_COUNT; i++)
-	{
-		if (opcodes[i].field == opcode)
-		{
+	for (uint32_t i = 0; i < XC_OPCODE_COUNT; ++i) {
+		if (opcodes[i].field == opcode) {
 			str = opcodes[i].str;
 			return 0;
 		}
