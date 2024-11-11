@@ -27,17 +27,17 @@
 
 void ltrim(char** str)
 {
-	if (str == NULL)
+	if (str == NULL || *str == NULL)
 		return;
 
 	while ((*str)[0] == ' ' || (*str)[0] == '\t' || (*str)[0] == '\n') {
-		str++;
+		(*str)++;
 	}
 }
 
 void rtrim(char** str)
 {
-	if (str == NULL)
+	if (str == NULL || *str == NULL)
 		return;
 
 	int len = strlen(*str);

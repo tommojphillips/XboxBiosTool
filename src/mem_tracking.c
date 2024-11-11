@@ -60,6 +60,14 @@ void memtrack_free(void* ptr)
 	memtrack_allocations--;
 	memtrack_allocatedBytes -= size;
 
+	if (memtrack_allocations < 0) {
+		printf("Error neg allocations.\n");
+	}
+
+	if (memtrack_allocatedBytes < 0) {
+		printf("Error neg allocated bytes.\n");
+	}
+
 #ifdef MEM_TRACKING_PRINT
 	printf("freed %d bytes\n", size);
 #endif

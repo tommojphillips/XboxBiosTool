@@ -60,42 +60,38 @@ const char HELP_STR_MCPX_ROM[] = "-mcpx <path>\t\t- path to the mcpx file. Shoul
 "\t\t\t- Use mcpx 1.0 for BIOS versions <= 4627\n\t\t\t- Use mcpx 1.1 for BIOS versions >= 4817.";
 
 const char HELP_STR_RC4_KEY[] = " <path> " \
-"\t- path to the key file. Should be 16 bytes\n" \
-"\t\t\t- Used for en/decrypting the %s.";
+"\t- path to the %s key file. Should be 16 bytes";
 
-const char HELP_STR_KEY_KRNL[] = " <path>\n" \
-"# Path to the 16 byte rc4_key.bin file.\n" \
-"* This should not be required unless it's a custom BIOS,\n  as keys are located in the 2BL.";
+const char HELP_STR_RC4_ENC[] = "\t\t- dont encrypt/decrypt the %s";
 
-const char HELP_STR_RC4_ENC[] = "\n# Assume the {1} is unencrypted. Decryption will be skipped.";
-
-const char HELP_STR_PARAM_EEPROM_KEY[] =	"-eepromkey <path>  path to the eeprom key file.";
-const char HELP_STR_PARAM_BLDR[] =			"-bldr <path>     - 2bl loader file.";
-const char HELP_STR_PARAM_PRELDR[] =		"-preldr <path>   - preldr file.";
-const char HELP_STR_PARAM_KRNL[] =			"-krnl <path>	  - kernel file.";
-const char HELP_STR_PARAM_KRNL_DATA[] =		"-krnldata <path> - kernel data section file.";
-const char HELP_STR_PARAM_INITTBL[] =		"-inittbl <path>  - init table file.";
-const char HELP_STR_PARAM_CERT_KEY[] =		"-certkey <path>  - path to the cert key file.";
-const char HELP_STR_PARAM_PUB_KEY[] =		"-pubkey <path>   - path to the public key file.";
-const char HELP_STR_PARAM_LS_NV2A_TBL[] =	"-nv2a            - dump NV2A table.";
-const char HELP_STR_PARAM_LS_DATA_TBL[] =	"-datatbl         - dump ROM data table.";
-const char HELP_STR_PARAM_LS_DUMP_KRNL[] =	"-img             - dump kernel image header info.";
-const char HELP_STR_PARAM_LS_KEYS[] =		"-keys            - dump rc4 keys";
-const char HELP_STR_PARAM_EXTRACT_KEYS[] =	"-keys            - extract rc4 keys (bfm, krnl, eeprom, cert, sb, preldr)";
-const char HELP_STR_PARAM_BFM[] =			"-bfm             - build a boot from media BIOS.";
-const char HELP_STR_PARAM_NO_MAX_SIZE[] =	"-nomaxsize       - do not limit the size of the xcode file.";
-const char HELP_STR_PARAM_DECODE_INI[] =	"-ini <path>      - set the decode settings file.";
-const char HELP_STR_PARAM_BIOS_FILE[] =		"-in <path>       - BIOS file.";
-const char HELP_STR_PARAM_IN_FILE[] =		"-in <path>       - input file.";
-const char HELP_STR_PARAM_OUT_FILE[] =		"-out <path>      - output file.";
+const char HELP_STR_PARAM_EEPROM_KEY[] =	"-eepromkey <path>  eeprom key file";
+const char HELP_STR_PARAM_BLDR[] =			"-bldr <path>     - 2BL file";
+const char HELP_STR_PARAM_PRELDR[] =		"-preldr <path>   - FBL file";
+const char HELP_STR_PARAM_KRNL[] =			"-krnl <path>	  - kernel file";
+const char HELP_STR_PARAM_KRNL_DATA[] =		"-krnldata <path> - kernel data section file";
+const char HELP_STR_PARAM_INITTBL[] =		"-inittbl <path>  - init table file";
+const char HELP_STR_PARAM_CERT_KEY[] =		"-certkey <path>  - cert key file";
+const char HELP_STR_PARAM_PUB_KEY[] =		"-pubkey <path>   - public key file";
+const char HELP_STR_PARAM_LS_NV2A_TBL[] =	"-nv2a            - list NV2A table";
+const char HELP_STR_PARAM_LS_DATA_TBL[] =	"-datatbl         - list ROM data table";
+const char HELP_STR_PARAM_LS_DUMP_KRNL[] =	"-img             - list kernel image header info";
+const char HELP_STR_PARAM_LS_KEYS[] =		"-keys            - list rc4 keys";
+const char HELP_STR_PARAM_EXTRACT_KEYS[] =	"-keys            - extract rc4 keys";
+const char HELP_STR_PARAM_BFM[] =			"-bfm             - build a boot from media BIOS";
+const char HELP_STR_PARAM_NO_MAX_SIZE[] =	"-nomaxsize       - do not limit the size of the xcode file";
+const char HELP_STR_PARAM_DECODE_INI[] =	"-ini <path>      - set the decode settings file";
+const char HELP_STR_PARAM_BIOS_FILE[] =		"-in <path>       - BIOS file";
+const char HELP_STR_PARAM_IN_FILE[] =		"-in <path>       - input file";
+const char HELP_STR_PARAM_OUT_FILE[] =		"-out <path>      - output file";
 const char HELP_STR_PARAM_SIM_SIZE[] =		"-simsize <size>  - size of the sim space in bytes. default is 32 bytes";
-const char HELP_STR_PARAM_ROMSIZE[] =		"-romsize <size>  - rom size in kb.";
-const char HELP_STR_PARAM_BINSIZE[] =		"-binsize <size>  - bin size in kb.";
-const char HELP_STR_PARAM_BASE[] =			"-base <offset>   - base offset in bytes.";
-const char HELP_STR_PARAM_HACK_INITTBL[] =	"-hackinittbl     - hack init tbl (size = 0).";
-const char HELP_STR_PARAM_HACK_SIGNATURE[] ="-hacksignature   - hack boot signature (signature = 0).";
-const char HELP_STR_PARAM_NO_BOOT_PARAMS[] ="-nobootparams    - dont update boot params.";
-const char HELP_STR_PARAM_BOOTABLE[] =      "-bootable        - run checks to see if and how a BIOS gets to 2BL.\n" \
-											"\t\t    Use -d to save 2BL to a file.";
+const char HELP_STR_PARAM_ROMSIZE[] =		"-romsize <size>  - rom size in kb";
+const char HELP_STR_PARAM_BINSIZE[] =		"-binsize <size>  - bin size in kb";
+const char HELP_STR_PARAM_BASE[] =			"-base <offset>   - base offset in bytes";
+const char HELP_STR_PARAM_HACK_INITTBL[] =	"-hackinittbl     - hack init tbl (size = 0)";
+const char HELP_STR_PARAM_HACK_SIGNATURE[] ="-hacksignature   - hack boot signature (signature = 0)";
+const char HELP_STR_PARAM_BOOTABLE[] =      "-bootable        - run checks to see if and how a BIOS gets to 2BL\n" \
+											"\t\t    Use -d to save 2BL to a file";
+const char HELP_STR_PARAM_UPDATE_BOOT_PARAMS[] =  "-nobootparams    - dont update 2BL boot params";
+const char HELP_STR_PARAM_RESTORE_BOOT_PARAMS[] = "-nobootparams    - dont restore 2BL boot params (FBL BIOSes only)";
 
 #endif // XB_BIOS_TOOL_COMMANDS_H

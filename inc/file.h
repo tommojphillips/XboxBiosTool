@@ -46,6 +46,9 @@ int writeFile(const char* filename, void* ptr, const uint32_t bytesToWrite);
 // write to a file.
 int writeFileF(const char* filename, void* ptr, const uint32_t bytesToWrite);
 
+// check if file exists.
+bool fileExists(const char* filename);
+
 // deletes a file.
 // filename: the absolute path to the file.
 // returns 0 if successful, 1 otherwise.
