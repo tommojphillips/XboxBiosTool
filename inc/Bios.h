@@ -47,7 +47,8 @@
 #define PRELDR_PARAMS_SIZE 0x80                                                  // preldr params size in bytes
 #define PRELDR_SIZE (PRELDR_BLOCK_SIZE - ROM_DIGEST_SIZE - PRELDR_PARAMS_SIZE)   // preldr size in bytes
 #define PRELDR_NONCE_SIZE 0x10                                                   // preldr nonce size in bytes
-#define PRELDR_REAL_BASE (0xFFFFFFFF - MCPX_BLOCK_SIZE - PRELDR_BLOCK_SIZE + 1)  // preldr rom base address
+#define PRELDR_REAL_BASE (0xFFFFFFFF - MCPX_BLOCK_SIZE - PRELDR_BLOCK_SIZE + 1)  // preldr rom base address		; FFFF.D400
+#define PRELDR_REAL_END (PRELDR_REAL_BASE + PRELDR_SIZE)					     // preldr rom end address		; FFFF.FC80
 
 #define BLDR_BLOCK_SIZE 0x6000                                                   // 2BL block size in bytes
 #define BLDR_RELOC 0x00400000                                                    // 2BL relocation base address
@@ -72,11 +73,11 @@ typedef struct Preldr {
 	uint8_t* data;
 	PRELDR_PARAMS* params;
 	PRELDR_FUNC_PTRS* funcs;
+	PRELDR_FUNC_BLOCK* funcBlock;
 	uint8_t* pubkey;
-	uint8_t* funcBlock;
 	uint8_t* entryPoint;
-	uint8_t* nonce;
 	uint8_t bldrKey[SHA1_DIGEST_LEN];
+	uint32_t jmpOffset;
 	int status;
 } Preldr;
 
@@ -115,22 +116,12 @@ typedef struct BiosParams {
 	Mcpx* mcpx;
 	bool encBldr;
 	bool encKrnl;
-	bool loadonly;
+	bool restoreBootParams;
 } BiosParams;
 
 inline void initBiosParams(BiosParams* params) {
 	memset(params, 0, sizeof(BiosParams));
-};
-
-inline void initBiosParams(BiosParams* params, Mcpx* mcpx, uint8_t* keyBldr, uint8_t* keyKrnl,
-	const uint32_t romsize, const bool encBldr, const bool encKrnl) {
-	params->romsize = romsize;
-	params->keyBldr = keyBldr;
-	params->keyKrnl = keyKrnl;
-	params->mcpx = mcpx;
-	params->encBldr = encBldr;
-	params->encKrnl = encKrnl;
-	params->loadonly = false;
+	params->restoreBootParams = true;
 };
 
 // Bios build parmeters 
@@ -186,7 +177,6 @@ public:
 	Bldr bldr;
 	Preldr preldr;
 	INIT_TBL* initTbl;
-	ROM_DATA_TBL* dataTbl;
 	uint8_t* krnl;
 	uint8_t* krnlData;
 	uint8_t* romDigest;
@@ -212,7 +202,6 @@ public:
 		size = 0;
 
 		initTbl = NULL;
-		dataTbl = NULL;
 		krnl = NULL;
 		krnlData = NULL;
 		romDigest = NULL;
@@ -261,9 +250,15 @@ public:
 	// validate the 2BL boot param sizes and romsize.
 	int validateBldrBootParams();
 
+	// preldr create the bldr key
+	void preldrCreateKey(uint8_t* sbkey, uint8_t* key);
+
+	// preldr symmetric encryption and decryption for the 2BL.
+	void preldrSymmetricEncDecBldr(const uint8_t* key, const uint32_t len);
+
 	// validate the preldr and decrypt the 2bl.
 	// sets up the preldr struct and decrypts the 2bl.
-	void validatePreldrAndDecryptBldr();
+	void preldrValidateAndDecryptBldr();
 
 	// symmetric encryption and decryption for the 2BL.
 	void symmetricEncDecBldr(const uint8_t* key, const uint32_t len);

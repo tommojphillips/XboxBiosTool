@@ -13,7 +13,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.If not, see < https://www.gnu.org/licenses/>.
+ * along with this program.If not, see https://www.gnu.org/licenses/
 */
 
 // Author: tommojphillips
@@ -45,7 +45,7 @@
 int Bios::loadFromFile(const char* filename, const BiosParams* biosParams)
 {
 	uint32_t binsize;
-	uint8_t* bios = readFile(filename, &binsize);
+	uint8_t* bios = readFile(filename, &binsize, 0);
 	if (bios == NULL)
 		return BIOS_LOAD_STATUS_FAILED;
 
@@ -61,26 +61,35 @@ int Bios::load(uint8_t* buff, const uint32_t binsize, const BiosParams* biosPara
 
 	init(buff, binsize, biosParams);
 
-	// verify the presence of a preldr and decrypt the 2bl.
-	validatePreldrAndDecryptBldr();
+	// verify the presence of FBL and decrypt the 2BL.
+	preldrValidateAndDecryptBldr();
 	if (preldr.status == PRELDR_STATUS_ERROR) {
 		return BIOS_LOAD_STATUS_FAILED;
 	}
 
-	// decrypt the 2bl if a preldr was not found
-	if (preldr.status == PRELDR_STATUS_NOT_FOUND && bldr.encryptionState && !params.loadonly) {
-		if (params.keyBldr != NULL)	{
-			symmetricEncDecBldr(params.keyBldr, XB_KEY_SIZE);
+	// if FBL didnt decrypt 2BL, decrypt 2BL.
+	if (preldr.status != PRELDR_STATUS_BLDR_DECRYPTED && bldr.encryptionState) {
+		// get sb key
+		uint8_t* sbkey = NULL;
+		if (params.keyBldr != NULL) {
+			sbkey = params.keyBldr;
 		}
 		else if (params.mcpx->sbkey != NULL) {
-			symmetricEncDecBldr(params.mcpx->sbkey, XB_KEY_SIZE);
+			sbkey = params.mcpx->sbkey;
 		}
-		if (bldr.encryptionState == false) {
-			// clear the rom digest; it's mangled by 2BL decryption anyway.
-			memset(romDigest, 0, ROM_DIGEST_SIZE);
+
+		if (sbkey != NULL) {
+			/*if we found FBL, dont mangle FBL section of 2BL.*/
+			if (preldr.status == PRELDR_STATUS_FOUND) {
+				printf("decrypting 2BL.. (preserving FBL)\n");
+				preldrSymmetricEncDecBldr(sbkey, XB_KEY_SIZE); 
+			}
+			else {
+				symmetricEncDecBldr(sbkey, XB_KEY_SIZE); /*dont care*/
+			}
 		}
 	}
-
+	
 	result = validateBldrBootParams();
 	if (result != 0)
 		return result;
@@ -88,7 +97,7 @@ int Bios::load(uint8_t* buff, const uint32_t binsize, const BiosParams* biosPara
 	getOffsets2();
 
 	// decrypt the kernel
-	if (kernelEncryptionState && !params.loadonly) {
+	if (kernelEncryptionState) {
 		symmetricEncDecKernel();
 	}
 
@@ -161,8 +170,6 @@ int Bios::build(BiosBuildParams* buildParams, uint32_t binsize, BiosParams* bios
 	}
 	memcpy(data, buildParams->inittbl, buildParams->inittblSize);
 
-	printState();
-
 	// build a bios that boots from media. ( BFM )
 	if (buildParams->bfm) {
 		printf("adding kernel delay flag\n");
@@ -183,16 +190,25 @@ int Bios::build(BiosBuildParams* buildParams, uint32_t binsize, BiosParams* bios
 		}
 	}
 
+	printState();
+
 	// encrypt 2bl.
 	if (!bldr.encryptionState) {
+
+		// get sb key
+		uint8_t* sbkey = NULL;
 		if (params.keyBldr != NULL) {
-			symmetricEncDecBldr(params.keyBldr, XB_KEY_SIZE);
+			sbkey = params.keyBldr;
 		}
 		else if (params.mcpx->sbkey != NULL) {
-			symmetricEncDecBldr(params.mcpx->sbkey, XB_KEY_SIZE);
+			sbkey = params.mcpx->sbkey;
 		}
 		else if (buildParams->bfm && bldr.bfmKey != NULL) {
-			symmetricEncDecBldr(bldr.bfmKey, XB_KEY_SIZE);
+			sbkey = bldr.bfmKey;
+		}
+
+		if (sbkey != NULL) {
+			symmetricEncDecBldr(sbkey, XB_KEY_SIZE);
 		}
 	}
 
@@ -248,7 +264,6 @@ int Bios::init(uint8_t* buff, const uint32_t binsize, const BiosParams* biosPara
 void Bios::getOffsets()
 {
 	initTbl = (INIT_TBL*)(data);
-	dataTbl = (ROM_DATA_TBL*)(data + initTbl->data_tbl_offset);
 
 	bldr.data = (data + size - BLDR_BLOCK_SIZE - MCPX_BLOCK_SIZE);
 	bldr.ldrParams = (BOOT_LDR_PARAM*)(bldr.data);
@@ -310,25 +325,28 @@ int Bios::validateBldrBootParams()
 
 	return 0;
 }
-void Bios::validatePreldrAndDecryptBldr()
+
+void Bios::preldrCreateKey(uint8_t* sbkey, uint8_t* key)
 {
-	int i;
-	const uint8_t* sbkey = NULL;
-	SHA1Context sha;
-	uint8_t* bootParamsPtr;
-	BOOT_PARAMS bootParamsCpy;
-	PRELDR_ENTRY* entry;
+	// create the bldr key from the sb key.
 
+	uint8_t* nonce = (preldr.data + PRELDR_BLOCK_SIZE - PRELDR_NONCE_SIZE);
+
+	SHA1Context sha = { 0 };
+	SHA1Reset(&sha);
+	SHA1Input(&sha, sbkey, XB_KEY_SIZE);
+	SHA1Input(&sha, nonce, PRELDR_NONCE_SIZE);
+	for (int i = 0; i < XB_KEY_SIZE; ++i)
+		key[i] = sbkey[i] ^ 0x5C;
+	SHA1Input(&sha, key, XB_KEY_SIZE);
+	SHA1Result(&sha, key);
+}
+void Bios::preldrValidateAndDecryptBldr()
+{
 	preldr.status = PRELDR_STATUS_NOT_FOUND;
-
-	// ignore the preldr if a rev 0 equivalent mcpx was provided.
-	if (params.mcpx->version == Mcpx::MCPX_V1_0 ||
-		params.mcpx->version == Mcpx::MOUSE_V1_0) {
-		return;
-	}
-
 	preldr.params = (PRELDR_PARAMS*)(preldr.data);
-	preldr.entryPoint = (preldr.data + preldr.params->jmpOffset + 5); // +5 bytes (opcode + offset)
+	preldr.jmpOffset = preldr.params->jmpOffset + 5; // +5 bytes (opcode + offset)
+	preldr.entryPoint = (preldr.data + preldr.jmpOffset);
 	
 	if (preldr.params->jmpOpcode != 0xE9) {
 		return;
@@ -337,24 +355,35 @@ void Bios::validatePreldrAndDecryptBldr()
 	preldr.funcs = (PRELDR_FUNC_PTRS*)(preldr.entryPoint - sizeof(PRELDR_FUNC_PTRS));
 	if (IN_BOUNDS(preldr.funcs, preldr.data, PRELDR_BLOCK_SIZE) == false) {
 		preldr.funcs = NULL;
-		return;
-	}
-
-	preldr.pubkey = (uint8_t*)(preldr.data + preldr.funcs->pubKeyPtr - PRELDR_REAL_BASE);
-	if (IN_BOUNDS_BLOCK(preldr.pubkey, 284, preldr.data, PRELDR_BLOCK_SIZE) == false) {
 		preldr.pubkey = NULL;
-	}
-
-	preldr.funcBlock = (uint8_t*)(preldr.data + preldr.funcs->funcBlockPtr - PRELDR_REAL_BASE);
-	if (IN_BOUNDS(preldr.funcBlock, preldr.data, PRELDR_BLOCK_SIZE) == false) {
 		preldr.funcBlock = NULL;
+	}
+	else {
+		// public key pointer
+		preldr.pubkey = (uint8_t*)(preldr.data + preldr.funcs->pubKeyPtr - PRELDR_REAL_BASE);
+		if (IN_BOUNDS_BLOCK(preldr.pubkey, 284, preldr.data, PRELDR_BLOCK_SIZE) == false) {
+			preldr.pubkey = NULL;
+		}
+
+		// sha1 function block pointer
+		preldr.funcBlock = (PRELDR_FUNC_BLOCK*)(preldr.data + preldr.funcs->funcBlockPtr - PRELDR_REAL_BASE);
+		if (IN_BOUNDS(preldr.funcBlock, preldr.data, PRELDR_BLOCK_SIZE) == false) {
+			preldr.funcBlock = NULL;
+		}
 	}
 
 	preldr.status = PRELDR_STATUS_FOUND;
-	preldr.nonce = (preldr.data + PRELDR_BLOCK_SIZE - PRELDR_NONCE_SIZE);
+
+	// ignore the preldr if a rev 0 equivalent mcpx was provided.
+	if (params.mcpx->version == Mcpx::MCPX_V1_0 ||
+		params.mcpx->version == Mcpx::MOUSE_V1_0) {
+		return;
+	}
 	
+
 	// get sbkey
-	if (params.keyBldr != NULL)	{
+	uint8_t* sbkey = NULL;
+	if (params.keyBldr != NULL) {
 		sbkey = params.keyBldr;
 	}
 	else if (params.mcpx->sbkey != NULL) {
@@ -364,88 +393,87 @@ void Bios::validatePreldrAndDecryptBldr()
 		return;
 	}
 
-	// create the bldr key
-	SHA1Reset(&sha);
-	SHA1Input(&sha, sbkey, XB_KEY_SIZE);
-	SHA1Input(&sha, preldr.nonce, PRELDR_NONCE_SIZE);
-	for (i = 0; i < XB_KEY_SIZE; i++)
-		preldr.bldrKey[i] = sbkey[i] ^ 0x5C;
-	SHA1Input(&sha, preldr.bldrKey, XB_KEY_SIZE);
-	SHA1Result(&sha, preldr.bldrKey);
+	preldrCreateKey(sbkey, preldr.bldrKey);
 
-	// continue if not loadonly
-	if (params.loadonly)
-		return;
-
-	// continue if bldr is encrypted.
+	// continue if 2BL is encrypted.
 	if (!bldr.encryptionState)
 		return;
 
-	// decrypt the bldr
-	symmetricEncDecBldr(preldr.bldrKey, SHA1_DIGEST_LEN);
+	printf("decrypting 2BL.. (preserving FBL)\n");
+	preldrSymmetricEncDecBldr(preldr.bldrKey, SHA1_DIGEST_LEN); /*dont mangle the FBL section of 2BL.*/
 
-	// calculate the offset to the 2bl entry point.
-	entry = (PRELDR_ENTRY*)(bldr.data + BLDR_BLOCK_SIZE - PRELDR_BLOCK_SIZE - sizeof(PRELDR_ENTRY));
-	if (bldr.data + entry->bldrEntryOffset < bldr.data || bldr.data + entry->bldrEntryOffset > bldr.data + BLDR_BLOCK_SIZE)	{
-		printf("Error: 2BL entry offset is out of bounds\n");
-		preldr.status = PRELDR_STATUS_ERROR;
+	// calculate the offset to the 2BL entry point.
+	PRELDR_ENTRY* entry = (PRELDR_ENTRY*)(bldr.data + BLDR_BLOCK_SIZE - PRELDR_BLOCK_SIZE - sizeof(PRELDR_ENTRY));
+	if (entry->bldrEntryOffset > BLDR_BLOCK_SIZE) {
+		printf("revert preldr decryption.. 2BL entry offset is out of bounds.\n");
+		preldrSymmetricEncDecBldr(preldr.bldrKey, SHA1_DIGEST_LEN);/*revert*/
 		return;
 	}
 
 	// restore 2BL loader params.
-	// the first 16 bytes of 2bl were zeroed during the build process
-	// and are mangled by decryption. it makes up the 2bl entry point,
-	// (4 bytes) and part of the command line argument buffer (12 bytes)
+	// the first 16 bytes of 2BL were zeroed during the build process.
+	// it makes up the 2BL entry point (4 bytes), and part of the 
+	// command line argument buffer (12 bytes)
 	memset(bldr.data, 0, 16);
 	bldr.ldrParams->bldrEntryPoint = BLDR_BASE + entry->bldrEntryOffset;
-	
-	// restore 2BL boot params; move the boot params 16 bytes right;
-	// this will write over the preldr nonce. but its mangled by 2BL
-	// decryption anyway, so it doesnt matter.
-	bootParamsPtr = (uint8_t*)bldr.bootParams - PRELDR_NONCE_SIZE;
-	memcpy(&bootParamsCpy, bootParamsPtr, sizeof(BOOT_PARAMS));
-	memcpy(bldr.bootParams, &bootParamsCpy, sizeof(BOOT_PARAMS));
-	memset(bootParamsPtr, 0, PRELDR_NONCE_SIZE);
-	
-	// zero the preldr; it has been mangled by 2BL 
-	// decryption anyway, so it doesnt matter.
-	memset(preldr.data, 0, PRELDR_SIZE);
-	preldr.data = NULL;
 
-	// zero the rom digest; it has been mangled by 2BL 
-	// decryption anyway, so it doesnt matter.
-	memset(romDigest, 0, ROM_DIGEST_SIZE);
-	romDigest = NULL;
+	if (params.restoreBootParams) {
+		// restore 2BL boot params; move the boot params 16 bytes right
+		// this will write over the preldr nonce.
+		uint8_t* bootParamsPtr = (uint8_t*)bldr.bootParams - PRELDR_NONCE_SIZE;
+		for (int i = sizeof(BOOT_PARAMS) - 1; i >= 0; --i) {
+			((uint8_t*)bldr.bootParams)[i] = bootParamsPtr[i];
+		}
+		memset(bootParamsPtr, 0, PRELDR_NONCE_SIZE);
+	}
+	else {
+		// temp fixup of 2BL loader params pointer.
+		bldr.bootParams = (BOOT_PARAMS*)((uint8_t*)bldr.bootParams - PRELDR_NONCE_SIZE);
+	}
 
-	// zero preldr entry as we've restored the 2BL loader params.
-	// at this point, its just 8 bytes in the middle of the 2BL.
-	memset(entry, 0, sizeof(PRELDR_ENTRY));
-	entry = NULL;
-	
-	// set all preldr ptrs to NULL, as they now point to invalid data.
-	preldr.params = NULL;
-	preldr.funcs = NULL;
-	preldr.pubkey = NULL;
-	preldr.funcBlock = NULL;
-	preldr.entryPoint = NULL;
-	preldr.nonce = NULL;
-
-	// preldr load success.
+	// FBL load success.
 	preldr.status = PRELDR_STATUS_BLDR_DECRYPTED;
 }
 
+void Bios::preldrSymmetricEncDecBldr(const uint8_t* key, const uint32_t len)
+{
+	if (bldr.data == NULL)
+		return;
+
+	if (!IN_BOUNDS_BLOCK(bldr.data, BLDR_BLOCK_SIZE, data, size)) {
+		printf("error de/encrypting 2BL. 2BL ptr is out of bounds\n");
+		return;
+	}
+
+	RC4_CONTEXT context = { 0 };
+	rc4_key(&context, key, len);
+
+	// decrypt 2BL up to FBL
+	rc4(&context, bldr.data, BLDR_BLOCK_SIZE - PRELDR_BLOCK_SIZE);
+
+	// seed context; we do this so we dont mangle the FBL decrypting 2BL
+	// but still correctly decrypt parts after the preldr block.
+	rc4(&context, NULL, PRELDR_BLOCK_SIZE - PRELDR_PARAMS_SIZE);
+
+	// decrypt parts after the preldr block; FBL params, 2BL boot params.
+	rc4(&context, bldr.data + BLDR_BLOCK_SIZE - PRELDR_PARAMS_SIZE, PRELDR_PARAMS_SIZE);
+}
 void Bios::symmetricEncDecBldr(const uint8_t* key, const uint32_t len)
 {
 	if (bldr.data == NULL)
 		return;
 
 	if (!IN_BOUNDS_BLOCK(bldr.data, BLDR_BLOCK_SIZE, data, size)) {
-		printf("Error: 2BL ptr is out of bounds\n");
+		printf("error de/encrypting 2BL. 2BL ptr is out of bounds\n");
 		return;
 	}
 
 	printf("%s 2BL..\n", bldr.encryptionState ? "decrypting" : "encrypting");
-	symmetricEncDec(bldr.data, BLDR_BLOCK_SIZE, key, len);
+	
+	RC4_CONTEXT context = { 0 };
+	rc4_key(&context, key, len);
+	rc4(&context, bldr.data, BLDR_BLOCK_SIZE);
+
 	bldr.encryptionState = !bldr.encryptionState;
 }
 void Bios::symmetricEncDecKernel()
@@ -475,12 +503,16 @@ void Bios::symmetricEncDecKernel()
 	}
 
 	if (!IN_BOUNDS_BLOCK(krnl, bldr.bootParams->krnlSize, data, size)) {
-		printf("Error: krnl ptr is out of bounds\n");
+		printf("error de/encrypting kernel. kernel ptr is out of bounds\n");
 		return;
 	}
 
-	printf("%s kernel.. (using key %s)\n", (kernelEncryptionState ? "decrypting" : "encrypting"), (params.keyKrnl != NULL ? "from CLI" : "found in 2BL"));
-	symmetricEncDec(krnl, bldr.bootParams->krnlSize, key, XB_KEY_SIZE);
+	printf("%s kernel..\n", kernelEncryptionState ? "decrypting" : "encrypting");
+		
+	RC4_CONTEXT context = { 0 };
+	rc4_key(&context, key, XB_KEY_SIZE);
+	rc4(&context, krnl, bldr.bootParams->krnlSize);
+
 	kernelEncryptionState = !kernelEncryptionState;
 }
 
@@ -570,8 +602,7 @@ int Bios::preldrDecryptPublicKey()
 }
 int Bios::printState()
 {
-	printf("rom size:\t%u kb\nbin size:\t%u kb\n\n2BL entry:\t0x%08X\nsignature:\t",
-		params.romsize / 1024, size / 1024, bldr.ldrParams->bldrEntryPoint);
+	printf("\n2BL entry:\t0x%08X\nsignature:\t", bldr.ldrParams->bldrEntryPoint);
 	uprinth((uint8_t*)&bldr.bootParams->signature, 4);
 	printf("krnl data size:\t%u bytes\nkrnl size:\t%u bytes\n" \
 		"2bl size:\t%u bytes\ninit tbl size:\t%u bytes\n" \
