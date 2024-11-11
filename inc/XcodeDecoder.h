@@ -105,28 +105,36 @@ inline DECODE_SETTINGS* createDecodeSettings() {
 inline void destroyDecodeSettings(DECODE_SETTINGS* settings) {
     if (settings->format_str != NULL) {
         free(settings->format_str);
+        settings->format_str = NULL;
     }
     if (settings->jmp_str != NULL) {
         free(settings->jmp_str);
+        settings->jmp_str = NULL;
     }
     if (settings->no_operand_str != NULL) {
         free(settings->no_operand_str);
+        settings->no_operand_str = NULL;
     }
     if (settings->num_str != NULL) {
         free(settings->num_str);
+        settings->num_str = NULL;
     }
     if (settings->num_str_format != NULL) {
         free(settings->num_str_format);
+        settings->num_str_format = NULL;
     }
     if (settings->prefix_str != NULL) {
         free(settings->prefix_str);
+        settings->prefix_str = NULL;
     }
     if (settings->comment_prefix != NULL) {
         free(settings->comment_prefix);
+        settings->comment_prefix = NULL;
     }
     for (int i = 0; i < 5; i++) {
         if (settings->format_map[i].str != NULL) {
             free(settings->format_map[i].str);
+            settings->format_map[i].str = NULL;
         }
     }
     for (int i = 0; i < XC_OPCODE_COUNT; i++) {
@@ -136,28 +144,33 @@ inline void destroyDecodeSettings(DECODE_SETTINGS* settings) {
     }
 };
 
+#define JMP_XCODE_NOT_BRANCHABLE 0
+#define JMP_XCODE_BRANCHABLE 1
+
+typedef struct _JMP_XCODE {
+    int branchable;
+    uint32_t xcodeOffset;
+    XCODE* xcode;
+} JMP_XCODE;
+
 // DECODE_CONTEXT
 typedef struct {
     DECODE_SETTINGS settings;
+    JMP_XCODE* jmps;
     LABEL* labels;
     XCODE* xcode;
     FILE* stream;
     uint32_t labelCount;
     uint32_t xcodeCount;
+    uint32_t jmpCount;
     uint32_t xcodeSize;
     uint32_t xcodeBase;
+    bool branch;
     char str_decode[128];
 } DECODE_CONTEXT;
 inline void initDecodeContext(DECODE_CONTEXT* context) {
-    context->labels = NULL;
-    context->stream = NULL;
-    context->xcode = NULL;
-    context->xcodeSize = 0;
-    context->xcodeCount = 0;
-    context->xcodeBase = 0;
-    context->labelCount = 0;
-    context->str_decode[0] = '\0';
-
+    memset(context, 0, sizeof(DECODE_CONTEXT));
+    context->branch = false;
     initDecodeSettings(&context->settings);
 };
 inline DECODE_CONTEXT* createDecodeContext() {
@@ -168,19 +181,26 @@ inline DECODE_CONTEXT* createDecodeContext() {
     return context;
 };
 inline void destroyDecodeContext(DECODE_CONTEXT* context) {
-    if (context != NULL)
-    {
+    if (context != NULL) {
         context->stream = NULL;
         context->xcode = NULL;
 
-        if (context->labels != NULL)
-        {
+        if (context->labels != NULL) {
             free(context->labels);
             context->labels = NULL;
         }
         context->labelCount = 0;
 
+        if (context->jmps != NULL) {
+            free(context->jmps);
+            context->jmps = NULL;
+        }
+        context->jmpCount = 0;
+
         destroyDecodeSettings(&context->settings);
+
+        free(context);
+        context = NULL;
     }
 };
 
@@ -192,7 +212,6 @@ public:
 	};
 	~XcodeDecoder() {
         destroyDecodeContext(context);
-        free(context);
 	};
 
     DECODE_CONTEXT* context;

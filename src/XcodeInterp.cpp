@@ -54,21 +54,19 @@ const FIELD_MAP xcode_opcode_map[] = {
 	{ "xc_nop_80",		XC_NOP_80 }
 };
 
-int XcodeInterp::load(uint8_t* data, uint32_t size)
+int XcodeInterp::load(uint8_t* in_data, uint32_t in_size)
 {
-	if (_data != NULL)
-	{
+	if (data != NULL) {
 		return 1;
 	}
 
-	_data = (uint8_t*)malloc(size);
-	if (_data == NULL)
-	{
+	data = (uint8_t*)malloc(in_size);
+	if (data == NULL) {
 		return ERROR_OUT_OF_MEMORY;
 	}
 
-	memcpy(_data, data, size);
-	_size = size;
+	memcpy(data, in_data, in_size);
+	size = in_size;
 	
 	reset();
 
@@ -76,45 +74,43 @@ int XcodeInterp::load(uint8_t* data, uint32_t size)
 }
 void XcodeInterp::reset()
 {
-	_offset = 0;
-	_status = DATA_OK;
-	_ptr = (XCODE*)_data;
+	offset = 0;
+	status = DATA_OK;
+	ptr = (XCODE*)data;
 }
 int XcodeInterp::interpretNext(XCODE*& xcode)
 {
-	if (_data == NULL)
-	{
-		_status = INTERP_STATUS::DATA_ERROR;
+	if (data == NULL) {
+		status = INTERP_STATUS::DATA_ERROR;
 		return ERROR_INVALID_DATA;
 	}
 
-	if (_status == INTERP_STATUS::EXIT_OP_FOUND) // last xcode was an exit. dont interpret anymore xcodes after this
+	// last xcode was an exit. dont interpret anymore xcodes after this
+	if (status == INTERP_STATUS::EXIT_OP_FOUND) 
 		return 1;
 
-	if (_offset + sizeof(XCODE) > _size) // check if offset is within bounds
-	{
-		_status = INTERP_STATUS::DATA_ERROR;		
+	// check if offset is within bounds
+	if (offset + sizeof(XCODE) > size) {
+		status = INTERP_STATUS::DATA_ERROR;		
 		return 1;
 	}
 
-	_ptr = (XCODE*)(_data + _offset);	
-	xcode = _ptr;
+	ptr = (XCODE*)(data + offset);	
+	xcode = ptr;
 
-	if (xcode->opcode == XC_EXIT)
-	{
-		_status = INTERP_STATUS::EXIT_OP_FOUND;
+	if (xcode->opcode == XC_EXIT) {
+		status = INTERP_STATUS::EXIT_OP_FOUND;
 	}
-	else
-	{
-		_status = INTERP_STATUS::DATA_OK;
+	else {
+		status = INTERP_STATUS::DATA_OK;
 	}
 	
-	_offset += sizeof(XCODE);
+	offset += sizeof(XCODE);
 
 	return 0;
 }
 
-int encodeX86AsMemWrites(uint8_t* data, uint32_t size, uint8_t*& buffer, uint32_t* xcodeSize)
+int encodeX86AsMemWrites(uint8_t* data, uint32_t size, uint32_t base, uint8_t*& buffer, uint32_t* xcodeSize)
 {
 	const uint32_t allocSize = sizeof(XCODE) * 10;
 
@@ -125,14 +121,19 @@ int encodeX86AsMemWrites(uint8_t* data, uint32_t size, uint8_t*& buffer, uint32_
 	uint32_t nSize = allocSize;
 	uint32_t offset = 0;
 	XCODE xcode = { XC_MEM_WRITE, 0, 0 };
-
-	if (size % 4 != 0) {
-		return 1;
-	}
-
+	uint32_t xc_d;
+	
 	for (uint32_t i = 0; i < size; i+=4) {
-		xcode.addr = i;
-		xcode.data = *(uint32_t*)(data + i);
+		if (i + 4 > size) {
+			xc_d = 0;
+			memcpy(&xc_d, data + i, size - i);
+		}
+		else {
+			xc_d = *(uint32_t*)(data + i);
+		}
+
+		xcode.addr = base + i;
+		xcode.data = xc_d;
 
 		if (offset + sizeof(XCODE) > nSize) {
 			uint8_t* new_buffer = (uint8_t*)realloc(buffer, nSize + allocSize);

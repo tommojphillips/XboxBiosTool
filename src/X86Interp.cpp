@@ -416,36 +416,30 @@ int decodeX86(uint8_t* data, uint32_t size, uint32_t base, FILE* stream, uint32_
 	uint32_t instructionTreeSize;
 
 	result = generateX86InstructionTree(data+base, size-base, &instructionTree, &instructionTreeSize);
-	if (result > 1)
-	{
+	if (result > 1) {
 		printf("failed to generate instruction tree.\n");
-		if (instructionTree != NULL)
-		{
+		if (instructionTree != NULL) {
 			free(instructionTree);
 			instructionTree = NULL;
 		}
 		return 1;
 	}
 
-	if (instructionTreeSize == 0)
-	{
+	if (instructionTreeSize == 0) {
 		printf("No instructions found.\n");
 	}
-	else
-	{
+	else {
 		printf("\nx86 instructions:\n");
 
 		uint32_t offset = 0;
-		for (i = 0; i < instructionTreeSize / sizeof(X86_INSTR); ++i)
-		{
+		for (i = 0; i < instructionTreeSize / sizeof(X86_INSTR); ++i) {
 			getX86Mnemonic(&instructionTree[i], str_instr);
-			fprintf(stream, "\t %08x: %s\n", base + offset, str_instr);
+			fprintf(stream, "\t %s\n", str_instr);
 
 			offset += (instructionTree[i].map->opcode_len + instructionTree[i].map->operand1_len + instructionTree[i].map->operand2_len);
 		}
 
-		if (codeSize != NULL)
-		{
+		if (codeSize != NULL) {
 			*codeSize = offset;
 		}
 	}
@@ -464,31 +458,26 @@ int getX86Instruction(const uint8_t* data, uint32_t size, X86_INSTR* instruction
 	initX86Instruction(instruction);
 	
 	// iterate through the x86 instructions
-	for (uint32_t i = 0; i < sizeof(x86_instructions) / sizeof(X86_INSTR_MAP); i++)
-	{
+	for (uint32_t i = 0; i < sizeof(x86_instructions) / sizeof(X86_INSTR_MAP); i++) {
 		if (x86_instructions[i].opcode_len > size)
 			continue;
-		if (memcmp(data, (uint8_t*)&x86_instructions[i].opcode, x86_instructions[i].opcode_len) == 0)
-		{
+		if (memcmp(data, (uint8_t*)&x86_instructions[i].opcode, x86_instructions[i].opcode_len) == 0) {
 			instruction->map = &x86_instructions[i];
 		}
 	}
 
-	if (instruction->map->type == X86_INSTR_NONE)
-	{
+	if (instruction->map->type == X86_INSTR_NONE) {
 		memcpy(&instruction->opcode, data, 1);
 		return X86_ERROR_UNKOWN_OPCODE;
 	}
 
 	memcpy(&instruction->opcode, data, instruction->map->opcode_len);
 
-	if (instruction->map->operand1_len > 0)
-	{
+	if (instruction->map->operand1_len > 0) {
 		memcpy(&instruction->operand1, data + instruction->map->opcode_len, instruction->map->operand1_len);
 	}
 	
-	if (instruction->map->operand2_len > 0)
-	{
+	if (instruction->map->operand2_len > 0) {
 		memcpy(&instruction->operand2, data + instruction->map->opcode_len + instruction->map->operand1_len, instruction->map->operand2_len);
 	}
 
@@ -503,8 +492,7 @@ int getX86Mnemonic(X86_INSTR* instruction, char* str)
 	uint32_t operand1 = instruction->operand1;
 	const X86_INSTR_MAP map = *instruction->map;
 
-	if (map.type == X86_INSTR_NONE)
-	{
+	if (map.type == X86_INSTR_NONE) {
 		sprintf(str + i, "unk 0x%02x", instruction->opcode);
 		return X86_ERROR_UNKOWN_OPCODE;
 	}
@@ -512,14 +500,12 @@ int getX86Mnemonic(X86_INSTR* instruction, char* str)
 	strcpy(str, x86_mnemonics[map.type].str);
 	i = strlen(str);
 
-	if (map.reg != X86_REG_NONE)
-	{
+	if (map.reg != X86_REG_NONE) {
 		sprintf(str + i, " %s", x86_registers[map.reg].str);
 		i = strlen(str);
 	}
 	
-	if (map.reg2 != X86_REG_NONE)
-	{
+	if (map.reg2 != X86_REG_NONE) {
 		sprintf(str + i, ", %s", x86_registers[map.reg2].str);
 		i = strlen(str);
 	}
@@ -527,14 +513,12 @@ int getX86Mnemonic(X86_INSTR* instruction, char* str)
 	if (instruction->map->operand1_len == 0)
 		return X86_ERROR_SUCCESS;
 
-	if (map.reg != X86_REG_NONE)
-	{
+	if (map.reg != X86_REG_NONE) {
 		strcpy(str + i, ",");
 		i++;
 	}
 
-	switch (map.type)
-	{
+	switch (map.type) {
 		case X86_INSTR_MOV_PTR:
 			sprintf(str + i, " [0x%02x]", operand1);
 			break;
@@ -861,19 +845,14 @@ int generateX86InstructionTree(uint8_t* data, uint32_t size, X86_INSTR** instruc
 	treeIndex = 0;
 	result = 1;
 
-	for (offset = 0; offset < size - 1;)
-	{
-		// check if the next [max_instr_size] bytes are zero, if so we are done.
-		if (memcmp((data + offset), zero_mem, (offset < size - MAX_INSTR_SIZE ? MAX_INSTR_SIZE : size - offset)) == 0)
+	for (offset = 0; offset < size - 1;) {
+		if (size > MAX_INSTR_SIZE && memcmp((data + offset), zero_mem, (offset < size - MAX_INSTR_SIZE ? MAX_INSTR_SIZE : size - offset)) == 0)
 			break;
 
-		if (treeIndex >= treeSize / sizeof(X86_INSTR))
-		{
+		if (treeIndex >= treeSize / sizeof(X86_INSTR)) {
 			X86_INSTR* newTree = (X86_INSTR*)realloc(tree, treeSize + ALLOC_SIZE);
-			if (newTree == NULL)
-			{
-				if (tree != NULL)
-				{
+			if (newTree == NULL) {
+				if (tree != NULL) {
 					free(tree);
 					tree = NULL;
 				}
@@ -886,8 +865,7 @@ int generateX86InstructionTree(uint8_t* data, uint32_t size, X86_INSTR** instruc
 		}
 
 		result = getX86Instruction(data + offset, size - offset, &tree[treeIndex]);
-		if (result != 0)
-		{
+		if (result != 0) {
 			offset++;
 			result = 0;
 			break;
@@ -897,13 +875,11 @@ int generateX86InstructionTree(uint8_t* data, uint32_t size, X86_INSTR** instruc
 		treeIndex++;
 	}
 
-	if (instructionTree != NULL)
-	{
+	if (instructionTree != NULL) {
 		*instructionTree = tree;
 	}
 
-	if (instructionTreeSize != NULL)
-	{
+	if (instructionTreeSize != NULL) {
 		*instructionTreeSize = treeIndex * sizeof(X86_INSTR);
 	}
 

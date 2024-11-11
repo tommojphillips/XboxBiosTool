@@ -35,6 +35,9 @@
 #endif
 
 #define SMB_BASE            0xC000
+#define SMB_CMD_REGISTER    (SMB_BASE + 0x08)
+#define SMB_VAL_REGISTER    (SMB_BASE + 0x06)
+
 #define NV2A_BASE           0x0F000000
 #define NV2A_BASE_KERNEL    0x0FD00000
 #define MCPX_1_0_IO_BAR     0x80000810
@@ -68,7 +71,9 @@
 typedef uint8_t OPCODE;
 
 typedef struct _LABEL {
-    uint32_t offset;
+    uint32_t offset;        // the offset of the label
+    uint32_t references;    // how many times the label is jumped to ( xcodes that use this label )
+    bool defined;           // if we have come across this label definition. ( the xcode that this label points to )
     char name[20];
 } LABEL;
 
@@ -84,14 +89,14 @@ extern const FIELD_MAP xcode_opcode_map[];
 class XcodeInterp {
 public:
     XcodeInterp() {
-		_size = 0;
+		size = 0;
         reset();
-        _data = NULL;
+        data = NULL;
     };
     ~XcodeInterp() {
-        if (_data != NULL) {
-            free(_data);
-            _data = NULL;
+        if (data != NULL) {
+            free(data);
+            data = NULL;
         }
 	};
 
@@ -100,21 +105,16 @@ public:
     int load(uint8_t* data, uint32_t size);
     void reset();
     int interpretNext(XCODE*& xcode);
-        
-    XCODE* getPtr() const { return _ptr; };
-    uint8_t* getData() const { return _data; };
-    uint32_t getOffset() const { return _offset; };
-    INTERP_STATUS getStatus() const { return _status; };
-
+    
+    uint8_t* data;         // XCODE data
+    uint32_t size;         // size of the XCODE data  
+    XCODE* ptr;            // current position in the XCODE data
+    uint32_t offset;       // offset from the start of the data to the end of the current XCODE (offset to the next XCODE)
+    INTERP_STATUS status;  // status of the xcode interpreter
 private:
-    uint8_t* _data;         // XCODE data
-    uint32_t _size;         // size of the XCODE data  
-    XCODE* _ptr;            // current position in the XCODE data
-    uint32_t _offset;       // offset from the start of the data to the end of the current XCODE (offset to the next XCODE)
-    INTERP_STATUS _status;  // status of the xcode interpreter
 };
 
-int encodeX86AsMemWrites(uint8_t* data, uint32_t size, uint8_t*& buffer, uint32_t* xcodeSize);
+int encodeX86AsMemWrites(uint8_t* data, uint32_t size, uint32_t base, uint8_t*& buffer, uint32_t* xcodeSize);
 
 int getOpcodeStr(const FIELD_MAP* opcodes, uint8_t opcode, const char*& str);
 const LOADINI_RETURN_MAP  getDecodeSettingsMap();

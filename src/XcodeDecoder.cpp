@@ -67,6 +67,10 @@
 	if (XC_WRITE(0, xc_cmd, xc_addr, xc_data) && XC_WRITE(-1, xc_prev_cmd, xc_prev_addr, xc_prev_data) && XC_WRITE(-2, xc_prev1_cmd, xc_prev1_addr, xc_prev1_data)) \
 		{ strcat(str, comment); return 0; }
 
+#define XC_WRITE_COMMENT_NEXT_2_XCODE(comment, xc_cmd, xc_addr, xc_data, xc_prev_cmd, xc_prev_addr, xc_prev_data, xc_prev1_cmd, xc_prev1_addr, xc_prev1_data) \
+	if (XC_WRITE(0, xc_cmd, xc_addr, xc_data) && XC_WRITE(1, xc_prev_cmd, xc_prev_addr, xc_prev_data) && XC_WRITE(2, xc_prev1_cmd, xc_prev1_addr, xc_prev1_data)) \
+		{ strcat(str, comment); return 0; }
+
 #define XC_WRITE_COMMENT_MASK_LAST_XCODE(comment, xc_cmd, xc_addr, xc_addr_mask, xc_data, xc_prev_cmd, xc_prev_addr, xc_prev_addr_mask, xc_prev_data) \
 	if (XC_WRITE_MASK(0, xc_cmd, xc_addr, xc_addr_mask, xc_data, 0xFFFFFFFF) && XC_WRITE_MASK(-1, xc_prev_cmd, xc_prev_addr, xc_prev_addr_mask, xc_prev_data, 0xFFFFFFFF)) \
 		{ strcat(str, comment); return 0; }
@@ -88,7 +92,7 @@ static const FIELD_MAP format_map[] = {
 	{ "{data}", DECODE_FIELD_DATA },
 	{ "{comment}", DECODE_FIELD_COMMENT }
 };
-static const LOADINI_SETTING settings_map[] = {
+const LOADINI_SETTING settings_map[] = {
 	{ "format_str", LOADINI_SETTING_TYPE::STR },
 	{ "jmp_str", LOADINI_SETTING_TYPE::STR },
 	{ "no_operand_str", LOADINI_SETTING_TYPE::STR },
@@ -114,25 +118,16 @@ static const LOADINI_SETTING settings_map[] = {
 	{ xcode_opcode_map[13].str, LOADINI_SETTING_TYPE::STR },
 	{ xcode_opcode_map[14].str, LOADINI_SETTING_TYPE::STR }
 };
-static const LOADINI_RETURN_MAP cmap = { settings_map, sizeof(settings_map), sizeof(settings_map) / sizeof(LOADINI_SETTING_MAP) };
+const LOADINI_RETURN_MAP cmap = { settings_map, sizeof(settings_map), sizeof(settings_map) / sizeof(LOADINI_SETTING_MAP) };
 
-// remove {entry} from str;
-// output: output buffer
-// str: input string
-// i: start index
-// j: end index
-// len: length of input string
-// m: max length of output buffer
-// return 0 if found, 1 if not found, -1 if error
 int ll(char* output, char* str, uint32_t i, uint32_t* j, uint32_t len, uint32_t m);
-
-// output: output buffer
-// str: input string
-// i: start index
-// j: end index
-// len: length of input string
-// return 0 if found, 1 if not found, -1 if error
 int ll2(char* output, char* str, uint32_t i, uint32_t& j, uint32_t len);
+
+int createLabel(DECODE_CONTEXT* context, uint32_t offset, const char* label_format);
+int createJmp(DECODE_CONTEXT * context, uint32_t xcodeOffset, XCODE * xcode);
+int searchLabel(DECODE_CONTEXT* context, uint32_t offset, LABEL** label);
+int searchJmp(DECODE_CONTEXT* context, uint32_t offset, JMP_XCODE** jmp);
+void walkBranch(DECODE_CONTEXT * context, XcodeInterp * interp);
 
 int XcodeDecoder::load(uint8_t* data, uint32_t size, uint32_t base, const char* ini)
 {
@@ -141,8 +136,11 @@ int XcodeDecoder::load(uint8_t* data, uint32_t size, uint32_t base, const char* 
 	// parse xcodes for labels.
 
 	int result = 0;
-	uint32_t lbi;
-	bool isLabel = false;
+	XCODE* xcode = NULL;
+	LABEL* label = NULL;
+	uint32_t labelArraySize = 0;
+	uint32_t jmpArraySize = 0;
+	uint32_t jmpCount = 0;
 	static const char* label_format = "lb_%02d";
 
 	result = interp.load(data + base, size - base);
@@ -155,71 +153,74 @@ int XcodeDecoder::load(uint8_t* data, uint32_t size, uint32_t base, const char* 
 	}
 
 	context->xcodeBase = base;
-	
+	context->jmpCount = 0;
+	context->labelCount = 0;
+	context->settings.labelMaxLen = 0;
 	memset(context->str_decode, 0, sizeof(context->str_decode));
 
 	result = loadSettings(ini, &context->settings);
 	if (result != 0) {
 		return result;
 	}
-
-	// Fix up the xcode data to the offset for decoding
-
-	// Count the number of labels for allocation
-
-	lbi = 0;
+	
 	interp.reset();
-	while (interp.interpretNext(context->xcode) == 0) {
-		if (context->xcode->opcode != XC_JMP && context->xcode->opcode != XC_JNE)
-			continue;
-
-		lbi++;
-		context->xcode->data = interp.getOffset() + context->xcode->data;
+	while (interp.interpretNext(xcode) == 0) {
+		if (xcode->opcode == XC_JMP || xcode->opcode == XC_JNE) {
+			jmpCount++;
+		}
 	}
 
-	// initialize labels; NOTE. More than likely over allocated as labels can be referenced more than once within the xcode table.
+	if (jmpCount > 0) {
+		// initialize label array;
+		labelArraySize = sizeof(LABEL) * jmpCount;
+		context->labels = (LABEL*)malloc(labelArraySize);
+		if (context->labels == NULL) {
+			return ERROR_OUT_OF_MEMORY;
+		}
+		memset(context->labels, 0, labelArraySize);	
 
-	context->labels = (LABEL*)malloc(sizeof(LABEL) * lbi);
-	if (context->labels == NULL) {
-		return ERROR_OUT_OF_MEMORY;
+		// initialize jmp array;
+		jmpArraySize = sizeof(JMP_XCODE) * jmpCount;
+		context->jmps = (JMP_XCODE*)malloc(jmpArraySize);
+		if (context->jmps == NULL) {
+			return ERROR_OUT_OF_MEMORY;
+		}
+		memset(context->jmps, 0, jmpArraySize);
 	}
 
-	context->settings.labelMaxLen = 0;
+	// create labels, jmps
+	interp.reset();
+	while (interp.interpretNext(xcode) == 0) {
+		if (xcode->opcode == XC_JMP || xcode->opcode == XC_JNE) {
+			
+			// create a label
+			if (context->labels != NULL) {
+				if (searchLabel(context, interp.offset + xcode->data, &label) == 0) {
+					label->references++;
+				}
+				else {
+					createLabel(context, interp.offset + xcode->data, label_format);
+				}
+			}
+
+			// create a jmp
+			if (context->jmps != NULL) {
+				createJmp(context, interp.offset - sizeof(XCODE), xcode);
+			}
+		}
+	}
+
+	// init label max size
+	uint32_t lbi = context->labelCount;
 	while (lbi > 0) {
 		context->settings.labelMaxLen++;
 		lbi /= 10;
 	}
 	context->settings.labelMaxLen += strlen(label_format) - 4; // 4 for %02d
-
-	lbi = 0;
-	interp.reset();
-	while (interp.interpretNext(context->xcode) == 0) {
-		if (context->xcode->opcode != XC_JMP && context->xcode->opcode != XC_JNE)
-			continue;
-
-		// check if offset is already a label
-		isLabel = false;
-		for (uint32_t lb = 0; lb < lbi; lb++) {
-			LABEL* label = &context->labels[lb];
-			if (label == NULL)
-				continue;
-			if (label->offset == context->xcode->data) {
-				isLabel = true;
-				break;
-			}
-		}
-
-		// label does not exist. create one.
-		if (!isLabel) {
-			LABEL* label = &context->labels[lbi];
-			sprintf(label->name, label_format, lbi);
-			label->offset = context->xcode->data;
-			lbi++;
-		}
-	}
-	context->xcodeSize = interp.getOffset();
-	context->xcodeCount = interp.getOffset() / sizeof(XCODE);
-	context->labelCount = lbi;
+	
+	// xcode info
+	context->xcodeSize = interp.offset;
+	context->xcodeCount = interp.offset / sizeof(XCODE);
 
 	return 0;
 }
@@ -445,17 +446,15 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 		// find next valid opcode (range 0-255)
 		while ((opcode = k) < 255 && getOpcodeStr(xcode_opcode_map, k++, str) != 0);
 
-		if (str == NULL)
-		{
+		if (str == NULL) {
 			result = 1;
 			goto Cleanup;
 		}
-
-		if (settings->opcodes[i].str == NULL) // set default opcode string
-		{
+		
+		// set default opcode string
+		if (settings->opcodes[i].str == NULL) {
 			settings->opcodes[i].str = (char*)malloc(strlen(str) + 1);
-			if (settings->opcodes[i].str == NULL)
-			{
+			if (settings->opcodes[i].str == NULL) {
 				result = ERROR_OUT_OF_MEMORY;
 				goto Cleanup;
 			}
@@ -465,16 +464,14 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 		memcpy(&settings->opcodes[i].field, &opcode, sizeof(OPCODE));
 
 		len = strlen(settings->opcodes[i].str);
-		if (len > settings->opcodeMaxLen)
-		{
+		if (len > settings->opcodeMaxLen) {
 			settings->opcodeMaxLen = len;
 		}
 	}
 
 Cleanup:
 
-	if (result == ERROR_INVALID_DATA)
-	{
+	if (result == ERROR_INVALID_DATA) {
 		printf("Error: Key '%s' has invalid value '%s'\n", buf, value);
 	}
 
@@ -486,19 +483,15 @@ int XcodeDecoder::decodeXcodes()
 	int result;
 
 	interp.reset();
-	while (interp.interpretNext(context->xcode) == 0)
-	{
+	while (interp.interpretNext(context->xcode) == 0) {
 		result = decode();
-		if (result != 0)
-		{
-			if (result == ERROR_BUFFER_OVERFLOW)
-			{
+		if (result != 0) {
+			if (result == ERROR_BUFFER_OVERFLOW) {
 				printf("Error: Decode format too large.\n");
 			}
-			else
-			{
+			else {
 				printf("Error decoding xcode:\n\t%04X, OP: %02X, ADDR: %04X, DATA: %04X\n",
-					(context->xcodeBase + interp.getOffset() - sizeof(XCODE)), context->xcode->opcode, context->xcode->addr, context->xcode->data);
+					(context->xcodeBase + interp.offset - sizeof(XCODE)), context->xcode->opcode, context->xcode->addr, context->xcode->data);
 			}
 			return result;
 		}
@@ -515,18 +508,40 @@ int XcodeDecoder::decode()
 	uint32_t operand_len = 0;
 	uint32_t no_operand_len = 0;
 	uint32_t jmp_len = 0;
-	
+	LABEL* label;
+	JMP_XCODE* jmp;
+
 	char str[64] = {};
 	char str_tmp[64] = {};
 
-	for (uint32_t lb = 0; lb < context->labelCount; lb++) {
-		LABEL* label = &context->labels[lb];
-		if (label->offset == interp.getOffset() - sizeof(XCODE)) {
-			sprintf(str, "%s:", label->name);
-			if (context->settings.label_on_new_line)
-				strcat(str, "\n");
-			break;
+	// branch checks
+	if (context->branch) {
+		if (context->xcode->opcode == XC_JNE) {
+			walkBranch(context, &interp);
 		}
+		else if (context->xcode->opcode == XC_JMP) {
+			if (searchJmp(context, interp.offset - sizeof(XCODE), &jmp) == 0) {
+				switch (jmp->branchable) {
+					case JMP_XCODE_BRANCHABLE:
+						//fprintf(context->stream, "; jmp is branchable\n");
+						walkBranch(context, &interp);
+						break;
+					case JMP_XCODE_NOT_BRANCHABLE:
+						//fprintf(context->stream, "; jmp is unbranchable!!\n");
+						fprintf(context->stream, "; took unbranchable jmp!!\n");
+						interp.offset += context->xcode->data;
+						break;
+				}
+			}
+		}
+	}
+
+	// output label
+	if (searchLabel(context, interp.offset - sizeof(XCODE), &label) == 0) {
+		label->defined = true;
+		sprintf(str, "%s:", label->name);
+		if (context->settings.label_on_new_line)
+			strcat(str, "\n");
 	}
 
 	if (!context->settings.label_on_new_line)
@@ -536,11 +551,12 @@ int XcodeDecoder::decode()
 	strcpy(context->str_decode, str);
 	str[0] = '\0';
 
-	// prefix
+	// output prefix
 	if (context->settings.prefix_str != NULL) {
 		strcat(context->str_decode, context->settings.prefix_str);
 	}
 
+	// output decode format; loop to find the seq of the format.
 	for (uint32_t seq = 0; seq < sizeof(context->settings.format_map) / sizeof(DECODE_STR_SETTING_MAP); seq++) {
 		for (uint32_t j = 0; j < sizeof(context->settings.format_map) / sizeof(DECODE_STR_SETTING_MAP); j++) {
 			if (context->settings.format_map[j].seq != seq + 1)
@@ -560,119 +576,121 @@ int XcodeDecoder::decode()
 			str[0] = '\0';
 			memset(str_tmp, 0, sizeof(str_tmp));
 
+			// append part of the decode str depending on the seq.
 			switch (context->settings.format_map[j].type) {
-			case DECODE_FIELD_OFFSET:
-				sprintf(str_tmp, context->settings.format_map[j].str, "%04x");
-				sprintf(str, str_tmp, context->xcodeBase + interp.getOffset() - sizeof(XCODE));
-				break;
+				
+				// output OFFSET
+				case DECODE_FIELD_OFFSET: {
+					sprintf(str_tmp, context->settings.format_map[j].str, "%04x");
+					sprintf(str, str_tmp, context->xcodeBase + interp.offset - sizeof(XCODE));
+				} break;
 
-			case DECODE_FIELD_OPCODE:
-				const char* str_opcode;
-				if (getOpcodeStr(context->settings.opcodes, context->xcode->opcode, str_opcode) != 0)
-					return 1;
-				sprintf(str, context->settings.format_map[j].str, str_opcode);
-				if (context->settings.pad) {
-					rpad(str, op_len, ' ');
-				}
-				break;
+				// output OPCODE
+				case DECODE_FIELD_OPCODE: {
+					const char* str_opcode;
+					if (getOpcodeStr(context->settings.opcodes, context->xcode->opcode, str_opcode) != 0)
+						return 1;
+					sprintf(str, context->settings.format_map[j].str, str_opcode);
+					if (context->settings.pad) {
+						rpad(str, op_len, ' ');
+					}
+				} break;
 
-			case DECODE_FIELD_ADDRESS:	
-				switch (context->xcode->opcode) {
-					case XC_JMP: {
-						if (context->settings.no_operand_str != NULL) {
-							strcpy(str_tmp, context->settings.no_operand_str);
-						}
-						else {
-							for (uint32_t lb = 0; lb < context->labelCount; lb++) {
-								LABEL* label = &context->labels[lb];
-								if (label->offset == context->xcode->data) {
-									sprintf(str_tmp, context->settings.jmp_str, label->name);
+				// output ADDRESS
+				case DECODE_FIELD_ADDRESS: {
+					switch (context->xcode->opcode) {
+						case XC_JMP: {
+							if (context->settings.no_operand_str != NULL) {
+								strcpy(str_tmp, context->settings.no_operand_str);
+								break;
+							}
+
+							if (searchLabel(context, interp.offset + context->xcode->data, &label) == 0) {
+								sprintf(str_tmp, context->settings.jmp_str, label->name);
+							}
+						} break;
+
+						case XC_USE_RESULT: {
+							if (context->settings.opcode_use_result) {
+								const char* opcode_str;
+								if (getOpcodeStr(context->settings.opcodes, (uint8_t)context->xcode->addr, opcode_str) == 0) {
+									strcpy(str_tmp, opcode_str);
 									break;
 								}
-							}//str_tmp[0] = '\0';
-						}						
-					} break;
-
-					case XC_USE_RESULT: {
-						if (context->settings.opcode_use_result) {
-							const char* opcode_str;
-							if (getOpcodeStr(context->settings.opcodes, (uint8_t)context->xcode->addr, opcode_str) == 0) {
-								strcpy(str_tmp, opcode_str);
-								break;
 							}
+						} // fall through to default
+
+						default: {
+							sprintf(str_tmp, context->settings.num_str_format, context->xcode->addr);
+							break;
 						}
 					}
-					// fall through
 
-					default: {
-						sprintf(str_tmp, context->settings.num_str_format, context->xcode->addr);
-						break;
+					sprintf(str, context->settings.format_map[j].str, str_tmp);
+					if (context->settings.pad) {
+
+						if (context->settings.opcode_use_result && operand_len < op_len)
+							operand_len = op_len;
+
+						if (operand_len < no_operand_len)
+							operand_len = no_operand_len;
+						rpad(str, operand_len, ' ');
 					}
-				}
+				} break;
 
-				sprintf(str, context->settings.format_map[j].str, str_tmp);
-				if (context->settings.pad) {
-					if (context->settings.opcode_use_result && operand_len < op_len)
-						operand_len = op_len;
-					if (operand_len < no_operand_len)
-						operand_len = no_operand_len;
-					rpad(str, operand_len, ' ');
-				}
-				break;
+				// output DATA
+				case DECODE_FIELD_DATA: {
+					switch (context->xcode->opcode) {
+						case XC_MEM_READ:
+						case XC_IO_READ:
+						case XC_PCI_READ:
+						case XC_EXIT:
+							if (context->settings.no_operand_str != NULL) {
+								strcpy(str_tmp, context->settings.no_operand_str);
+							}
+							else {
+								str_tmp[0] = '\0';
+							}
+							break;
 
-			case DECODE_FIELD_DATA:
-				switch (context->xcode->opcode) {
-					case XC_MEM_READ:
-					case XC_IO_READ:
-					case XC_PCI_READ:
-					case XC_EXIT:
-						if (context->settings.no_operand_str != NULL) {
-							strcpy(str_tmp, context->settings.no_operand_str);
-						}
-						else {
-							str_tmp[0] = '\0';
-						}
-						break;
+						case XC_JMP:
+							if (context->settings.no_operand_str != NULL) {
+								if (searchLabel(context, interp.offset + context->xcode->data, &label) == 0) {
+									sprintf(str_tmp, context->settings.jmp_str, label->name);
+								}
+							}
+							break;
 
-					case XC_JMP:
-						if (context->settings.no_operand_str != NULL)
-							goto MakeLabel;
-						break;
-
-					case XC_JNE:
-						MakeLabel:
-						for (uint32_t lb = 0; lb < context->labelCount; lb++) {
-							LABEL* label = &context->labels[lb];
-							if (label->offset == context->xcode->data) {
+						case XC_JNE:							
+							if (searchLabel(context, interp.offset + context->xcode->data, &label) == 0) {
 								sprintf(str_tmp, context->settings.jmp_str, label->name);
-								break;
 							}
-						}
-						break;
+							break;
 
-					default:
-						sprintf(str_tmp, context->settings.num_str_format, context->xcode->data);
-						break;
-				}
+						default:
+							sprintf(str_tmp, context->settings.num_str_format, context->xcode->data);
+							break;
+					}
 
-				sprintf(str, context->settings.format_map[j].str, str_tmp);
-				if (context->settings.pad) {
-					if (operand_len < jmp_len)
-						operand_len = jmp_len;
-					if (operand_len < no_operand_len)
-						operand_len = no_operand_len;
-					rpad(str, operand_len, ' ');
-				}
-				break;
+					sprintf(str, context->settings.format_map[j].str, str_tmp);
+					if (context->settings.pad) {
+						if (operand_len < jmp_len)
+							operand_len = jmp_len;
+						if (operand_len < no_operand_len)
+							operand_len = no_operand_len;
+						rpad(str, operand_len, ' ');
+					}
+				} break;
 
-			case DECODE_FIELD_COMMENT:
-				uint32_t prefixLen = strlen(context->settings.comment_prefix);
-				getCommentStr(str_tmp + prefixLen);
-				if (str_tmp[prefixLen] != '\0') {
-					memcpy(str_tmp, context->settings.comment_prefix, prefixLen);
-				}
-				sprintf(str, context->settings.format_map[j].str, str_tmp);
-				break;
+				// output COMMENT
+				case DECODE_FIELD_COMMENT: {
+					uint32_t prefixLen = strlen(context->settings.comment_prefix);
+					getCommentStr(str_tmp + prefixLen);
+					if (str_tmp[prefixLen] != '\0') {
+						memcpy(str_tmp, context->settings.comment_prefix, prefixLen);
+					}
+					sprintf(str, context->settings.format_map[j].str, str_tmp);
+				} break;
 			}
 
 			if (len + strlen(str) > sizeof(context->str_decode)) {
@@ -684,8 +702,7 @@ int XcodeDecoder::decode()
 		}
 	}
 
-	if (context->stream != NULL)
-	{
+	if (context->stream != NULL) {
 		fprintf(context->stream, "%s\n", context->str_decode);
 	}
 
@@ -696,26 +713,55 @@ int XcodeDecoder::getCommentStr(char* str)
 {
 	// -1 = dont care about field
 
-	XCODE* _ptr = interp.getPtr();
-	uint32_t _offset = interp.getOffset();
-	uint8_t* _data = interp.getData();
+	XCODE* _ptr = interp.ptr;
+	uint8_t* _data = interp.data;
 
 	XC_WRITE_COMMENT("smbus read status", XC_IO_READ, SMB_BASE + 0x00, -1);
-	XC_WRITE_COMMENT("smbus clear status", XC_IO_WRITE, SMB_BASE + 0x00, 0x10);
+	XC_WRITE_COMMENT("smbus clear status\n", XC_IO_WRITE, SMB_BASE + 0x00, 0x10);
 
-	XC_WRITE_COMMENT("smbus read revision register", XC_IO_WRITE, SMB_BASE + 0x08, 0x01);
+	XC_WRITE_COMMENT("smbus read revision register", XC_IO_WRITE, SMB_CMD_REGISTER, 0x01);
 
-	XC_WRITE_COMMENT("smbus set cmd", XC_IO_WRITE, SMB_BASE + 0x08, -1);
-	XC_WRITE_COMMENT("smbus set val", XC_IO_WRITE, SMB_BASE + 0x06, -1);
+	// CX871
+	XC_WRITE_COMMENT("CX871 slave address", XC_IO_WRITE, SMB_BASE + 0x04, 0x8A);
+	XC_WRITE_COMMENT_NEXT_XCODE("CX871 0xBA = 0x3F",
+		XC_IO_WRITE, SMB_CMD_REGISTER, 0xBA,
+		XC_IO_WRITE, SMB_VAL_REGISTER, 0x3F);
+	XC_WRITE_COMMENT_NEXT_XCODE("CX871 0x6C = 0x46",
+		XC_IO_WRITE, SMB_CMD_REGISTER, 0x6C,
+		XC_IO_WRITE, SMB_VAL_REGISTER, 0x46);
+	XC_WRITE_COMMENT_NEXT_XCODE("CX871 0xB8 = 0x00",
+		XC_IO_WRITE, SMB_CMD_REGISTER, 0xB8,
+		XC_IO_WRITE, SMB_VAL_REGISTER, 0x00);
+	XC_WRITE_COMMENT_NEXT_XCODE("CX871 0xCE = 0x19",
+		XC_IO_WRITE, SMB_CMD_REGISTER, 0xCE,
+		XC_IO_WRITE, SMB_VAL_REGISTER, 0x19);
+	XC_WRITE_COMMENT_NEXT_XCODE("CX871 0xC6 = 0x9C",
+		XC_IO_WRITE, SMB_CMD_REGISTER, 0xC6,
+		XC_IO_WRITE, SMB_VAL_REGISTER, 0x9C);
+	XC_WRITE_COMMENT_NEXT_XCODE("CX871 0x32 = 0x08",
+		XC_IO_WRITE, SMB_CMD_REGISTER, 0x32,
+		XC_IO_WRITE, SMB_VAL_REGISTER, 0x08);
+	XC_WRITE_COMMENT_NEXT_XCODE("CX871 0xC4 = 0x01",
+		XC_IO_WRITE, SMB_CMD_REGISTER, 0xC4,
+		XC_IO_WRITE, SMB_VAL_REGISTER, 0x01);
+
+	// focus
+	XC_WRITE_COMMENT("focus slave address", XC_IO_WRITE, SMB_BASE + 0x04, 0xD4);
+
+	// xcalibur
+	XC_WRITE_COMMENT("xcalibur slave address", XC_IO_WRITE, SMB_BASE + 0x04, 0xE1);
+	
+	XC_WRITE_COMMENT_NEXT_XCODE("report memory type",
+		XC_IO_WRITE, SMB_BASE + 0x04, 0x20,
+		XC_IO_WRITE, SMB_CMD_REGISTER, 0x13);
+
+	XC_WRITE_COMMENT("smbus set cmd", XC_IO_WRITE, SMB_CMD_REGISTER, -1);
+	XC_WRITE_COMMENT("smbus set val", XC_IO_WRITE, SMB_VAL_REGISTER, -1);
+
+	XC_WRITE_COMMENT("smc slave write address", XC_IO_WRITE, SMB_BASE + 0x04, 0x20);
+	XC_WRITE_COMMENT("smc slave read address", XC_IO_WRITE, SMB_BASE + 0x04, 0x21);
 
 	XC_WRITE_COMMENT("smbus kickoff", XC_IO_WRITE, SMB_BASE + 0x02, 0x0A);
-
-	XC_WRITE_COMMENT("smc slave write addr", XC_IO_WRITE, SMB_BASE + 0x04, 0x20);
-	XC_WRITE_COMMENT("smc slave read addr", XC_IO_WRITE, SMB_BASE + 0x04, 0x21);
-
-	XC_WRITE_COMMENT("871 encoder slave addr", XC_IO_WRITE, SMB_BASE + 0x04, 0x8A);
-	XC_WRITE_COMMENT("focus encoder slave addr", XC_IO_WRITE, SMB_BASE + 0x04, 0xD4);
-	XC_WRITE_COMMENT("xcalibur encoder slave addr", XC_IO_WRITE, SMB_BASE + 0x04, 0xE1);
 
 	// mcpx v1.0 io bar
 	XC_WRITE_COMMENT("read io bar (B02) MCPX v1.0", XC_PCI_READ, MCPX_1_0_IO_BAR, 0);
@@ -733,7 +779,7 @@ int XcodeDecoder::getCommentStr(char* str)
 
 	// spin loop
 	XC_WRITE_COMMENT_LAST_XCODE("spin until smbus is ready",
-		XC_JNE, 0x10, _offset - (sizeof(XCODE) * 2),
+		XC_JNE, 0x10, -18,
 		XC_IO_READ, SMB_BASE + 0x00, 0);
 
 	XC_WRITE_COMMENT("disable the tco timer", XC_IO_WRITE, 0x8049, 0x08);
@@ -752,7 +798,7 @@ int XcodeDecoder::getCommentStr(char* str)
 	XC_WRITE_COMMENT("reload nv reg base", XC_PCI_WRITE, 0x8000F020, 0xFDF0FD00);
 
 	// nv clk
-	XC_WRITE_COMMENT("set nv clk 155 MHz ( rev == A1 )", XC_MEM_WRITE, NV2A_BASE + NV_CLK_REG, 0x11701);
+	XC_WRITE_COMMENT("set nv clk 155 MHz", XC_MEM_WRITE, NV2A_BASE + NV_CLK_REG, 0x11701);
 
 	XC_WRITE_STATEMENT(XC_MEM_WRITE, NV2A_BASE + NV_CLK_REG, -1,
 		uint32_t base = 16667;
@@ -766,12 +812,12 @@ int XcodeDecoder::getCommentStr(char* str)
 		XC_MEM_READ, NV2A_BASE, 0,
 		XC_AND_OR, 0xFF, 0);
 
-	XC_WRITE_COMMENT_LAST_2_XCODE("jmp if nv rev >= A2 ( >= DVT4 )",
+	XC_WRITE_COMMENT_LAST_2_XCODE("if nv rev != A2",
 		XC_JNE, 0xA1, -1,
 		XC_AND_OR, 0xFF, 0,
 		XC_MEM_READ, NV2A_BASE, 0);
 
-	XC_WRITE_COMMENT_LAST_2_XCODE("jmp if nv rev < A2 ( < DVT4 )",
+	XC_WRITE_COMMENT_LAST_2_XCODE("if nv rev != A1",
 		XC_JNE, 0xA2, -1,
 		XC_AND_OR, 0xFF, 0,
 		XC_MEM_READ, NV2A_BASE, 0);
@@ -785,8 +831,13 @@ int XcodeDecoder::getCommentStr(char* str)
 		XC_MEM_WRITE, NV2A_BASE + 0x1214, 0x09090909,
 		XC_MEM_WRITE, NV2A_BASE + 0x122C, 0xAAAAAAAA);
 
+	XC_WRITE_COMMENT_NEXT_2_XCODE("memory pad configuration",
+		XC_MEM_WRITE, NV2A_BASE + 0x1230, 0xFFFFFFFF,
+		XC_MEM_WRITE, NV2A_BASE + 0x1234, 0xAAAAAAAA,
+		XC_MEM_WRITE, NV2A_BASE + 0x1238, 0xAAAAAAAA);
+
 	XC_WRITE_STATEMENT(XC_PCI_WRITE, 0x80000084, -1,
-		sprintf(str + strlen(str), "set memory size %d Mb", (_ptr->data + 1) / 1024 / 1024));
+		sprintf(str + strlen(str), "set memory size %d Mb\n", (_ptr->data + 1) / 1024 / 1024));
 
 	XC_WRITE_COMMENT("set extbank bit (00000F00)", XC_MEM_WRITE, NV2A_BASE + 0x100200, 0x03070103);
 	XC_WRITE_COMMENT("clear extbank bit (00000F00)", XC_MEM_WRITE, NV2A_BASE + 0x100200, 0x03070003);
@@ -803,8 +854,8 @@ int XcodeDecoder::getCommentStr(char* str)
 		XC_MEM_READ, 0x00555508, 0x00FFFF0F, 0);
 
 	XC_WRITE_COMMENT_NEXT_XCODE("15ns delay by performing jmps",
-		XC_JMP, 0, _offset,
-		XC_JMP, 0, _offset + sizeof(XCODE));
+		XC_JMP, 0, 0,
+		XC_JMP, 0, 0);
 
 	XC_WRITE_COMMENT_LAST_2_XCODE("don't gen INIT# on powercycle",
 		XC_USE_RESULT, 0x04, MCPX_LEG_24,
@@ -814,13 +865,34 @@ int XcodeDecoder::getCommentStr(char* str)
 	XC_WRITE_COMMENT("visor attack prep", XC_MEM_WRITE, 0x00000000, -1);
 	XC_WRITE_COMMENT("TEA attack prep", XC_MEM_WRITE, 0x007fd588, -1);
 
+	XC_WRITE_COMMENT("ctrim_A1", XC_MEM_WRITE, 0x0f0010b0, 0x07633451);
+	XC_WRITE_COMMENT("ctrim_A2", XC_MEM_WRITE, 0x0f0010b0, 0x07633461);
+	XC_WRITE_COMMENT("set ctrim2 ( samsung )", XC_MEM_WRITE, 0x0f0010b8, 0xFFFF0000);
+	XC_WRITE_COMMENT("set ctrim2 ( micron )", XC_MEM_WRITE, 0x0f0010b8, 0xEEEE0000);
+	XC_WRITE_COMMENT("ctrim continue", XC_MEM_WRITE, 0x0f0010d4, 0x9);
+	XC_WRITE_COMMENT("ctrim common", XC_MEM_WRITE, 0x0f0010b4, 0x0);
+	
+	XC_WRITE_COMMENT("pll_select", XC_MEM_WRITE, 0x0f68050c, 0x000a0400);
+
 	XC_WRITE_COMMENT("quit xcodes", XC_EXIT, 0x806, 0);
 
 	return 0;
 }
 
+const LOADINI_RETURN_MAP getDecodeSettingsMap() {
+	return cmap;
+}
 int ll(char* output, char* str, uint32_t i, uint32_t* j, uint32_t len, uint32_t m)
 {
+	// remove {entry} from str;
+	// output: output buffer
+	// str: input string
+	// i: start index
+	// j: end index
+	// len: length of input string
+	// m: max length of output buffer
+	// return 0 if found, 1 if not found, -1 if error
+
 	if (str[i] != '{')
 		return 1;
 
@@ -850,6 +922,13 @@ int ll(char* output, char* str, uint32_t i, uint32_t* j, uint32_t len, uint32_t 
 }
 int ll2(char* output, char* str, uint32_t i, uint32_t& j, uint32_t len)
 {
+	// output: output buffer
+	// str: input string
+	// i: start index
+	// j: end index
+	// len: length of input string
+	// return 0 if found, 1 if not found, -1 if error
+
 	if (str[i] != '{') {
 		j = i;
 		
@@ -886,8 +965,109 @@ int ll2(char* output, char* str, uint32_t i, uint32_t& j, uint32_t len)
 
 	return 0;
 }
-
-const LOADINI_RETURN_MAP getDecodeSettingsMap()
+void walkBranch(DECODE_CONTEXT* context, XcodeInterp* interp)
 {
-	return cmap;
+	// walk the branch and mark jmps as branchable.
+
+	XCODE* xc = NULL;
+	JMP_XCODE* jmp = NULL;
+	uint32_t offset = 0;
+	XCODE* ptr = NULL;
+	XcodeInterp::INTERP_STATUS status;
+	uint32_t jmpOffset = 0;
+	uint32_t endOffset = 0;
+
+	// save off interp state.
+	offset = interp->offset;
+	ptr = interp->ptr;
+	status = interp->status;
+	jmpOffset = offset + context->xcode->data;
+
+	//fprintf(context->stream, "; walking branch\n");
+	
+	if (jmpOffset > offset) {
+		// jmp offset is below; 
+		// walk from jmp-definition to jmp-offset
+
+		endOffset = jmpOffset;
+	}
+	else {
+		// jmp offset is above or equal; 
+		// walk from jmp-offset to jmp-definition
+
+		interp->offset = jmpOffset;
+		endOffset = offset;
+	}
+
+	while (interp->interpretNext(xc) == 0) {
+		if (interp->offset - sizeof(XCODE) == endOffset)
+			break;
+
+		if (xc->opcode == XC_JMP) {
+			if (searchJmp(context, interp->offset - sizeof(XCODE), &jmp) == 0) {
+				jmp->branchable = JMP_XCODE_BRANCHABLE;
+				jmp->xcode = xc;
+			}
+		}
+	}
+
+	// restore interp state.
+	interp->offset = offset;
+	interp->ptr = ptr;
+	interp->status = status;
+}
+int createJmp(DECODE_CONTEXT* context, uint32_t xcodeOffset, XCODE* xcode)
+{
+	// create a jmp; add to jmp count.
+
+	JMP_XCODE* jmp = &context->jmps[context->jmpCount];
+	jmp->branchable = JMP_XCODE_NOT_BRANCHABLE;
+	jmp->xcodeOffset = xcodeOffset;
+	jmp->xcode = xcode;
+	context->jmpCount++;
+	return 0;
+}
+int searchJmp(DECODE_CONTEXT* context, uint32_t offset, JMP_XCODE** jmp)
+{
+	// search for jmp by xcode offset.
+
+	if (jmp == NULL)
+		return 1;
+	for (uint32_t i = 0; i < context->jmpCount; i++) {
+		JMP_XCODE* jm = &context->jmps[i];
+		if (jm->xcodeOffset == offset) {
+			*jmp = jm;
+			return 0;
+		}
+	}
+
+	*jmp = NULL;
+	return 1;
+}
+int createLabel(DECODE_CONTEXT* context, uint32_t offset, const char* label_format)
+{
+	// create a label; add to label count.
+	LABEL* label = &context->labels[context->labelCount];
+	sprintf(label->name, label_format, context->labelCount);
+	label->offset = offset;
+	label->references = 1;
+	label->defined = false;
+	context->labelCount++;
+	return 0;
+}
+int searchLabel(DECODE_CONTEXT* context, uint32_t offset, LABEL** label)
+{
+	// search for label by xcode offset.
+
+	if (label == NULL)
+		return 1;
+	for (uint32_t i = 0; i < context->labelCount; i++) {
+		LABEL* lb = &context->labels[i];
+		if (lb->offset == offset) {
+			*label = lb;
+			return 0;
+		}
+	}
+	*label = NULL;
+	return 1;
 }
