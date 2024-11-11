@@ -120,10 +120,10 @@ void print_image_file_header(COFF_FILE_HEADER* file_header, bool basic);
 void print_image_optional_header(IMAGE_OPTIONAL_HEADER* optional_header, bool basic);
 void print_nt_headers(IMAGE_NT_HEADER* nt_header, bool basic);
 
+int dump_nt_headers(uint8_t* data, uint32_t size, bool basic);
+
 IMAGE_DOS_HEADER* verify_dos_header(uint8_t* data, uint32_t size);
 IMAGE_NT_HEADER* verify_nt_headers(uint8_t* data, uint32_t size);
-
-int dump_nt_headers(uint8_t* data, uint32_t size, bool basic);
 
 #ifdef __cplusplus
 };

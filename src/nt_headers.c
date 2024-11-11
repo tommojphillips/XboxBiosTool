@@ -1,4 +1,4 @@
-// nt_headers.cpp: 
+// nt_headers.c 
 
 /* Copyright(C) 2024 tommojphillips
  *
@@ -81,7 +81,6 @@ void print_krnl_data_section_header(IMAGE_DOS_HEADER* dos_header)
     		"virtual address:\t0x%04X\n",
         data_section->uninitializedDataSize, data_section->initializedDataSize, data_section->rawDataPtr, data_section->virtualAddr);
 }
-
 void print_image_file_header(COFF_FILE_HEADER* file_header, bool basic)
 { 
     char datetime[28] = { 0 };
@@ -108,7 +107,6 @@ void print_image_file_header(COFF_FILE_HEADER* file_header, bool basic)
             "Num symbols:\t0x%08X\n", file_header->symbolTablePtr, file_header->numSymbols);
     }
 }
-
 void print_image_optional_header(IMAGE_OPTIONAL_HEADER* optional_header, bool basic)
 {
     const char* magic_str = NULL;
@@ -146,7 +144,6 @@ void print_image_optional_header(IMAGE_OPTIONAL_HEADER* optional_header, bool ba
         optional_header->minorImageVersion, optional_header->majorOperatingSystemVersion, optional_header->minorOperatingSystemVersion, subsys_str, optional_header->subsystem, optional_header->stackReserveSize,
         optional_header->stackCommitSize, optional_header->heapReserveSize, optional_header->heapCommitSize);
 }
-
 void print_nt_headers(IMAGE_NT_HEADER* nt_header, bool basic)
 {
     print_image_file_header(&nt_header->file_header, basic);
@@ -156,10 +153,14 @@ void print_nt_headers(IMAGE_NT_HEADER* nt_header, bool basic)
 int dump_nt_headers(uint8_t* data, uint32_t size, bool basic)
 {
     IMAGE_NT_HEADER* nt = verify_nt_headers(data, size);
-    if (nt == NULL)
-	{
-		return 1;
-	}
+    if (nt == NULL) {
+        IMAGE_DOS_HEADER* dos = verify_dos_header(data, size);
+        if (dos == NULL) {
+            return 1;
+        }
+        print_image_dos_header(dos);
+        return 1;
+    }
 
     printf("PE signature found\n");
 
