@@ -20,3 +20,4 @@ obj/
 *.lastcodeanalysissucceeded
 XbBiosTool.vcxproj.filters
 XbBiosTool.vcxproj.user
+/tests/xcodes_no_branching.txt

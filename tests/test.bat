@@ -15,7 +15,7 @@ if "%~1" == "/?" goto :help
     REM ensure we got (cmpsrc.exe) on the PATH.
     where "cmpsrc.exe" 2>nul || (
         echo tommojphillips' "cmpsrc.exe" not found.
-	echo https://github.com/tommojphillips/CompareSrc/releases/
+	    echo https://github.com/tommojphillips/CompareSrc/releases/
         exit /b 1
     )
 
@@ -162,10 +162,7 @@ REM run original tests for bios greater than or equal to 4817
         
         REM compare preldr with REAL preldr. ensure we extracting it exactly as intended.
         call :cmp_file "preldr.bin" "!x3_preldr!"
-
-        REM test get16
-        call :do_test "-get16 !arg! %MCPX_ROM_1_1%" 0
-        
+                
         call :do_test "-ls !arg! -bootable !mcpx_rom! !extra_args!" 0 "!arg_name!"
     )
 if "!test_group!" == "-1.1" goto :exit
@@ -192,7 +189,8 @@ if "!test_group!" == "-512" goto :exit
         set "arg=%%f"
         set arg_name=%%~nf
         
-        call :do_test "-xcode-decode !arg!" 0 "!arg_name!"
+        call :run_decode_xcode_tests
+
         call :do_test "-xcode-sim !arg!" 0 "!arg_name!"
         call :do_test "-xcode-sim !arg! -d -out mem_sim.bin" 0 "!arg_name!"
         call :do_test "-disasm mem_sim.bin" 0 "!arg_name!"
@@ -323,9 +321,9 @@ if "!test_group!" == "-img" goto :exit
         call :do_test "-ls !arg! !mcpx_rom! !extra_args!" 0 "!arg_name!"
         call :do_test "-ls !arg! -nv2a" 0 "!arg_name!"
         call :do_test "-ls !arg! -datatbl" 0 "!arg_name!"
-        call :do_test "-ls !arg! -dump-krnl !mcpx_rom! !extra_args!" 0 "!arg_name!"
+        call :do_test "-ls !arg! -img !mcpx_rom! !extra_args!" 0 "!arg_name!"
         
-        call :do_test "-xcode-decode !arg!" 0 "!arg_name!"
+        call :run_decode_xcode_tests
 
         REM test extracting bios 
         call :do_test "-extr !arg! !mcpx_rom! !extra_args! -krnl krnl.bin" 0
@@ -351,4 +349,11 @@ if "!test_group!" == "-img" goto :exit
 	  REM compare decompressed kernel with an already decompressed kernel image to ensure we havent fucked anything up.
         call :cmp_file "krnl.img" "bios\img\!arg_name!_krnl.img"
     )
+    exit /b 0
+
+:run_decode_xcode_tests    
+    call :do_test "-xcode-decode !arg!" 0 "!arg_name!"        
+    call :do_test "-xcode-decode -ini ..\decode_settings.ini !arg!" 0 "!arg_name!"
+    call :do_test "-xcode-decode -ini ..\decode_settings2.ini !arg!" 0 "!arg_name!"
+    call :do_test "-xcode-decode -ini ..\decode_settings3.ini !arg!" 0 "!arg_name!"
     exit /b 0

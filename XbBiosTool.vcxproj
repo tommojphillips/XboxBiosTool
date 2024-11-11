@@ -261,18 +261,19 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\cli_tbl.cpp" />
-    <ClCompile Include="src\file.cpp" />
+    <ClCompile Include="src\file.c" />
     <ClCompile Include="src\loadini.cpp" />
-    <ClCompile Include="src\lzx_decoder.cpp" />
-    <ClCompile Include="src\lzx_encoder.cpp" />
+    <ClCompile Include="src\lzx_decoder.c" />
+    <ClCompile Include="src\lzx_encoder.c" />
     <ClCompile Include="src\Mcpx.cpp" />
     <ClCompile Include="src\mem_tracking.c" />
-    <ClCompile Include="src\nt_headers.cpp" />
+    <ClCompile Include="src\nt_headers.c" />
     <ClCompile Include="src\rc4.c" />
     <ClCompile Include="src\rsa.c" />
     <ClCompile Include="src\sha1.c" />
-    <ClCompile Include="src\str_util.cpp" />
-    <ClCompile Include="src\util.cpp" />
+    <ClCompile Include="src\str_util.c" />
+    <ClCompile Include="src\tea.c" />
+    <ClCompile Include="src\util.c" />
     <ClCompile Include="src\X86Interp.cpp" />
     <ClCompile Include="src\Bios.cpp" />
     <ClCompile Include="src\XbTool.cpp" />
@@ -290,6 +291,7 @@
     <ClInclude Include="inc\rsa.h" />
     <ClInclude Include="inc\sha1.h" />
     <ClInclude Include="inc\str_util.h" />
+    <ClInclude Include="inc\tea.h" />
     <ClInclude Include="inc\util.h" />
     <ClInclude Include="inc\version.h" />
     <ClInclude Include="inc\X86Interp.h" />
