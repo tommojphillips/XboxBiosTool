@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <malloc.h>
 
 // user incl
 #include "Bios.h"
@@ -36,10 +37,8 @@
 #include "rsa.h"
 #include "sha1.h"
 
-#ifndef NO_MEM_TRACKING
+#ifdef MEM_TRACKING
 #include "mem_tracking.h"
-#else
-#include <malloc.h>
 #endif
 
 int Bios::loadFromFile(const char* filename, const BiosParams* biosParams)
@@ -156,6 +155,16 @@ int Bios::build(BiosBuildParams* buildParams, uint32_t binsize, BiosParams* bios
 
 	getOffsets2();
 
+	if (buildParams->eepromKey != NULL) {
+		printf("updating eeprom key\n");
+		memcpy(bldr.keys->eepromKey, buildParams->eepromKey, XB_KEY_SIZE);
+	}
+
+	if (buildParams->certKey != NULL) {
+		printf("updating cert key\n");
+		memcpy(bldr.keys->certKey, buildParams->certKey, XB_KEY_SIZE);
+	}
+
 	// to-do add option to compress a kernel image.
 
 	// copy in the compressed kernel image.
@@ -165,7 +174,7 @@ int Bios::build(BiosBuildParams* buildParams, uint32_t binsize, BiosParams* bios
 	memcpy(krnlData, buildParams->krnlData, buildParams->krnlDataSize);
 
 	if (data + buildParams->inittblSize >= krnl) {
-		printf("Error: init table is too big\n");
+		printf("error init table is too big\n");
 		return BIOS_LOAD_STATUS_FAILED;
 	}
 	memcpy(data, buildParams->inittbl, buildParams->inittblSize);
@@ -184,11 +193,17 @@ int Bios::build(BiosBuildParams* buildParams, uint32_t binsize, BiosParams* bios
 		// if the kernel was encrypted with a key file, update the key in the 2BL.
 		if (kernelEncryptionState) {
 			if (bldr.keys != NULL && params.keyKrnl != NULL) {
-				printf("updating kernel key in 2BL\n");
+				printf("updating kernel key\n");
 				memcpy(bldr.keys->krnlKey, params.keyKrnl, XB_KEY_SIZE);
 			}
 		}
 	}
+	/*else {
+		if (bldr.keys != NULL && params.keyKrnl != NULL) {
+			printf("zeroing kernel key\n");
+			memset(bldr.keys->krnlKey, 0, XB_KEY_SIZE);
+		}
+	}*/
 
 	printState();
 
@@ -352,21 +367,21 @@ void Bios::preldrValidateAndDecryptBldr()
 		return;
 	}
 
-	preldr.funcs = (PRELDR_FUNC_PTRS*)(preldr.entryPoint - sizeof(PRELDR_FUNC_PTRS));
-	if (IN_BOUNDS(preldr.funcs, preldr.data, PRELDR_BLOCK_SIZE) == false) {
-		preldr.funcs = NULL;
+	preldr.ptrBlock = (PRELDR_PTR_BLOCK*)(preldr.entryPoint - sizeof(PRELDR_PTR_BLOCK));
+	if (IN_BOUNDS(preldr.ptrBlock, preldr.data, PRELDR_BLOCK_SIZE) == false) {
+		preldr.ptrBlock = NULL;
 		preldr.pubkey = NULL;
 		preldr.funcBlock = NULL;
 	}
 	else {
 		// public key pointer
-		preldr.pubkey = (uint8_t*)(preldr.data + preldr.funcs->pubKeyPtr - PRELDR_REAL_BASE);
-		if (IN_BOUNDS_BLOCK(preldr.pubkey, 284, preldr.data, PRELDR_BLOCK_SIZE) == false) {
+		preldr.pubkey = (XB_PUBLIC_KEY*)(preldr.data + preldr.ptrBlock->pubKeyPtr - PRELDR_REAL_BASE);
+		if (IN_BOUNDS(preldr.pubkey, preldr.data, PRELDR_BLOCK_SIZE) == false) {
 			preldr.pubkey = NULL;
 		}
 
 		// sha1 function block pointer
-		preldr.funcBlock = (PRELDR_FUNC_BLOCK*)(preldr.data + preldr.funcs->funcBlockPtr - PRELDR_REAL_BASE);
+		preldr.funcBlock = (PRELDR_FUNC_BLOCK*)(preldr.data + preldr.ptrBlock->funcBlockPtr - PRELDR_REAL_BASE);
 		if (IN_BOUNDS(preldr.funcBlock, preldr.data, PRELDR_BLOCK_SIZE) == false) {
 			preldr.funcBlock = NULL;
 		}
@@ -379,7 +394,6 @@ void Bios::preldrValidateAndDecryptBldr()
 		params.mcpx->version == Mcpx::MOUSE_V1_0) {
 		return;
 	}
-	
 
 	// get sbkey
 	uint8_t* sbkey = NULL;
@@ -569,35 +583,25 @@ int Bios::replicateBios(uint32_t binsize)
 }
 int Bios::preldrDecryptPublicKey()
 {
-	uint8_t* sbkey = NULL;
+	if (preldr.pubkey == NULL)
+		return 1;
 
+	// get sbkey
+	uint8_t* sbkey = NULL;
 	if (params.keyBldr != NULL) {
 		sbkey = params.keyBldr;
 	}
 	else if (params.mcpx->sbkey != NULL) {
 		sbkey = params.mcpx->sbkey;
 	}
-
-	if (preldr.pubkey == NULL || sbkey == NULL)
+	else {
 		return 1;
-
-	size_t pubkey_size;
-	RC4_CONTEXT context;
+	}
+		
+	RC4_CONTEXT context = { 0 };
 	rc4_key(&context, sbkey, 12);
-	
-	// decrypt header
-	rc4(&context, preldr.pubkey, sizeof(RSA_HEADER));
+	rc4(&context, (uint8_t*)preldr.pubkey, sizeof(XB_PUBLIC_KEY));
 
-	if (rsa_verifyPublicKey(preldr.pubkey, PRELDR_BLOCK_SIZE, 0, NULL) != RSA_ERROR_SUCCESS)
-		return 1;
-
-	pubkey_size = RSA_PUBKEY_SIZE(preldr.pubkey);
-	if (pubkey_size != sizeof(RSA_HEADER) + 256)
-		return 1;
-	
-	// decrypt modulus
-	rc4(&context, preldr.pubkey + sizeof(RSA_HEADER), pubkey_size);
-	
 	return 0;
 }
 int Bios::printState()

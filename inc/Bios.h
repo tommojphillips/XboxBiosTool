@@ -23,6 +23,7 @@
 #define XB_BIOS_H
 
 #include <stdint.h>
+#include <malloc.h>
 
 // user incl
 #include "Mcpx.h"
@@ -31,10 +32,8 @@
 #include "rsa.h"
 #include "sha1.h"
 
-#ifndef NO_MEM_TRACKING
+#ifdef MEM_TRACKING
 #include "mem_tracking.h"
-#else
-#include <malloc.h>
 #endif
 
 #define MIN_BIOS_SIZE 0x40000                                                    // Min bios file/rom size in bytes
@@ -68,13 +67,19 @@
 #define PRELDR_STATUS_NOT_FOUND			2 // not found. old bios (mcpx v1.0) or not a valid bios.
 #define PRELDR_STATUS_ERROR				3 // ERROR
 
+// xbox public key structure
+typedef struct _XB_PUBLIC_KEY {
+	RSA_HEADER header;		// rsa header structure
+	uint8_t modulus[264];   // pointer to the modulus.
+} XB_PUBLIC_KEY;
+
 // Preldr structure
 typedef struct Preldr {
 	uint8_t* data;
 	PRELDR_PARAMS* params;
-	PRELDR_FUNC_PTRS* funcs;
+	PRELDR_PTR_BLOCK* ptrBlock;
 	PRELDR_FUNC_BLOCK* funcBlock;
-	uint8_t* pubkey;
+	XB_PUBLIC_KEY* pubkey;
 	uint8_t* entryPoint;
 	uint8_t bldrKey[SHA1_DIGEST_LEN];
 	uint32_t jmpOffset;
@@ -131,6 +136,8 @@ typedef struct BiosBuildParams {
 	uint8_t* bldr;
 	uint8_t* krnl;
 	uint8_t* krnlData;
+	uint8_t* eepromKey;
+	uint8_t* certKey;
 	uint32_t preldrSize;
 	uint32_t bldrSize; 
 	uint32_t inittblSize;
@@ -165,6 +172,14 @@ inline void freeBiosBuildParams(BiosBuildParams* params) {
 	if (params->krnlData != NULL) {
 		free(params->krnlData);
 		params->krnlData = NULL;
+	}
+	if (params->eepromKey != NULL) {
+		free(params->eepromKey);
+		params->eepromKey = NULL;
+	}
+	if (params->certKey != NULL) {
+		free(params->certKey);
+		params->certKey = NULL;
 	}
 };
 

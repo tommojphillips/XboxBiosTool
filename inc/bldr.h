@@ -141,11 +141,11 @@ typedef struct _PRELDR_PARAMS {
 } PRELDR_PARAMS;
 #pragma pack(pop)
 
-// Preldr pointers structure
-typedef struct _PRELDR_FUNC_PTRS {
+// Preldr pointer block structure
+typedef struct _PRELDR_PTR_BLOCK {
     uint32_t pubKeyPtr;
     uint32_t funcBlockPtr;
-} PRELDR_FUNC_PTRS;
+} PRELDR_PTR_BLOCK;
 
 // Preldr function block structure
 typedef struct _PRELDR_FUNC_BLOCK {
