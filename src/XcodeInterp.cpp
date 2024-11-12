@@ -32,7 +32,7 @@
 
 #include "util.h" // error codes. MOVE
 
-#ifndef NO_MEM_TRACKING
+#ifdef MEM_TRACKING
 #include "mem_tracking.h"
 #endif
 

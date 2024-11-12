@@ -31,7 +31,7 @@
 #include "file.h"
 #include "util.h"
 
-#ifndef NO_MEM_TRACKING
+#ifdef MEM_TRACKING
 #include "mem_tracking.h"
 #endif
 

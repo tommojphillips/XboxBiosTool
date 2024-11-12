@@ -5,14 +5,13 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <memory.h>
+#include <malloc.h>
 
 // user incl
 #include "lzx.h"
 
-#ifndef NO_MEM_TRACKING
+#ifdef MEM_TRACKING
 #include "mem_tracking.h"
-#else
-#include <malloc.h>
 #endif
 
 #define MAX_MAIN_TREE_ELEMENTS 700

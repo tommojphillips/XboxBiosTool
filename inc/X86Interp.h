@@ -26,7 +26,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#ifndef NO_MEM_TRACKING
+#ifdef MEM_TRACKING
 #include "mem_tracking.h"
 #endif
 

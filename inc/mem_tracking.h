@@ -18,11 +18,6 @@
   // Author: tommojphillips
   // GitHub: https:\\github.com\tommojphillips
 
-#define MEM_TRACKING
-#ifdef NO_MEM_TRACKING
-#undef MEM_TRACKING
-#endif
-
 #ifndef MEM_TRACKING_H
 #define MEM_TRACKING_H
 #ifdef MEM_TRACKING

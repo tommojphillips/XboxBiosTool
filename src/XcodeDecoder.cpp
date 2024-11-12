@@ -32,7 +32,7 @@
 #include "str_util.h"
 #include "loadini.h"
 
-#ifndef NO_MEM_TRACKING
+#ifdef MEM_TRACKING
 #include "mem_tracking.h"
 #endif
 
@@ -118,7 +118,7 @@ const LOADINI_SETTING settings_map[] = {
 	{ xcode_opcode_map[13].str, LOADINI_SETTING_TYPE::STR },
 	{ xcode_opcode_map[14].str, LOADINI_SETTING_TYPE::STR }
 };
-const LOADINI_RETURN_MAP cmap = { settings_map, sizeof(settings_map), sizeof(settings_map) / sizeof(LOADINI_SETTING_MAP) };
+const LOADINI_RETURN_MAP decode_settings_map = { settings_map, sizeof(settings_map), sizeof(settings_map) / sizeof(LOADINI_SETTING_MAP) };
 
 int ll(char* output, char* str, uint32_t i, uint32_t* j, uint32_t len, uint32_t m);
 int ll2(char* output, char* str, uint32_t i, uint32_t& j, uint32_t len);
@@ -239,36 +239,36 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 	static const char* default_format_str = "{offset}: {op} {addr} {data} {comment}";
 	
 	static const LOADINI_SETTING_MAP var_map[] = {
-		{ &cmap.s[0], &settings->format_str},
-		{ &cmap.s[1], &settings->jmp_str },
-		{ &cmap.s[2], &settings->no_operand_str },
-		{ &cmap.s[3], &settings->num_str },
-		{ &cmap.s[4], &settings->comment_prefix},
-		{ &cmap.s[5], &settings->label_on_new_line },
-		{ &cmap.s[6], &settings->pad },
-		{ &cmap.s[7], &settings->opcode_use_result },
-		{ &cmap.s[8], &settings->opcodes[0].str },
-		{ &cmap.s[9], &settings->opcodes[1].str },
-		{ &cmap.s[10], &settings->opcodes[2].str },
-		{ &cmap.s[11], &settings->opcodes[3].str },
-		{ &cmap.s[12], &settings->opcodes[4].str },
-		{ &cmap.s[13], &settings->opcodes[5].str },
-		{ &cmap.s[14], &settings->opcodes[6].str },
-		{ &cmap.s[15], &settings->opcodes[7].str },
-		{ &cmap.s[16], &settings->opcodes[8].str },
-		{ &cmap.s[17], &settings->opcodes[9].str },
-		{ &cmap.s[18], &settings->opcodes[10].str },
-		{ &cmap.s[19], &settings->opcodes[11].str },
-		{ &cmap.s[20], &settings->opcodes[12].str },
-		{ &cmap.s[21], &settings->opcodes[13].str },
-		{ &cmap.s[22], &settings->opcodes[14].str }
+		{ &decode_settings_map.s[0], &settings->format_str},
+		{ &decode_settings_map.s[1], &settings->jmp_str },
+		{ &decode_settings_map.s[2], &settings->no_operand_str },
+		{ &decode_settings_map.s[3], &settings->num_str },
+		{ &decode_settings_map.s[4], &settings->comment_prefix},
+		{ &decode_settings_map.s[5], &settings->label_on_new_line },
+		{ &decode_settings_map.s[6], &settings->pad },
+		{ &decode_settings_map.s[7], &settings->opcode_use_result },
+		{ &decode_settings_map.s[8], &settings->opcodes[0].str },
+		{ &decode_settings_map.s[9], &settings->opcodes[1].str },
+		{ &decode_settings_map.s[10], &settings->opcodes[2].str },
+		{ &decode_settings_map.s[11], &settings->opcodes[3].str },
+		{ &decode_settings_map.s[12], &settings->opcodes[4].str },
+		{ &decode_settings_map.s[13], &settings->opcodes[5].str },
+		{ &decode_settings_map.s[14], &settings->opcodes[6].str },
+		{ &decode_settings_map.s[15], &settings->opcodes[7].str },
+		{ &decode_settings_map.s[16], &settings->opcodes[8].str },
+		{ &decode_settings_map.s[17], &settings->opcodes[9].str },
+		{ &decode_settings_map.s[18], &settings->opcodes[10].str },
+		{ &decode_settings_map.s[19], &settings->opcodes[11].str },
+		{ &decode_settings_map.s[20], &settings->opcodes[12].str },
+		{ &decode_settings_map.s[21], &settings->opcodes[13].str },
+		{ &decode_settings_map.s[22], &settings->opcodes[14].str }
 	};
 
 	if (ini != NULL) {
 		stream = fopen(ini, "r");
 		if (stream != NULL) { // only load ini file if it exists
 			printf("settings file: %s\n", ini);
-			result = loadini(stream, var_map, cmap.size);
+			result = loadini(stream, var_map, decode_settings_map.size);
 			fclose(stream);
 			if (result != 0) { // convert to error code
 				result = 1;
@@ -472,7 +472,7 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 Cleanup:
 
 	if (result == ERROR_INVALID_DATA) {
-		printf("Error: Key '%s' has invalid value '%s'\n", buf, value);
+		printf("error key '%s' has invalid value '%s'\n", buf, value);
 	}
 
 	return result;
@@ -487,10 +487,10 @@ int XcodeDecoder::decodeXcodes()
 		result = decode();
 		if (result != 0) {
 			if (result == ERROR_BUFFER_OVERFLOW) {
-				printf("Error: Decode format too large.\n");
+				printf("error decode format too large.\n");
 			}
 			else {
-				printf("Error decoding xcode:\n\t%04X, OP: %02X, ADDR: %04X, DATA: %04X\n",
+				printf("error decoding xcode:\n\t%04X, OP: %02X, ADDR: %04X, DATA: %04X\n",
 					(context->xcodeBase + interp.offset - sizeof(XCODE)), context->xcode->opcode, context->xcode->addr, context->xcode->data);
 			}
 			return result;
@@ -879,9 +879,6 @@ int XcodeDecoder::getCommentStr(char* str)
 	return 0;
 }
 
-const LOADINI_RETURN_MAP getDecodeSettingsMap() {
-	return cmap;
-}
 int ll(char* output, char* str, uint32_t i, uint32_t* j, uint32_t len, uint32_t m)
 {
 	// remove {entry} from str;

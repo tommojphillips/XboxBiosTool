@@ -23,15 +23,14 @@
 #define XCODE_INTERP_H
 
 #include <stdint.h>
+#include <malloc.h>
 
 // user incl
 #include "bldr.h"
 #include "loadini.h"
 
-#ifndef NO_MEM_TRACKING
+#ifdef MEM_TRACKING
 #include "mem_tracking.h"
-#else
-#include <malloc.h>
 #endif
 
 #define SMB_BASE            0xC000
@@ -117,6 +116,5 @@ private:
 int encodeX86AsMemWrites(uint8_t* data, uint32_t size, uint32_t base, uint8_t*& buffer, uint32_t* xcodeSize);
 
 int getOpcodeStr(const FIELD_MAP* opcodes, uint8_t opcode, const char*& str);
-const LOADINI_RETURN_MAP  getDecodeSettingsMap();
 
 #endif // !XCODE_INTERP_H

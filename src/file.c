@@ -21,12 +21,12 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <malloc.h>
 
 #include "file.h"
-#ifndef NO_MEM_TRACKING
+
+#ifdef MEM_TRACKING
 #include "mem_tracking.h"
-#else
-#include <malloc.h>
 #endif
 
 uint8_t* readFile(const char* filename, uint32_t* bytesRead, const uint32_t expectedSize)

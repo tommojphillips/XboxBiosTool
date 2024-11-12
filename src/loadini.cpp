@@ -22,15 +22,14 @@
 // std incl
 #include <stdint.h>
 #include <string.h>
+#include <malloc.h>
 
 // user incl
 #include "loadini.h"
 #include "str_util.h"
 
-#ifndef NO_MEM_TRACKING
+#ifdef MEM_TRACKING
 #include "mem_tracking.h"
-#else
-#include <malloc.h>
 #endif
 
 #ifndef LOADINI_MAX_LINE_SIZE

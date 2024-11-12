@@ -3,15 +3,14 @@
 // std incl
 #include <stdint.h>
 #include <memory.h>
+#include <malloc.h>
 
 // user incl
 #include "lzx.h"
 #include "nt_headers.h"
 
-#ifndef NO_MEM_TRACKING
+#ifdef MEM_TRACKING
 #include "mem_tracking.h"
-#else
-#include <malloc.h>
 #endif
 
 #define MAX_MAIN_TREE_ELEMENTS 672

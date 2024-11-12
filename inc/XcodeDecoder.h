@@ -23,15 +23,16 @@
 #define XCODE_DECODER_H
 
 #include <stdint.h>
+#include <malloc.h>
 
 // user incl
 #include "XcodeInterp.h"
 
-#ifndef NO_MEM_TRACKING
+#ifdef MEM_TRACKING
 #include "mem_tracking.h"
-#else
-#include <malloc.h>
 #endif
+
+extern const LOADINI_RETURN_MAP decode_settings_map;
 
 typedef enum : uint8_t {
     DECODE_FIELD_OFFSET,
@@ -89,7 +90,7 @@ inline void initDecodeSettings(DECODE_SETTINGS* settings) {
         settings->format_map[i].str = NULL;
         settings->format_map[i].seq = 0;
     }
-
+    
     for (int i = 0; i < XC_OPCODE_COUNT; i++) {
         settings->opcodes[i].str = NULL;
         settings->opcodes[i].field = 0;

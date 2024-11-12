@@ -129,7 +129,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MEM_TRACKING;_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>
       </ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -164,7 +164,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NO_MEM_TRACKING;_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>
       </ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -201,7 +201,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>false</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MEM_TRACKING;_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerOutput>NoListing</AssemblerOutput>
@@ -233,7 +233,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>false</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NO_MEM_TRACKING;_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerOutput>NoListing</AssemblerOutput>

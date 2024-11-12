@@ -28,7 +28,7 @@
 #include "Mcpx.h"
 #include "sha1.h"
 
-#ifndef NO_MEM_TRACKING
+#ifdef MEM_TRACKING
 #include "mem_tracking.h"
 #endif
 
