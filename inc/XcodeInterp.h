@@ -23,15 +23,10 @@
 #define XCODE_INTERP_H
 
 #include <stdint.h>
-#include <malloc.h>
 
 // user incl
 #include "bldr.h"
 #include "loadini.h"
-
-#ifdef MEM_TRACKING
-#include "mem_tracking.h"
-#endif
 
 #define SMB_BASE            0xC000
 #define SMB_CMD_REGISTER    (SMB_BASE + 0x08)
@@ -67,6 +62,12 @@
 
 #define XC_OPCODE_COUNT 15
 
+#define XC_INTERP_ERROR_SUCCESS 0
+#define XC_INTERP_ERROR_FAILED 1
+#define XC_INTERP_ERROR_BUFFER_OVERFLOW 4
+#define XC_INTERP_ERROR_OUT_OF_MEMORY 5
+#define XC_INTERP_ERROR_INVALID_DATA 6
+
 typedef uint8_t OPCODE;
 
 typedef struct _LABEL {
@@ -93,16 +94,14 @@ public:
         data = NULL;
     };
     ~XcodeInterp() {
-        if (data != NULL) {
-            free(data);
-            data = NULL;
-        }
+        unload();
 	};
 
     enum INTERP_STATUS : int { DATA_OK = 0, EXIT_OP_FOUND, DATA_ERROR };
 
     int load(uint8_t* data, uint32_t size);
     void reset();
+    void unload();
     int interpretNext(XCODE*& xcode);
     
     uint8_t* data;         // XCODE data
@@ -110,11 +109,9 @@ public:
     XCODE* ptr;            // current position in the XCODE data
     uint32_t offset;       // offset from the start of the data to the end of the current XCODE (offset to the next XCODE)
     INTERP_STATUS status;  // status of the xcode interpreter
-private:
 };
 
 int encodeX86AsMemWrites(uint8_t* data, uint32_t size, uint32_t base, uint8_t*& buffer, uint32_t* xcodeSize);
-
 int getOpcodeStr(const FIELD_MAP* opcodes, uint8_t opcode, const char*& str);
 
 #endif // !XCODE_INTERP_H

@@ -19,13 +19,10 @@
 // Author: tommojphillips
 // GitHub: https:\\github.com\tommojphillips
 
+#include <stdint.h>
 #include "rc4.h"
 
-inline void swap_byte(uint8_t* a, uint8_t* b) {
-    uint8_t tmp = *a;
-    *a = *b;
-    *b = tmp;
-}
+void swap_byte(uint8_t* a, uint8_t* b);
 
 void rc4_key(RC4_CONTEXT* context, const uint8_t* key, const size_t len) {
     int i = 0;
@@ -58,8 +55,14 @@ void rc4(RC4_CONTEXT* c, uint8_t* data, const size_t size) {
     }
 }
 
-void symmetricEncDec(uint8_t* data, const size_t size, const uint8_t* key, const size_t key_len) {
+void rc4_symmetric_enc_dec(uint8_t* data, const size_t size, const uint8_t* key, const size_t key_len) {
     RC4_CONTEXT context = { 0 };
     rc4_key(&context, key, key_len);
     rc4(&context, data, size);
+}
+
+inline void swap_byte(uint8_t* a, uint8_t* b) {
+    uint8_t tmp = *a;
+    *a = *b;
+    *b = tmp;
 }

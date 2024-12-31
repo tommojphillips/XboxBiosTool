@@ -122,15 +122,13 @@ const LOADINI_RETURN_MAP decode_settings_map = { settings_map, sizeof(settings_m
 
 int ll(char* output, char* str, uint32_t i, uint32_t* j, uint32_t len, uint32_t m);
 int ll2(char* output, char* str, uint32_t i, uint32_t& j, uint32_t len);
-
 int createLabel(DECODE_CONTEXT* context, uint32_t offset, const char* label_format);
 int createJmp(DECODE_CONTEXT * context, uint32_t xcodeOffset, XCODE * xcode);
 int searchLabel(DECODE_CONTEXT* context, uint32_t offset, LABEL** label);
 int searchJmp(DECODE_CONTEXT* context, uint32_t offset, JMP_XCODE** jmp);
 void walkBranch(DECODE_CONTEXT * context, XcodeInterp * interp);
 
-int XcodeDecoder::load(uint8_t* data, uint32_t size, uint32_t base, const char* ini)
-{
+int XcodeDecoder::load(uint8_t* data, uint32_t size, uint32_t base, const char* ini) {
 	// set up the xcode decoder.
 	// load the interpreter, decode settings and context.
 	// parse xcodes for labels.
@@ -224,9 +222,7 @@ int XcodeDecoder::load(uint8_t* data, uint32_t size, uint32_t base, const char* 
 
 	return 0;
 }
-
-int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
-{
+int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const {
 	char* value = NULL;
 	uint32_t len = 0;
 	uint32_t i = 0;
@@ -472,14 +468,12 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 Cleanup:
 
 	if (result == ERROR_INVALID_DATA) {
-		printf("error key '%s' has invalid value '%s'\n", buf, value);
+		printf("Error: key '%s' has invalid value '%s'\n", buf, value);
 	}
 
 	return result;
 }
-
-int XcodeDecoder::decodeXcodes()
-{
+int XcodeDecoder::decodeXcodes() {
 	int result;
 
 	interp.reset();
@@ -487,10 +481,10 @@ int XcodeDecoder::decodeXcodes()
 		result = decode();
 		if (result != 0) {
 			if (result == ERROR_BUFFER_OVERFLOW) {
-				printf("error decode format too large.\n");
+				printf("Error: decode format too large.\n");
 			}
 			else {
-				printf("error decoding xcode:\n\t%04X, OP: %02X, ADDR: %04X, DATA: %04X\n",
+				printf("Error: decoding xcode:\n\t%04X, OP: %02X, ADDR: %04X, DATA: %04X\n",
 					(context->xcodeBase + interp.offset - sizeof(XCODE)), context->xcode->opcode, context->xcode->addr, context->xcode->data);
 			}
 			return result;
@@ -499,9 +493,7 @@ int XcodeDecoder::decodeXcodes()
 
 	return 0;
 }
-
-int XcodeDecoder::decode()
-{
+int XcodeDecoder::decode() {
 	uint32_t len;
 	uint32_t fmt_len;
 	uint32_t op_len = 0;
@@ -523,11 +515,9 @@ int XcodeDecoder::decode()
 			if (searchJmp(context, interp.offset - sizeof(XCODE), &jmp) == 0) {
 				switch (jmp->branchable) {
 					case JMP_XCODE_BRANCHABLE:
-						//fprintf(context->stream, "; jmp is branchable\n");
 						walkBranch(context, &interp);
 						break;
 					case JMP_XCODE_NOT_BRANCHABLE:
-						//fprintf(context->stream, "; jmp is unbranchable!!\n");
 						fprintf(context->stream, "; took unbranchable jmp!!\n");
 						interp.offset += context->xcode->data;
 						break;
@@ -708,9 +698,7 @@ int XcodeDecoder::decode()
 
 	return 0;
 }
-
-int XcodeDecoder::getCommentStr(char* str)
-{
+int XcodeDecoder::getCommentStr(char* str) {
 	// -1 = dont care about field
 
 	XCODE* _ptr = interp.ptr;
@@ -879,8 +867,7 @@ int XcodeDecoder::getCommentStr(char* str)
 	return 0;
 }
 
-int ll(char* output, char* str, uint32_t i, uint32_t* j, uint32_t len, uint32_t m)
-{
+static int ll(char* output, char* str, uint32_t i, uint32_t* j, uint32_t len, uint32_t m) {
 	// remove {entry} from str;
 	// output: output buffer
 	// str: input string
@@ -917,8 +904,7 @@ int ll(char* output, char* str, uint32_t i, uint32_t* j, uint32_t len, uint32_t 
 
 	return 0;
 }
-int ll2(char* output, char* str, uint32_t i, uint32_t& j, uint32_t len)
-{
+static int ll2(char* output, char* str, uint32_t i, uint32_t& j, uint32_t len) {
 	// output: output buffer
 	// str: input string
 	// i: start index
@@ -962,8 +948,7 @@ int ll2(char* output, char* str, uint32_t i, uint32_t& j, uint32_t len)
 
 	return 0;
 }
-void walkBranch(DECODE_CONTEXT* context, XcodeInterp* interp)
-{
+static void walkBranch(DECODE_CONTEXT* context, XcodeInterp* interp) {
 	// walk the branch and mark jmps as branchable.
 
 	XCODE* xc = NULL;
@@ -1013,8 +998,7 @@ void walkBranch(DECODE_CONTEXT* context, XcodeInterp* interp)
 	interp->ptr = ptr;
 	interp->status = status;
 }
-int createJmp(DECODE_CONTEXT* context, uint32_t xcodeOffset, XCODE* xcode)
-{
+static int createJmp(DECODE_CONTEXT* context, uint32_t xcodeOffset, XCODE* xcode) {
 	// create a jmp; add to jmp count.
 
 	JMP_XCODE* jmp = &context->jmps[context->jmpCount];
@@ -1024,8 +1008,7 @@ int createJmp(DECODE_CONTEXT* context, uint32_t xcodeOffset, XCODE* xcode)
 	context->jmpCount++;
 	return 0;
 }
-int searchJmp(DECODE_CONTEXT* context, uint32_t offset, JMP_XCODE** jmp)
-{
+static int searchJmp(DECODE_CONTEXT* context, uint32_t offset, JMP_XCODE** jmp) {
 	// search for jmp by xcode offset.
 
 	if (jmp == NULL)
@@ -1041,8 +1024,7 @@ int searchJmp(DECODE_CONTEXT* context, uint32_t offset, JMP_XCODE** jmp)
 	*jmp = NULL;
 	return 1;
 }
-int createLabel(DECODE_CONTEXT* context, uint32_t offset, const char* label_format)
-{
+static int createLabel(DECODE_CONTEXT* context, uint32_t offset, const char* label_format) {
 	// create a label; add to label count.
 	LABEL* label = &context->labels[context->labelCount];
 	sprintf(label->name, label_format, context->labelCount);
@@ -1052,8 +1034,7 @@ int createLabel(DECODE_CONTEXT* context, uint32_t offset, const char* label_form
 	context->labelCount++;
 	return 0;
 }
-int searchLabel(DECODE_CONTEXT* context, uint32_t offset, LABEL** label)
-{
+static int searchLabel(DECODE_CONTEXT* context, uint32_t offset, LABEL** label) {
 	// search for label by xcode offset.
 
 	if (label == NULL)
@@ -1067,4 +1048,115 @@ int searchLabel(DECODE_CONTEXT* context, uint32_t offset, LABEL** label)
 	}
 	*label = NULL;
 	return 1;
+}
+
+void initDecodeSettings(DECODE_SETTINGS* settings) {
+	settings->format_str = NULL;
+	settings->jmp_str = NULL;
+	settings->no_operand_str = NULL;
+	settings->num_str = NULL;
+	settings->num_str_format = NULL;
+	settings->prefix_str = NULL;
+	settings->comment_prefix = NULL;
+
+	settings->label_on_new_line = false;
+	settings->pad = true;
+	settings->opcode_use_result = false;
+
+	settings->labelMaxLen = 0;
+	settings->opcodeMaxLen = 0;
+
+	for (int i = 0; i < 5; i++) {
+		settings->format_map[i].type = (DECODE_FIELD)i;
+		settings->format_map[i].str = NULL;
+		settings->format_map[i].seq = 0;
+	}
+
+	for (int i = 0; i < XC_OPCODE_COUNT; i++) {
+		settings->opcodes[i].str = NULL;
+		settings->opcodes[i].field = 0;
+	}
+}
+DECODE_SETTINGS* createDecodeSettings() {
+	DECODE_SETTINGS* settings = (DECODE_SETTINGS*)malloc(sizeof(DECODE_SETTINGS));
+	if (settings == NULL)
+		return NULL;
+	initDecodeSettings(settings);
+	return settings;
+}
+void destroyDecodeSettings(DECODE_SETTINGS* settings) {
+	if (settings->format_str != NULL) {
+		free(settings->format_str);
+		settings->format_str = NULL;
+	}
+	if (settings->jmp_str != NULL) {
+		free(settings->jmp_str);
+		settings->jmp_str = NULL;
+	}
+	if (settings->no_operand_str != NULL) {
+		free(settings->no_operand_str);
+		settings->no_operand_str = NULL;
+	}
+	if (settings->num_str != NULL) {
+		free(settings->num_str);
+		settings->num_str = NULL;
+	}
+	if (settings->num_str_format != NULL) {
+		free(settings->num_str_format);
+		settings->num_str_format = NULL;
+	}
+	if (settings->prefix_str != NULL) {
+		free(settings->prefix_str);
+		settings->prefix_str = NULL;
+	}
+	if (settings->comment_prefix != NULL) {
+		free(settings->comment_prefix);
+		settings->comment_prefix = NULL;
+	}
+	for (int i = 0; i < 5; i++) {
+		if (settings->format_map[i].str != NULL) {
+			free(settings->format_map[i].str);
+			settings->format_map[i].str = NULL;
+		}
+	}
+	for (int i = 0; i < XC_OPCODE_COUNT; i++) {
+		if (settings->opcodes[i].str != NULL) {
+			free((char*)settings->opcodes[i].str);
+		}
+	}
+}
+void initDecodeContext(DECODE_CONTEXT* context) {
+	memset(context, 0, sizeof(DECODE_CONTEXT));
+	context->branch = false;
+	initDecodeSettings(&context->settings);
+}
+DECODE_CONTEXT* createDecodeContext() {
+	DECODE_CONTEXT* context = (DECODE_CONTEXT*)malloc(sizeof(DECODE_CONTEXT));
+	if (context == NULL)
+		return NULL;
+	initDecodeContext(context);
+	return context;
+}
+void destroyDecodeContext(DECODE_CONTEXT* context) {
+	if (context != NULL) {
+		context->stream = NULL;
+		context->xcode = NULL;
+
+		if (context->labels != NULL) {
+			free(context->labels);
+			context->labels = NULL;
+		}
+		context->labelCount = 0;
+
+		if (context->jmps != NULL) {
+			free(context->jmps);
+			context->jmps = NULL;
+		}
+		context->jmpCount = 0;
+
+		destroyDecodeSettings(&context->settings);
+
+		free(context);
+		context = NULL;
+	}
 }

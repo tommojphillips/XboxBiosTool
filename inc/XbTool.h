@@ -29,12 +29,6 @@
 #include "Mcpx.h"
 #include "cli_tbl.h"
 
-#ifndef NO_MEM_TRACKING
-#include "mem_tracking.h"
-#else
-#include <malloc.h>
-#endif
-
 enum XB_CLI_COMMAND : CLI_COMMAND {
 	CMD_INFO = CLI_COMMAND_START_INDEX,
 	CMD_LIST_BIOS,
@@ -88,19 +82,22 @@ enum XB_CLI_SWITCH : CLI_SWITCH {
 	SW_HACK_SIGNATURE,
 	SW_UPDATE_BOOT_PARAMS,
 	SW_HELP_ENCRYPTION,
+	SW_BRANCH,
 	SW_HELP_ALL,
 	SW_WORKING_DIRECTORY,
+	SW_OFFSET,
+	SW_XCODES
 };
-
-const int CLI_LS_FLAGS = (1 << SW_LS_DATA_TBL) | (1 << SW_LS_NV2A_TBL) | (1 << SW_DUMP_KRNL) | (1 << SW_KEYS);
 
 typedef struct {
 	uint32_t romsize;
 	uint32_t binsize;
 	uint32_t simSize;
 	uint32_t base;
+	uint32_t offset;
 	uint8_t* keyBldr;
 	uint8_t* keyKrnl;
+	Mcpx mcpx;
 	const char* inFile;
 	const char* outFile;
 	const char* bankFiles[4];
@@ -112,30 +109,15 @@ typedef struct {
 	const char* mcpxFile;
 	const char* bldrKeyFile;
 	const char* krnlKeyFile;
-	Mcpx mcpx;
 	const char* pubKeyFile;
 	const char* certKeyFile;
 	const char* eepromKeyFile;
 	const char* settingsFile;
 	const char* workingDirectoryPath;
+	const char* xcodesFile;
 } XbToolParameters;
 
-inline void initXbToolParameters(XbToolParameters* params) {
-	memset(params, 0, sizeof(XbToolParameters));
-};
-inline void freeXbToolParameters(XbToolParameters* params) {
-	if (params->keyBldr != NULL) {
-		free(params->keyBldr);
-		params->keyBldr = NULL;
-	}
-	if (params->keyKrnl != NULL) {
-		free(params->keyKrnl);
-		params->keyKrnl = NULL;
-	}
-	freeMcpx(&params->mcpx);
-};
-
-// Command Functions
+/* Command functions */
 
 int info();
 int help();
@@ -155,18 +137,20 @@ int compressFile();
 int decompressFile();
 int disasm();
 
-// Heelper Functions
+void init_parameters(XbToolParameters* params);
+void free_parameters(XbToolParameters* params);
+int inject_xcodes(uint8_t* data, uint32_t size, uint8_t* xcodes, uint32_t xcodesSize);
 uint8_t* load_init_tbl_file(uint32_t* size, uint32_t* base);
-int readKeys();
-int readMCPX();
+
 int verifyBiosBootable(Bios* bios);
+
+/* BIOS print functions */
 void printBldrInfo(Bios* bios);
 void printPreldrInfo(Bios* bios);
 void printInitTblInfo(Bios* bios);
 void printNv2aInfo(Bios* bios);
 void printDataTblInfo(Bios* bios);
 void printKeyInfo(Bios* bios);
-int validateArgs();
 
 int main(int argc, char** argv);
 

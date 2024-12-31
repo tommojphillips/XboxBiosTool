@@ -24,11 +24,6 @@
 
 // std incl
 #include <stdint.h>
-#include <stdio.h>
-
-#ifdef MEM_TRACKING
-#include "mem_tracking.h"
-#endif
 
 // X86 instruction types;
 enum X86_INSTR_TYPE : uint8_t {
@@ -478,148 +473,49 @@ extern const X86_INSTR_MAP x86_instructions[];
 extern const X86_INSTR_MAP x86_unknown_instruction;
 
 // initialize x86 instruction.
-inline void initX86Instruction(X86_INSTR* mem) {
-	mem->map = &x86_unknown_instruction;
-	mem->opcode = X86_OPCODE_NONE;
-	mem->operand1 = 0;
-	mem->operand2 = 0;
-};
+void initX86Instruction(X86_INSTR* mem);
 
 // initialize x86 cpu memory
-inline int initX86CPUMemory(X86_MEMORY* memory, uint32_t ramStart, uint32_t ramEnd, uint32_t romStart, uint32_t romEnd) {
-	// ram
-	memory->ram_start = ramStart;
-	memory->ram_end = ramEnd;
-	memory->ram_size = (ramEnd - ramStart + 1);
-	memory->ram = (uint8_t*)malloc(memory->ram_size);
-
-	// rom
-	memory->rom_start = romStart;
-	memory->rom_end = romEnd;
-	memory->rom_size = (romEnd - romStart + 1);
-	memory->rom = (uint8_t*)malloc(memory->rom_size);
-
-	if (memory->ram == NULL || memory->rom == NULL)
-		return 1;
-
-	return 0;
-};
+int initX86CPUMemory(X86_MEMORY* memory, uint32_t ramStart, uint32_t ramEnd, uint32_t romStart, uint32_t romEnd);
 
 // destroy free x86 cpu memory
-inline void freeX86CPUMemory(X86_MEMORY* memory) {
-	if (memory->ram != NULL)
-	{
-		free(memory->ram);
-		memory->ram = NULL;
-	}
-	if (memory->rom != NULL)
-	{
-		free(memory->rom);
-		memory->rom = NULL;
-	}
-};
+void freeX86CPUMemory(X86_MEMORY* memory);
 
 // reset cpu state
-inline void resetX86CPU(X86_CPU* cpu) {
-	for (int i = 0; i < X86_REG_COUNT; ++i)
-		cpu->registers[i] = 0;
-
-	cpu->eflags.OF = false;
-	cpu->eflags.PF = false;
-	cpu->eflags.AF = false;
-	cpu->eflags.ZF = false;
-	cpu->eflags.SF = false;
-	cpu->eflags.CF = false;
-	cpu->eip = 0;
-	cpu->hlt = false;
-
-	initX86Instruction(&cpu->instruction);
-};
+void resetX86CPU(X86_CPU* cpu);
 
 // clear cpu memory
-inline void clearX86CPUMemory(X86_CPU* cpu) {
-	memset(cpu->memory.ram, 0, cpu->memory.ram_size);
-	memset(cpu->memory.rom, 0, cpu->memory.rom_size);
-};
+void clearX86CPUMemory(X86_CPU* cpu);
 
 // initialize cpu.
-inline int initX86CPU(X86_CPU* cpu, uint32_t ramStart, uint32_t ramEnd, uint32_t romStart, uint32_t romEnd) {
-	if (initX86CPUMemory(&cpu->memory, ramStart, ramEnd, romStart, romEnd) != 0)
-		return 1;
-
-	resetX86CPU(cpu);
-	clearX86CPUMemory(cpu);
-
-	return 0;
-};
+int initX86CPU(X86_CPU* cpu, uint32_t ramStart, uint32_t ramEnd, uint32_t romStart, uint32_t romEnd);
 
 // destroy and free cpu.
-inline void freeX86CPU(X86_CPU* cpu) {
-	resetX86CPU(cpu);
-	freeX86CPUMemory(&cpu->memory);
-};
+void freeX86CPU(X86_CPU* cpu);
 
 // get a cpu memory ptr
 // cpu: pointer to cpu state.
 // address: the address to get a pointer to. address can reside in rom or ram.
-inline void* getX86CPUMemoryPtr(X86_CPU* cpu, uint32_t address) {
-	if (address >= cpu->memory.ram_start && address < cpu->memory.ram_end) {
-			return cpu->memory.ram + address - cpu->memory.ram_start;
-		}
-		if (address >= cpu->memory.rom_start && address < cpu->memory.rom_end) {
-			return cpu->memory.rom + address - cpu->memory.rom_start;
-		}
-	return NULL;
-};
+void* getX86CPUMemoryPtr(X86_CPU* cpu, uint32_t address);
 
 // get a cpu memory ptr. checks sizes is within the cpu memory.
 // cpu: pointer to cpu state.
-inline void* getX86CPUMemoryBlock(X86_CPU* cpu, uint32_t address, uint32_t size) {
-		if (address >= cpu->memory.ram_start && address + size < cpu->memory.ram_end) {
-			return cpu->memory.ram + address - cpu->memory.ram_start;
-		}
-		if (address >= cpu->memory.rom_start && address + size < cpu->memory.rom_end) {
-			return cpu->memory.rom + address - cpu->memory.rom_start;
-		}
-	return NULL;
-};
+void* getX86CPUMemoryBlock(X86_CPU* cpu, uint32_t address, uint32_t size);
 
 // copy cpu memory from one address to another. fromAddress and toAddress must reside in cpu memory. (rom or ram)
 // cpu: pointer to cpu state.
-inline int copyFromToX86CPUMemory(X86_CPU* cpu, uint32_t fromAddress, uint32_t toAddress, uint32_t size) {
-	void* src = getX86CPUMemoryBlock(cpu, fromAddress, size);
-	void* dest = getX86CPUMemoryBlock(cpu, toAddress, size);
-	if (src == NULL || dest == NULL)
-		return 1;
-	memcpy(dest, src, size);
-	return 0;
-};
+int copyFromToX86CPUMemory(X86_CPU* cpu, uint32_t fromAddress, uint32_t toAddress, uint32_t size);
 
 // copy from an external src into cpu memory. toAddress must reside in cpu memory. (rom or ram)
 // cpu: pointer to cpu state.
 // toAddress: the cpu memory address copy the external data to.
 // data: the external data to copy into cpu memory.
 // size: the external data size.
-inline int copyIntoX86CPUMemory(X86_CPU* cpu, uint32_t toAddress, uint8_t* data, uint32_t size) {
-	void* dest = getX86CPUMemoryBlock(cpu, toAddress, size);
-	if (data == NULL || dest == NULL)
-		return 1;
-	memcpy(dest, data, size);
-	return 0;
-};
+int copyIntoX86CPUMemory(X86_CPU* cpu, uint32_t toAddress, uint8_t* data, uint32_t size);
 
 // print cpu state to console.
 // cpu: pointer to cpu state.
-inline void printX86CPUState(const X86_CPU* cpu) {
-	for (int i = 0; i < X86_REG_COUNT; ++i)	{
-		printf("%s: %x\n", x86_registers[i].str, cpu->registers[i]);
-	}
-
-	printf("eflags: OF: %d, ZF: %d, SF: %d, CF: %d\n", 
-		cpu->eflags.OF, cpu->eflags.ZF, cpu->eflags.SF, cpu->eflags.CF);
-
-	printf("eip: %x\n", cpu->eip);
-};
+void printX86CPUState(const X86_CPU* cpu);
 
 // arithmetic logic unit
 int ALU(X86_CPU* cpu, X86_INSTR_TYPE type, uint32_t operand1, uint32_t operand2, uint32_t* result);

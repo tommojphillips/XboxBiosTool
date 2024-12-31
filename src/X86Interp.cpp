@@ -407,8 +407,7 @@ const X86_INSTR_MAP x86_unknown_instruction = { X86_INSTR_NONE, X86_REG_NONE, X8
 
 const uint32_t MAX_INSTR_SIZE = 6; // 2 + 4
 
-int decodeX86(uint8_t* data, uint32_t size, uint32_t base, FILE* stream, uint32_t* codeSize)
-{
+int decodeX86(uint8_t* data, uint32_t size, uint32_t base, FILE* stream, uint32_t* codeSize) {
 	int result;
 	uint32_t i;
 	char str_instr[128] = { 0 };
@@ -429,12 +428,12 @@ int decodeX86(uint8_t* data, uint32_t size, uint32_t base, FILE* stream, uint32_
 		printf("No instructions found.\n");
 	}
 	else {
-		printf("\nx86 instructions:\n");
+		printf("\nAssembly:\n");
 
 		uint32_t offset = 0;
 		for (i = 0; i < instructionTreeSize / sizeof(X86_INSTR); ++i) {
 			getX86Mnemonic(&instructionTree[i], str_instr);
-			fprintf(stream, "\t %s\n", str_instr);
+			fprintf(stream, "\t%s\n", str_instr);
 
 			offset += (instructionTree[i].map->opcode_len + instructionTree[i].map->operand1_len + instructionTree[i].map->operand2_len);
 		}
@@ -446,12 +445,10 @@ int decodeX86(uint8_t* data, uint32_t size, uint32_t base, FILE* stream, uint32_
 
 	free(instructionTree);
 	instructionTree = NULL;
-
 	return 0;
 }
 
-int getX86Instruction(const uint8_t* data, uint32_t size, X86_INSTR* instruction)
-{
+int getX86Instruction(const uint8_t* data, uint32_t size, X86_INSTR* instruction) {
 	if (instruction == NULL)
 		return X86_ERROR;
 
@@ -486,8 +483,7 @@ int getX86Instruction(const uint8_t* data, uint32_t size, X86_INSTR* instruction
 	return X86_ERROR_SUCCESS;
 }
 
-int getX86Mnemonic(X86_INSTR* instruction, char* str)
-{
+int getX86Mnemonic(X86_INSTR* instruction, char* str) {
 	uint32_t i = 0;
 	uint32_t operand1 = instruction->operand1;
 	const X86_INSTR_MAP map = *instruction->map;
@@ -542,8 +538,7 @@ int getX86Mnemonic(X86_INSTR* instruction, char* str)
 	return X86_ERROR_SUCCESS;
 }
 
-int executeX86Instruction(X86_CPU* cpu)
-{
+int executeX86Instruction(X86_CPU* cpu) {
 	const X86_INSTR_MAP* map;
 	uint32_t operand;
 	X86_REG_TYPE reg;
@@ -642,8 +637,7 @@ int executeX86Instruction(X86_CPU* cpu)
 	return X86_ERROR_SUCCESS;
 }
 
-int ALU(X86_CPU* cpu, X86_INSTR_TYPE type, uint32_t operand1, uint32_t operand2, uint32_t* result)
-{	
+int ALU(X86_CPU* cpu, X86_INSTR_TYPE type, uint32_t operand1, uint32_t operand2, uint32_t* result) {	
 	switch (type) {
 		case X86_INSTR_ADD:
 			*result = (operand1 + operand2);
@@ -691,8 +685,7 @@ int ALU(X86_CPU* cpu, X86_INSTR_TYPE type, uint32_t operand1, uint32_t operand2,
 
 	return 0;
 }
-int ALU_setflags(X86_EFLAGS* eflags, uint32_t operand1, uint32_t operand2, uint32_t result)
-{
+int ALU_setflags(X86_EFLAGS* eflags, uint32_t operand1, uint32_t operand2, uint32_t result) {
 	#define bitset(flags, n) ((flags & (1 << (n))) != 0)
 
 	// overflow flag; compare sign bit
@@ -710,8 +703,7 @@ int ALU_setflags(X86_EFLAGS* eflags, uint32_t operand1, uint32_t operand2, uint3
 	return 0;
 }
 
-int JLU(X86_CPU* cpu)
-{
+int JLU(X86_CPU* cpu) {
 	X86_INSTR_TYPE type = cpu->instruction.map->type;
 	int operand = 99999;
 
@@ -826,8 +818,7 @@ int JLU(X86_CPU* cpu)
 	return 0;
 }
 
-int generateX86InstructionTree(uint8_t* data, uint32_t size, X86_INSTR** instructionTree, uint32_t* instructionTreeSize)
-{
+int generateX86InstructionTree(uint8_t* data, uint32_t size, X86_INSTR** instructionTree, uint32_t* instructionTreeSize) {
 	const uint32_t ALLOC_SIZE = sizeof(X86_INSTR) * 10;
 	const uint8_t zero_mem[MAX_INSTR_SIZE] = { 0 };
 
@@ -884,4 +875,116 @@ int generateX86InstructionTree(uint8_t* data, uint32_t size, X86_INSTR** instruc
 	}
 
 	return result;
+}
+
+void initX86Instruction(X86_INSTR* mem) {
+	mem->map = &x86_unknown_instruction;
+	mem->opcode = X86_OPCODE_NONE;
+	mem->operand1 = 0;
+	mem->operand2 = 0;
+}
+int initX86CPUMemory(X86_MEMORY* memory, uint32_t ramStart, uint32_t ramEnd, uint32_t romStart, uint32_t romEnd) {
+	// ram
+	memory->ram_start = ramStart;
+	memory->ram_end = ramEnd;
+	memory->ram_size = (ramEnd - ramStart + 1);
+	memory->ram = (uint8_t*)malloc(memory->ram_size);
+
+	// rom
+	memory->rom_start = romStart;
+	memory->rom_end = romEnd;
+	memory->rom_size = (romEnd - romStart + 1);
+	memory->rom = (uint8_t*)malloc(memory->rom_size);
+
+	if (memory->ram == NULL || memory->rom == NULL)
+		return 1;
+
+	return 0;
+}
+void freeX86CPUMemory(X86_MEMORY* memory) {
+	if (memory->ram != NULL)
+	{
+		free(memory->ram);
+		memory->ram = NULL;
+	}
+	if (memory->rom != NULL)
+	{
+		free(memory->rom);
+		memory->rom = NULL;
+	}
+}
+void resetX86CPU(X86_CPU* cpu) {
+	for (int i = 0; i < X86_REG_COUNT; ++i)
+		cpu->registers[i] = 0;
+
+	cpu->eflags.OF = false;
+	cpu->eflags.PF = false;
+	cpu->eflags.AF = false;
+	cpu->eflags.ZF = false;
+	cpu->eflags.SF = false;
+	cpu->eflags.CF = false;
+	cpu->eip = 0;
+	cpu->hlt = false;
+
+	initX86Instruction(&cpu->instruction);
+}
+void clearX86CPUMemory(X86_CPU* cpu) {
+	memset(cpu->memory.ram, 0, cpu->memory.ram_size);
+	memset(cpu->memory.rom, 0, cpu->memory.rom_size);
+}
+int initX86CPU(X86_CPU* cpu, uint32_t ramStart, uint32_t ramEnd, uint32_t romStart, uint32_t romEnd) {
+	if (initX86CPUMemory(&cpu->memory, ramStart, ramEnd, romStart, romEnd) != 0)
+		return 1;
+
+	resetX86CPU(cpu);
+	clearX86CPUMemory(cpu);
+
+	return 0;
+}
+void freeX86CPU(X86_CPU* cpu) {
+	resetX86CPU(cpu);
+	freeX86CPUMemory(&cpu->memory);
+}
+void* getX86CPUMemoryPtr(X86_CPU* cpu, uint32_t address) {
+	if (address >= cpu->memory.ram_start && address < cpu->memory.ram_end) {
+		return cpu->memory.ram + address - cpu->memory.ram_start;
+	}
+	if (address >= cpu->memory.rom_start && address < cpu->memory.rom_end) {
+		return cpu->memory.rom + address - cpu->memory.rom_start;
+	}
+	return NULL;
+}
+void* getX86CPUMemoryBlock(X86_CPU* cpu, uint32_t address, uint32_t size) {
+	if (address >= cpu->memory.ram_start && address + size < cpu->memory.ram_end) {
+		return cpu->memory.ram + address - cpu->memory.ram_start;
+	}
+	if (address >= cpu->memory.rom_start && address + size < cpu->memory.rom_end) {
+		return cpu->memory.rom + address - cpu->memory.rom_start;
+	}
+	return NULL;
+}
+int copyFromToX86CPUMemory(X86_CPU* cpu, uint32_t fromAddress, uint32_t toAddress, uint32_t size) {
+	void* src = getX86CPUMemoryBlock(cpu, fromAddress, size);
+	void* dest = getX86CPUMemoryBlock(cpu, toAddress, size);
+	if (src == NULL || dest == NULL)
+		return 1;
+	memcpy(dest, src, size);
+	return 0;
+}
+int copyIntoX86CPUMemory(X86_CPU* cpu, uint32_t toAddress, uint8_t* data, uint32_t size) {
+	void* dest = getX86CPUMemoryBlock(cpu, toAddress, size);
+	if (data == NULL || dest == NULL)
+		return 1;
+	memcpy(dest, data, size);
+	return 0;
+}
+void printX86CPUState(const X86_CPU* cpu) {
+	for (int i = 0; i < X86_REG_COUNT; ++i) {
+		printf("%s: %x\n", x86_registers[i].str, cpu->registers[i]);
+	}
+
+	printf("eflags: OF: %d, ZF: %d, SF: %d, CF: %d\n",
+		cpu->eflags.OF, cpu->eflags.ZF, cpu->eflags.SF, cpu->eflags.CF);
+
+	printf("eip: %x\n", cpu->eip);
 }

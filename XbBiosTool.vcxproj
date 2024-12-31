@@ -265,7 +265,7 @@
     <ClCompile Include="src\loadini.cpp" />
     <ClCompile Include="src\lzx_decoder.c" />
     <ClCompile Include="src\lzx_encoder.c" />
-    <ClCompile Include="src\Mcpx.cpp" />
+    <ClCompile Include="src\Mcpx.c" />
     <ClCompile Include="src\mem_tracking.c" />
     <ClCompile Include="src\nt_headers.c" />
     <ClCompile Include="src\rc4.c" />

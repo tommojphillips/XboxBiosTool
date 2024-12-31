@@ -23,18 +23,12 @@
 #define XB_BIOS_H
 
 #include <stdint.h>
-#include <malloc.h>
 
 // user incl
 #include "Mcpx.h"
-#include "file.h"
 #include "bldr.h"
 #include "rsa.h"
 #include "sha1.h"
-
-#ifdef MEM_TRACKING
-#include "mem_tracking.h"
-#endif
 
 #define MIN_BIOS_SIZE 0x40000                                                    // Min bios file/rom size in bytes
 #define MAX_BIOS_SIZE 0x100000                                                   // Max bios file/rom size in bytes
@@ -86,10 +80,6 @@ typedef struct Preldr {
 	int status;
 } Preldr;
 
-inline void initPreldr(Preldr* preldr) {
-	memset(preldr, 0, sizeof(Preldr));
-	preldr->status = PRELDR_STATUS_ERROR;
-}
 
 // 2BL structure
 typedef struct Bldr {
@@ -109,9 +99,6 @@ typedef struct Bldr {
 	bool bootParamsValid;
 } Bldr;
 
-inline void initBldr(Bldr* bldr) {
-	memset(bldr, 0, sizeof(Bldr));
-};
 
 // Bios load parameters
 typedef struct BiosParams {	
@@ -124,10 +111,6 @@ typedef struct BiosParams {
 	bool restoreBootParams;
 } BiosParams;
 
-inline void initBiosParams(BiosParams* params) {
-	memset(params, 0, sizeof(BiosParams));
-	params->restoreBootParams = true;
-};
 
 // Bios build parmeters 
 typedef struct BiosBuildParams {
@@ -148,40 +131,6 @@ typedef struct BiosBuildParams {
 	bool hacksignature;
 	bool nobootparams;
 } BiosBuildParams;
-
-inline void initBiosBuildParams(BiosBuildParams* params) {
-	memset(params, 0, sizeof(BiosBuildParams));
-};
-inline void freeBiosBuildParams(BiosBuildParams* params) {
-	if (params->preldr != NULL)	{
-		free(params->preldr);
-		params->preldr = NULL;
-	}
-	if (params->bldr != NULL) {
-		free(params->bldr);
-		params->bldr = NULL;
-	}
-	if (params->inittbl != NULL) {
-		free(params->inittbl);
-		params->inittbl = NULL;
-	}
-	if (params->krnl != NULL) {
-		free(params->krnl);
-		params->krnl = NULL;
-	}
-	if (params->krnlData != NULL) {
-		free(params->krnlData);
-		params->krnlData = NULL;
-	}
-	if (params->eepromKey != NULL) {
-		free(params->eepromKey);
-		params->eepromKey = NULL;
-	}
-	if (params->certKey != NULL) {
-		free(params->certKey);
-		params->certKey = NULL;
-	}
-};
 
 // Bios
 class Bios {
@@ -207,45 +156,12 @@ public:
 		unload();
 	};
 
-	// reset bios; reset values.
-	inline void resetValues() {
-		initBiosParams(&params);
-		initPreldr(&preldr);
-		initBldr(&bldr);
-
-		data = NULL;
-		size = 0;
-
-		initTbl = NULL;
-		krnl = NULL;
-		krnlData = NULL;
-		romDigest = NULL;
-		availableSpace = -1;
-
-		decompressedKrnl = NULL;
-		decompressedKrnlSize = 0;
-		kernelEncryptionState = false;
-	};
-
 	// unload the bios. reset values and free memory.
-	inline void unload() {
-		if (data != NULL) {
-			free(data);
-		}
-
-		if (decompressedKrnl != NULL) {
-			free(decompressedKrnl);
-		}
-
-		resetValues();
-	};
+	void unload();
 	
 	// load bios from memory.
 	int load(uint8_t* buff, const uint32_t binsize, const BiosParams* biosParams);
 
-	// load bios from file.
-	int loadFromFile(const char* filename, const BiosParams* biosParams);
-		
 	// build bios. 
 	int build(BiosBuildParams* buildParams, uint32_t binsize, BiosParams* biosParams);
 
@@ -286,23 +202,20 @@ public:
 	// returns 0 if successful,
 	int decompressKrnl();
 
-	// replicate the bios with a new size.
-	// buffSize: the new size of the bios.
-	// returns 0 if successful,
-	int replicateBios(uint32_t buffSize);
-
 	// preldr decrypt preldr public key.
 	int preldrDecryptPublicKey();
 
-	// print current state of the bios.
-	int printState();
-	
-	inline int saveKernelToFile(const char* filename) { return writeFileF(filename, krnl, bldr.bootParams->krnlSize); };
-	inline int saveKernelDataToFile(const char* filename) { return writeFileF(filename, krnlData, bldr.bootParams->krnlDataSize); };
+private:
+	// reset bios; reset values.
+	void resetValues();
 };
 
-int checkBiosSize(const uint32_t size);
-int validateRequiredSpace(const uint32_t requiredSpace, uint32_t* size);
-int replicateData(uint32_t from, uint32_t to, uint8_t* buffer, uint32_t buffersize);
+void bios_init_preldr(Preldr* preldr);
+void bios_init_bldr(Bldr* bldr);
+void bios_init_params(BiosParams* params);
+void bios_init_build_params(BiosBuildParams* params);
+void bios_free_build_params(BiosBuildParams* params);
+int bios_check_size(const uint32_t size);
+int bios_replicate_data(uint32_t from, uint32_t to, uint8_t* buffer, uint32_t buffersize);
 
 #endif // !XB_BIOS_H

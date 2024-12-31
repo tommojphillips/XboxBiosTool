@@ -22,11 +22,7 @@
 #ifndef RC4_H
 #define RC4_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include "stdint.h"
+#include <stdint.h>
 
 typedef struct _RC4_CONTEXT {
     uint8_t k;
@@ -35,11 +31,16 @@ typedef struct _RC4_CONTEXT {
     uint8_t s[256];
 } RC4_CONTEXT;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void rc4_key(RC4_CONTEXT* context, const uint8_t* key, const size_t len);
 void rc4(RC4_CONTEXT* context, uint8_t* data, const size_t size);
-void symmetricEncDec(uint8_t* data, const size_t size, const uint8_t* key, const size_t key_len);
+void rc4_symmetric_enc_dec(uint8_t* data, const size_t size, const uint8_t* key, const size_t key_len);
 
 #ifdef __cplusplus
 };
 #endif
+
 #endif // _RC4_H

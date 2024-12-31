@@ -80,18 +80,21 @@ const char HELP_STR_PARAM_EXTRACT_KEYS[] =	"-keys            - extract rc4 keys"
 const char HELP_STR_PARAM_BFM[] =			"-bfm             - build a boot from media BIOS";
 const char HELP_STR_PARAM_NO_MAX_SIZE[] =	"-nomaxsize       - do not limit the size of the xcode file";
 const char HELP_STR_PARAM_DECODE_INI[] =	"-ini <path>      - set the decode settings file";
-const char HELP_STR_PARAM_BIOS_FILE[] =		"-in <path>       - BIOS file";
 const char HELP_STR_PARAM_IN_FILE[] =		"-in <path>       - input file";
 const char HELP_STR_PARAM_OUT_FILE[] =		"-out <path>      - output file";
+const char HELP_STR_PARAM_IN_BIOS_FILE[] =	"-in <path>       - BIOS file";
+const char HELP_STR_PARAM_OUT_BIOS_FILE[] =	"-out <path>      - BIOS output file";
 const char HELP_STR_PARAM_SIM_SIZE[] =		"-simsize <size>  - size of the sim space in bytes. default is 32 bytes";
 const char HELP_STR_PARAM_ROMSIZE[] =		"-romsize <size>  - rom size in kb";
 const char HELP_STR_PARAM_BINSIZE[] =		"-binsize <size>  - bin size in kb";
 const char HELP_STR_PARAM_BASE[] =			"-base <offset>   - base offset in bytes";
 const char HELP_STR_PARAM_HACK_INITTBL[] =	"-hackinittbl     - hack init tbl (size = 0)";
 const char HELP_STR_PARAM_HACK_SIGNATURE[] ="-hacksignature   - hack boot signature (signature = 0)";
+const char HELP_STR_PARAM_WDIR[] =          "-dir             - working directory";
 const char HELP_STR_PARAM_BOOTABLE[] =      "-bootable        - run checks to see if and how a BIOS gets to 2BL\n" \
 											"\t\t    Use -d to save 2BL to a file";
 const char HELP_STR_PARAM_UPDATE_BOOT_PARAMS[] =  "-nobootparams    - dont update 2BL boot params";
 const char HELP_STR_PARAM_RESTORE_BOOT_PARAMS[] = "-nobootparams    - dont restore 2BL boot params (FBL BIOSes only)";
+const char HELP_STR_PARAM_BRANCH[] =		"-branch          - take unbranchable jumps";
 
 #endif // XB_BIOS_TOOL_COMMANDS_H
