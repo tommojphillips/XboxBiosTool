@@ -120,13 +120,13 @@ const LOADINI_SETTING settings_map[] = {
 };
 const LOADINI_RETURN_MAP decode_settings_map = { settings_map, sizeof(settings_map), sizeof(settings_map) / sizeof(LOADINI_SETTING_MAP) };
 
-int ll(char* output, char* str, uint32_t i, uint32_t* j, uint32_t len, uint32_t m);
-int ll2(char* output, char* str, uint32_t i, uint32_t& j, uint32_t len);
-int createLabel(DECODE_CONTEXT* context, uint32_t offset, const char* label_format);
-int createJmp(DECODE_CONTEXT * context, uint32_t xcodeOffset, XCODE * xcode);
-int searchLabel(DECODE_CONTEXT* context, uint32_t offset, LABEL** label);
-int searchJmp(DECODE_CONTEXT* context, uint32_t offset, JMP_XCODE** jmp);
-void walkBranch(DECODE_CONTEXT * context, XcodeInterp * interp);
+static int ll(char* output, char* str, uint32_t i, uint32_t* j, uint32_t len, uint32_t m);
+static int ll2(char* output, char* str, uint32_t i, uint32_t& j, uint32_t len);
+static int createLabel(DECODE_CONTEXT* context, uint32_t offset, const char* label_format);
+static int createJmp(DECODE_CONTEXT * context, uint32_t xcodeOffset, XCODE * xcode);
+static int searchLabel(DECODE_CONTEXT* context, uint32_t offset, LABEL** label);
+static int searchJmp(DECODE_CONTEXT* context, uint32_t offset, JMP_XCODE** jmp);
+static void walkBranch(DECODE_CONTEXT * context, XcodeInterp * interp);
 
 int XcodeDecoder::load(uint8_t* data, uint32_t size, uint32_t base, const char* ini) {
 	// set up the xcode decoder.

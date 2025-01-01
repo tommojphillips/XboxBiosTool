@@ -43,7 +43,6 @@ enum XB_CLI_COMMAND : CLI_COMMAND {
 	CMD_REPLICATE_BIOS,
 	CMD_COMPRESS_FILE,
 	CMD_DECOMPRESS_FILE,
-	CMD_DISASM,
 };
 enum XB_CLI_SWITCH : CLI_SWITCH {
 	SW_ROMSIZE = CLI_SWITCH_START_INDEX,
@@ -63,7 +62,6 @@ enum XB_CLI_SWITCH : CLI_SWITCH {
 	SW_LS_DATA_TBL,
 	SW_DUMP_KRNL,
 	SW_KEYS,
-	SW_VERIFY_BIOS_BOOTABLE,
 	SW_NO_MAX_SIZE,
 	SW_MCPX_FILE,
 	SW_PUB_KEY_FILE,
@@ -135,14 +133,11 @@ int encodeX86();
 int dumpCoffPeImg();
 int compressFile();
 int decompressFile();
-int disasm();
 
 void init_parameters(XbToolParameters* params);
 void free_parameters(XbToolParameters* params);
 int inject_xcodes(uint8_t* data, uint32_t size, uint8_t* xcodes, uint32_t xcodesSize);
 uint8_t* load_init_tbl_file(uint32_t* size, uint32_t* base);
-
-int verifyBiosBootable(Bios* bios);
 
 /* BIOS print functions */
 void printBldrInfo(Bios* bios);

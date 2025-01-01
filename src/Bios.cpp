@@ -40,7 +40,7 @@
 #include "mem_tracking.h"
 #endif
 
-int validate_required_space(const uint32_t requiredSpace, uint32_t* size);
+static int validate_required_space(const uint32_t requiredSpace, uint32_t* size);
 
 int Bios::load(uint8_t* buff, const uint32_t binsize, const BiosParams* biosParams) {
 	int result;

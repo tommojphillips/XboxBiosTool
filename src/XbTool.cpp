@@ -32,7 +32,6 @@
 #include "Mcpx.h"
 #include "XcodeInterp.h"
 #include "XcodeDecoder.h"
-#include "X86Interp.h"
 #include "file.h"
 #include "util.h"
 #include "nt_headers.h"
@@ -64,8 +63,7 @@ static const CMD_TBL cmd_tbl[] = {
 	{ "dump-img", CMD_DUMP_PE_IMG, {SW_IN_FILE}, {SW_IN_FILE} },
 	{ "replicate", CMD_REPLICATE_BIOS, {SW_IN_FILE}, {SW_IN_FILE} },
 	{ "compress", CMD_COMPRESS_FILE, {SW_IN_FILE, SW_OUT_FILE}, {SW_IN_FILE} },
-	{ "decompress", CMD_DECOMPRESS_FILE, {SW_IN_FILE, SW_OUT_FILE}, {SW_IN_FILE} },	
-	{ "disasm", CMD_DISASM, {SW_IN_FILE}, {SW_IN_FILE} },
+	{ "decompress", CMD_DECOMPRESS_FILE, {SW_IN_FILE, SW_OUT_FILE}, {SW_IN_FILE} },
 };
 static const PARAM_TBL param_tbl[] = {
 	{ "in", &params.inFile, SW_IN_FILE, PARAM_TBL::STR },
@@ -106,7 +104,6 @@ static const PARAM_TBL param_tbl[] = {
 	{ "ini", &params.settingsFile, SW_INI_FILE, PARAM_TBL::STR },
 	{ "?", NULL, SW_HELP, PARAM_TBL::FLAG },
 	{ "keys", NULL, SW_KEYS, PARAM_TBL::FLAG },
-	{ "bootable", NULL, SW_VERIFY_BIOS_BOOTABLE, PARAM_TBL::FLAG },
 	{ "base", &params.base, SW_BASE, PARAM_TBL::INT },
 	{ "hackinittbl", NULL, SW_HACK_INITTBL, PARAM_TBL::FLAG },
 	{ "hacksignature", NULL, SW_HACK_SIGNATURE, PARAM_TBL::FLAG },
@@ -622,10 +619,6 @@ int listBios() {
 		// rom data table
 		printDataTblInfo(&bios);
 	}
-	else if (isFlagSet(SW_VERIFY_BIOS_BOOTABLE)) {
-		// verify bios bootable
-		result = verifyBiosBootable(&bios);
-	}
 	else if (isFlagSet(SW_KEYS)) {
 		// keys
 		if (biosStatus != BIOS_LOAD_STATUS_SUCCESS) {
@@ -825,13 +818,6 @@ int simulateXcodes() {
 		goto Cleanup;
 	}
 
-	// decode the x86 instructions.
-	result = decodeX86(mem_sim, params.simSize, 0, stdout, &codeSize);
-	if (result != 0) {
-		printf("Error: failed to decode x86 instructions\n");
-		goto Cleanup;
-	}
-
 	// if -d flag is set, dump the memory to a file, otherwise print the memory dump
 	if (isFlagSet(SW_DMP)) {
 		const char* filename = params.outFile;
@@ -1005,37 +991,6 @@ Cleanup:
 
 	return result;
 }
-int disasm() {
-	// disassemble x86 instructions
-
-	uint8_t* data;
-	uint32_t size;
-	uint32_t base;
-
-	int result = 0;
-
-	data = readFile(params.inFile, &size, 0);
-	if (data == NULL) {
-		return 1;
-	}
-
-	base = params.base;
-	if (base >= size)
-		base = 0;
-
-	printf("file: %s\nbase: 0x%x\n", params.inFile, base);
-
-	result = decodeX86(data, size, base, stdout, NULL);
-	if (result != 0) {
-		printf("Error: failed to decode x86 instructions\n");
-	}
-
-	if (data != NULL) {
-		free(data);
-	}
-
-	return result;
-}
 int dumpCoffPeImg() {
 	int result = 0;
 	uint8_t* data = NULL;
@@ -1083,9 +1038,9 @@ int help() {
 	if (isFlagSet(SW_HELP)) {
 		switch (cmd->type) {
 			case CMD_LIST_BIOS:
-				printf("# %s\n\n %s (req) *inferred\n %s\n %s\n %s\n %s\n %s\n\n",
+				printf("# %s\n\n %s (req) *inferred\n %s\n %s\n %s\n %s\n\n",
 					HELP_STR_LIST, HELP_STR_PARAM_IN_BIOS_FILE, HELP_STR_PARAM_LS_DATA_TBL,
-					HELP_STR_PARAM_LS_NV2A_TBL, HELP_STR_PARAM_LS_DUMP_KRNL, HELP_STR_PARAM_LS_KEYS, HELP_STR_PARAM_BOOTABLE);
+					HELP_STR_PARAM_LS_NV2A_TBL, HELP_STR_PARAM_LS_DUMP_KRNL, HELP_STR_PARAM_LS_KEYS);
 				printf("Usage: xbios -ls <bios_path> [switches]\n");
 				return 0;
 
@@ -1116,8 +1071,8 @@ int help() {
 				return 0;
 
 			case CMD_SIMULATE_XCODE:
-				printf("# %s\n\n %s (req) *inferred\n %s\n %s\n %s\n -d\t\t  - write sim to a file. Use -out to set output.\n\n",
-					HELP_STR_XCODE_SIM, HELP_STR_PARAM_IN_FILE, HELP_STR_PARAM_SIM_SIZE, HELP_STR_PARAM_BASE, HELP_STR_PARAM_NO_MAX_SIZE);
+				printf("# %s\n\n %s (req) *inferred\n %s\n %s\n -d\t\t  - write sim to a file. Use -out to set output.\n\n",
+					HELP_STR_XCODE_SIM, HELP_STR_PARAM_IN_FILE, HELP_STR_PARAM_SIM_SIZE, HELP_STR_PARAM_BASE);
 				printf("Usage: xbios -xcode-sim <path> [switches]\n");
 				return 0;
 
@@ -1144,8 +1099,8 @@ int help() {
 				}
 				else
 				{
-					printf("# %s\n\n %s (req) *inferred\n %s\n %s\n %s\n -d\t\t  - write xcodes to a file. Use -out to set output\n %s\n\n",
-						HELP_STR_XCODE_DECODE, HELP_STR_PARAM_IN_FILE, HELP_STR_PARAM_DECODE_INI, HELP_STR_PARAM_BASE, HELP_STR_PARAM_NO_MAX_SIZE, HELP_STR_PARAM_BRANCH);
+					printf("# %s\n\n %s (req) *inferred\n %s\n %s\n %s\n -d\t\t  - write xcodes to a file. Use -out to set output\n\n",
+						HELP_STR_XCODE_DECODE, HELP_STR_PARAM_IN_FILE, HELP_STR_PARAM_DECODE_INI, HELP_STR_PARAM_BASE, HELP_STR_PARAM_BRANCH);
 					printf("Use -xcode-decode -? -ini to get a list of decode settings\n\nUsage: xbios -xcode-decode <bios_path> [switches]\n");
 				}
 			} return 0;
@@ -1184,11 +1139,7 @@ int help() {
 				printf("# %s\n\n %s (req) *inferred\n %s (req) %s\n %s\n\n",
 					HELP_STR_REPLICATE, HELP_STR_PARAM_IN_BIOS_FILE, HELP_STR_PARAM_BINSIZE, HELP_STR_VALID_ROM_SIZES, HELP_STR_PARAM_OUT_FILE);
 				return 0;
-
-			case CMD_DISASM:
-				printf("# %s\n\n %s (req) *inferred\n %s\n\n", HELP_STR_DISASM, HELP_STR_PARAM_IN_FILE, HELP_STR_PARAM_BASE);
-				return 0;
-			
+							
 			case CMD_HELP:
 				break;
 
@@ -1253,19 +1204,19 @@ int helpAll() {
 }
 
 // Helper functions
-void init_parameters(XbToolParameters* params) {
-	memset(params, 0, sizeof(XbToolParameters));
+void init_parameters(XbToolParameters* _params) {
+	memset(_params, 0, sizeof(XbToolParameters));
 }
-void free_parameters(XbToolParameters* params) {
-	if (params->keyBldr != NULL) {
-		free(params->keyBldr);
-		params->keyBldr = NULL;
+void free_parameters(XbToolParameters* _params) {
+	if (_params->keyBldr != NULL) {
+		free(_params->keyBldr);
+		_params->keyBldr = NULL;
 	}
-	if (params->keyKrnl != NULL) {
-		free(params->keyKrnl);
-		params->keyKrnl = NULL;
+	if (_params->keyKrnl != NULL) {
+		free(_params->keyKrnl);
+		_params->keyKrnl = NULL;
 	}
-	mcpx_free(&params->mcpx);
+	mcpx_free(&_params->mcpx);
 }
 
 int inject_xcodes(uint8_t* data, uint32_t size, uint8_t* xcodes, uint32_t xcodesSize) {
@@ -1453,247 +1404,6 @@ Cleanup:
 	return inittbl;
 }
 
-int visorCheck(Bios* bios, X86_CPU* cpu) {
-	bool bootable = false;
-
-	// FFFF.FFFF -> 0000.0000
-
-	int result;
-	char str_instr[128] = {};
-
-	XcodeInterp interp;
-	XCODE* xcode;
-	uint32_t writes = 0;
-	X86_INSTR_TYPE type;
-
-	cpu->eip = 0;
-
-	result = interp.load(bios->data + 0x80, bios->params.romsize - 0x80);
-	if (result != 0)
-		return 2;/*crash (no visor)*/
-
-	while (interp.interpretNext(xcode) == 0) {
-		if (xcode->opcode == XC_MEM_WRITE && xcode->addr < cpu->memory.rom_end) {
-			copyIntoX86CPUMemory(cpu, xcode->addr, (uint8_t*)&xcode->data, sizeof(uint32_t));
-			writes++;
-		}
-	}
-
-	if (writes == 0)
-		return 2;/*crash (no visor)*/
-
-	// copy in bios into cpu rom.
-	copyIntoX86CPUMemory(cpu, cpu->memory.rom_start, bios->data, bios->size);
-
-	// copy in mcpx into cpu rom.
-	if (bios->params.mcpx->data != NULL) {
-		copyIntoX86CPUMemory(cpu, cpu->memory.rom_start + bios->size - MCPX_BLOCK_SIZE, bios->params.mcpx->data, MCPX_BLOCK_SIZE);
-	}
-
-	// replicate bios across space
-	if (bios->size < cpu->memory.rom_size) {
-		bios_replicate_data(bios->size, cpu->memory.rom_size, cpu->memory.rom, cpu->memory.rom_size);
-	}
-	
-	uint32_t edi, esi, ecx;
-	bool repmov_found;
-	bool jmp;
-
-	printf("\ninstructions:\n");
-
-NewTree:
-	edi = 0;
-	esi = 0;
-	ecx = 0;
-	repmov_found = false;
-	jmp = false;
-
-	while (cpu->eip < cpu->memory.rom_end) {
-		printf("\t%08x: ", cpu->eip);
-
-		result = executeX86Instruction(cpu);
-		if (result != 0) {
-			if (result == X86_ERROR_UNKOWN_OPCODE) {
-				printf("unknown opcode\nbytes: ");
-				uint8_t* nextBytes = (uint8_t*)getX86CPUMemoryBlock(cpu, cpu->eip, 16);
-				if (nextBytes != NULL)
-					uprinth(nextBytes, 16);
-			}
-			else {
-				printf("Error: %d", result);
-			}
-			return 2;/*crash (no visor)*/
-		}
-
-		type = cpu->instruction.map->type;
-
-		getX86Mnemonic(&cpu->instruction, str_instr);
-
-		printf("%s\n", str_instr);
-
-		// search for rep movsd instruction.			
-		if (cpu->instruction.opcode == X86_OPCODE_REP_MOVSD) {
-			esi = cpu->registers[X86_REG_ESI];
-			edi = cpu->registers[X86_REG_EDI];
-			ecx = cpu->registers[X86_REG_ECX] * sizeof(uint32_t);
-			repmov_found = true;
-			continue;
-		}
-
-		if (type == X86_INSTR_JMP_REG || type == X86_INSTR_JMP_DIRECT || type == X86_INSTR_JMP_INDIRECT) {
-			jmp = true;
-			break;
-		}
-	}
-
-	if (repmov_found == true) {
-		printf("\ncopy from %x to %x (%d bytes)\n", esi, edi, ecx);
-
-		if (isFlagSet(SW_DMP)) {
-			const char* filename = params.outFile;
-			if (filename == NULL)
-				filename = "bldr.bin";
-			void* ptr = getX86CPUMemoryPtr(cpu, edi);
-			if (ptr != NULL)
-				writeFileF(filename, ptr, ecx);
-		}
-
-		bootable = true;
-	}
-
-	if (jmp == true) {
-		if (bootable == false)
-			goto NewTree;
-
-		printf("jmp to %x\n", cpu->eip);
-		return 0;/*visor -> 2BL (made it to 2BL)*/
-	}
-	return 1;/*visor -> crash  (found code, but crashed)*/
-}
-int verifyBiosBootable(Bios* bios) {
-	// verify a BIOS is bootable.
-
-	typedef uint8_t BOOT_SEQ;
-	enum BOOT_SEQ_ELE : BOOT_SEQ {
-		BOOT_SEQ_END = 0,
-		BOOT_SEQ_MCPX,
-		BOOT_SEQ_MCPX_PANIC,
-		BOOT_SEQ_BLDR,
-		BOOT_SEQ_PRELDR,
-		BOOT_SEQ_VISOR,
-		BOOT_SEQ_CRASH,
-		BOOT_SEQ_COUNT
-	};
-	
-	const uint32_t ROM_BASE = 0xff000000;
-	const uint32_t ROM_END = 0xffffffff;
-	const uint32_t MEM_SIZE = 0x03ffffff;
-	bool bootable = false;
-	int seq_index = 0;
-	BOOT_SEQ seq[BOOT_SEQ_COUNT] = { 0 };
-	seq[seq_index++] = BOOT_SEQ_MCPX;
-
-	switch (params.mcpx.version) {
-		case MCPX_VERSION_MCPX_V1_0:
-		case MCPX_VERSION_MOUSE_V1_0: {
-			// mcpx rev 0: decrypt 2bl, check for boot signature;
-
-			if (bios->params.encBldr) {
-				// restore what ever the 2bl image was.
-				rc4_symmetric_enc_dec(bios->bldr.data, BLDR_BLOCK_SIZE, params.mcpx.sbkey, XB_KEY_SIZE);
-			}
-
-			bios->validateBldrBootParams();
-
-			printf("\nboot signature %s: ", bios->bldr.signatureValid ? "valid" : "invalid");
-			uprinth((uint8_t*)&bios->bldr.bootParams->signature, sizeof(uint32_t));
-
-			if (bios->bldr.signatureValid) {
-				// mcpx jump to 2BL.
-				seq[seq_index++] = BOOT_SEQ_BLDR;
-				bootable = true;
-			}
-
-			if (!bios->params.encBldr) {
-				// restore what ever the 2bl image was.
-				rc4_symmetric_enc_dec(bios->bldr.data, BLDR_BLOCK_SIZE, params.mcpx.sbkey, XB_KEY_SIZE);
-			}
-		} break;
-
-		case MCPX_VERSION_MCPX_V1_1:
-		case MCPX_VERSION_MOUSE_V1_1: {
-			seq[seq_index++] = BOOT_SEQ_PRELDR;
-			seq[seq_index++] = BOOT_SEQ_BLDR;
-			bootable = true;
-			printf("preldr boot checks not implemented\n");
-						
-			// hash preldr section with tea.
-			// TEA attack check.
-			// VISOR check.
-		} break;
-	}
-
-	if (!bootable) {
-		seq[seq_index++] = BOOT_SEQ_MCPX_PANIC;
-		X86_CPU cpu;
-		initX86CPU(&cpu, 0, MEM_SIZE, ROM_BASE, ROM_END);
-		int result = visorCheck(bios, &cpu);
-		freeX86CPU(&cpu);
-		if (result == 0) {
-			seq[seq_index++] = BOOT_SEQ_VISOR;
-			seq[seq_index++] = BOOT_SEQ_BLDR;
-			bootable = true;
-		}
-		else if (result == 1) {
-			seq[seq_index++] = BOOT_SEQ_VISOR;
-			seq[seq_index++] = BOOT_SEQ_CRASH;
-		}
-		else {
-			seq[seq_index++] = BOOT_SEQ_CRASH;
-		}
-	}
-
-	// print boot seq.
-	if (bootable) {
-		printf("\nbootable ( ");
-	}
-	else {
-		printf("\nunbootable ( ");
-	}
-	for (int i = 0; i < seq_index; ++i) {
-		switch (seq[i]) {
-			case BOOT_SEQ_MCPX:
-				printf("mcpx -> ");
-				break;
-			case BOOT_SEQ_MCPX_PANIC:
-				printf("panic -> ");
-				break;
-			case BOOT_SEQ_PRELDR:
-				printf("preldr -> ");
-				break;
-			case BOOT_SEQ_VISOR:
-				printf("visor -> ");
-				break;
-
-				// end points..
-			case BOOT_SEQ_BLDR:
-				printf("2BL");
-				break;
-			case BOOT_SEQ_CRASH:
-				printf("crash");
-				break;
-			case BOOT_SEQ_END:
-				printf("[end]");
-				break;
-		}
-	}
-	printf(" )\n ");
-
-	if (bootable)
-		return 0;
-	return 1;
-}
-
 /* BIOS print functions */
 
 void printBldrInfo(Bios* bios) {
@@ -1738,9 +1448,16 @@ void printPreldrInfo(Bios* bios) {
 	if (bios->preldr.status > PRELDR_STATUS_FOUND)
 		return;
 
+	int jmp_offset = (int)bios->preldr.params->jmpOffset + 5;
+	int jmp_address = PRELDR_REAL_BASE + jmp_offset;
+
 	printf("FBL:\n");
-	//printf("entry point:\t\t0x%08x (0x%08x)\n", bios->preldr.jmpOffset, PRELDR_REAL_BASE + bios->preldr.jmpOffset);
-	printf("entry point:\t\t0x%08x (0x%08x)\n", ((int)bios->preldr.params->jmpOffset + 5), PRELDR_REAL_BASE + ((int)bios->preldr.params->jmpOffset + 5));
+	printf("entry point:\t\t0x%08x (0x%08x)\n", jmp_offset, jmp_address);
+
+	if (jmp_address < PRELDR_REAL_BASE || jmp_address > PRELDR_REAL_BASE + PRELDR_BLOCK_SIZE) {
+		// escaped mcpx!
+	}
+
 	printf("\n");
 }
 void printInitTblInfo(Bios* bios) {
@@ -2082,10 +1799,6 @@ int main(int argc, char** argv) {
 
 		case CMD_DECOMPRESS_FILE:
 			result = decompressFile();
-			break;
-
-		case CMD_DISASM:
-			result = disasm();
 			break;
 
 		case CMD_DUMP_PE_IMG:

@@ -274,7 +274,6 @@
     <ClCompile Include="src\str_util.c" />
     <ClCompile Include="src\tea.c" />
     <ClCompile Include="src\util.c" />
-    <ClCompile Include="src\X86Interp.cpp" />
     <ClCompile Include="src\Bios.cpp" />
     <ClCompile Include="src\XbTool.cpp" />
     <ClCompile Include="src\XcodeDecoder.cpp" />
@@ -294,7 +293,6 @@
     <ClInclude Include="inc\tea.h" />
     <ClInclude Include="inc\util.h" />
     <ClInclude Include="inc\version.h" />
-    <ClInclude Include="inc\X86Interp.h" />
     <ClInclude Include="inc\bldr.h" />
     <ClInclude Include="inc\help_strings.h" />
     <ClInclude Include="inc\Bios.h" />
