@@ -671,8 +671,71 @@ int listBios() {
 	return result;
 }
 int replicateBios() {
-	printf("cmd needs work.\n");
-	return 1;
+	uint32_t size;
+	uint8_t* bios = NULL;
+	uint8_t* bank = NULL;
+	int result = 0;
+	uint32_t binsize;
+
+	const char* filename = params.outFile;
+	if (filename == NULL) {
+		filename = "bios.bin";
+	}
+
+	bank = readFile(params.inFile, &size, 0);
+	if (bank == NULL) {
+		result = 1;
+		goto Cleanup;
+	}
+	
+	if (bios_check_size(size) != 0) {
+		printf("Error: invalid bank size: %d\n", size);
+		result = 1;
+		goto Cleanup;
+	}
+
+	// did user type romsize instead? (romsize param isnt used in command so free to use either).
+	if (isFlagClear(SW_BINSIZE)) {
+		binsize = params.romsize;
+	}
+	else {
+		binsize = params.binsize;
+	}
+
+	if (size >= binsize) {
+		printf("Nothing to replicate.\n");
+		result = 0;
+		goto Cleanup;
+	}
+
+	bios = (uint8_t*)malloc(binsize);
+	if (bios == NULL) {
+		result = 1;
+		goto Cleanup;
+	}
+
+	memcpy(bios, bank, size);
+	if (bios_replicate_data(size, binsize, bios, binsize) != 0) {
+		printf("Error: failed to replicate the bios\n");
+		result = 1;
+		goto Cleanup;
+	}
+
+	result = writeFileF(filename, bios, binsize);
+	
+Cleanup:
+
+	if (bank != NULL) {
+		free(bank);
+		bank = NULL;
+	}
+
+	if (bios != NULL) {
+		free(bios);
+		bios = NULL;
+	}
+	
+	return result;
 }
 int decodeXcodes() {
 	XcodeDecoder decoder;
