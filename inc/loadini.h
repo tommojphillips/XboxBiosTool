@@ -19,16 +19,18 @@
 // Author: tommojphillips
 // GitHub: https:\\github.com\tommojphillips
 
-#ifndef XB_LOADINI_H
-#define XB_LOADINI_H
+#ifndef LOAD_INI_H
+#define LOAD_INI_H
 
 #include <stdint.h>
 #include <stdio.h>
 
-enum LOADINI_SETTING_TYPE : int { STR, BOOL };
+typedef enum {
+	LOADINI_SETTING_TYPE_STR,
+	LOADINI_SETTING_TYPE_BOOL
+} LOADINI_SETTING_TYPE;
 
-typedef int LOADINI_ERROR_CODE;
-enum LOADINI_ERROR_CODES : LOADINI_ERROR_CODE {
+enum {
 	LOADINI_ERROR_SUCCESS = 0,
 	LOADINI_ERROR_INVALID_DATA = 1,
 	LOADINI_ERROR_INVALID_KEY = 2
@@ -38,21 +40,31 @@ typedef struct {
 	const char* key;
 	const LOADINI_SETTING_TYPE type;
 } LOADINI_SETTING;
+
 typedef struct {
 	const LOADINI_SETTING* s;
 	void* var;
 } LOADINI_SETTING_MAP;
+
 typedef struct {
 	const LOADINI_SETTING* s;
 	const uint32_t size;
 	const uint32_t count;
 } LOADINI_RETURN_MAP;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // load ini file
 // stream: file stream
 // settings_map: map of settings
 // map_size: size of the map
 // returns LOADINI_ERROR_CODE
-LOADINI_ERROR_CODE loadini(FILE* stream, const LOADINI_SETTING_MAP* settings_map, uint32_t map_size);
+int loadini(FILE* stream, const LOADINI_SETTING_MAP* settings_map, uint32_t map_size);
 
-#endif // !XB_LOADINI_H
+#ifdef __cplusplus
+};
+#endif
+
+#endif // !LOAD_INI_H

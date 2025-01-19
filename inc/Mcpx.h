@@ -24,30 +24,28 @@
 
 #include <stdint.h>
 
-const uint32_t MCPX_BLOCK_SIZE = 512;
+#define MCPX_BLOCK_SIZE 512
 
-typedef enum { 
-	MCPX_VERSION_UNK,
-	MCPX_VERSION_MCPX_V1_0,
-	MCPX_VERSION_MCPX_V1_1,
-	MCPX_VERSION_MOUSE_V1_0, 
-	MCPX_VERSION_MOUSE_V1_1 
-} MCPX_VERSION;
+typedef enum {
+	MCPX_REV_UNK,
+	MCPX_REV_0,
+	MCPX_REV_1,
+} MCPX_REV;
 
-typedef struct {
-	MCPX_VERSION version;
+typedef struct {	
 	uint8_t* data;
 	uint8_t* sbkey;
+	MCPX_REV rev;
 	uint8_t hash[20];
-} Mcpx;
+} MCPX;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void mcpx_init(Mcpx* mcpx);
-void mcpx_free(Mcpx* mcpx);
-int mcpx_load(Mcpx* mcpx, uint8_t* data);
+void mcpx_init(MCPX* mcpx);
+void mcpx_free(MCPX* mcpx);
+int mcpx_load(MCPX* mcpx, uint8_t* data);
 
 #ifdef __cplusplus
 };

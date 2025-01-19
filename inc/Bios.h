@@ -61,6 +61,8 @@
 #define PRELDR_STATUS_NOT_FOUND			2 // not found. old bios (mcpx v1.0) or not a valid bios.
 #define PRELDR_STATUS_ERROR				3 // ERROR
 
+#define PRELDR_TEA_ATTACK_ENTRY_POINT 0x007fd588
+
 // xbox public key structure
 typedef struct _XB_PUBLIC_KEY {
 	RSA_HEADER header;		// rsa header structure
@@ -68,86 +70,83 @@ typedef struct _XB_PUBLIC_KEY {
 } XB_PUBLIC_KEY;
 
 // Preldr structure
-typedef struct Preldr {
+typedef struct {
 	uint8_t* data;
 	PRELDR_PARAMS* params;
-	PRELDR_PTR_BLOCK* ptrBlock;
-	PRELDR_FUNC_BLOCK* funcBlock;
-	XB_PUBLIC_KEY* pubkey;
-	uint8_t* entryPoint;
-	uint8_t bldrKey[SHA1_DIGEST_LEN];
-	uint32_t jmpOffset;
+	PRELDR_PTR_BLOCK* ptr_block;
+	PRELDR_FUNC_BLOCK* func_block;
+	XB_PUBLIC_KEY* public_key;
+	uint8_t bldr_key[SHA1_DIGEST_LEN];
+	uint32_t jmp_offset;
 	int status;
-} Preldr;
-
+} PRELDR;
 
 // 2BL structure
-typedef struct Bldr {
+typedef struct {
 	uint8_t* data;
 	BLDR_ENTRY* entry;
-	uint8_t* bfmKey;
+	uint8_t* bfm_key;
 	BLDR_KEYS* keys;
-	BOOT_PARAMS* bootParams;
-	BOOT_LDR_PARAM* ldrParams;
-	uint32_t entryOffset;
-	uint32_t keysOffset;
-	bool encryptionState;
-	bool krnlSizeValid;
-	bool krnlDataSizeValid;
-	bool inittblSizeValid;
-	bool signatureValid;
-	bool bootParamsValid;
-} Bldr;
+	BOOT_PARAMS* boot_params;
+	BOOT_LDR_PARAM* ldr_params;
+	bool encryption_state;
+} BLDR;
 
+// Kernel structure
+typedef struct {
+	uint8_t* compressed_kernel_ptr;
+	uint8_t* uncompressed_data_ptr;
+	uint8_t* img;
+	uint32_t img_size;
+	bool encryption_state;
+} KERNEL;
 
 // Bios load parameters
-typedef struct BiosParams {	
+typedef struct BIOS_LOAD_PARAMS {	
 	uint32_t romsize;
-	uint8_t* keyBldr;
-	uint8_t* keyKrnl;
-	Mcpx* mcpx;
-	bool encBldr;
-	bool encKrnl;
-	bool restoreBootParams;
-} BiosParams;
-
+	uint8_t* bldr_key;
+	uint8_t* kernel_key;
+	MCPX* mcpx;
+	bool enc_bldr;
+	bool enc_kernel;
+	bool restore_boot_params;
+} BIOS_LOAD_PARAMS;
 
 // Bios build parmeters 
-typedef struct BiosBuildParams {
-	uint8_t* inittbl;
+typedef struct BIOS_BUILD_PARAMS {
+	uint8_t* init_tbl;
 	uint8_t* preldr;
 	uint8_t* bldr;
-	uint8_t* krnl;
-	uint8_t* krnlData;
-	uint8_t* eepromKey;
-	uint8_t* certKey;
-	uint32_t preldrSize;
+	uint8_t* compressed_kernel;
+	uint8_t* kernel_data;
+	uint8_t* eeprom_key;
+	uint8_t* cert_key;
+	uint32_t preldr_size;
 	uint32_t bldrSize; 
-	uint32_t inittblSize;
-	uint32_t krnlSize;
-	uint32_t krnlDataSize;
+	uint32_t init_tbl_size;
+	uint32_t kernel_size;
+	uint32_t kernel_data_size;
 	bool bfm;
 	bool hackinittbl;
 	bool hacksignature;
 	bool nobootparams;
-} BiosBuildParams;
+	bool zero_kernel_key;
+} BIOS_BUILD_PARAMS;
 
 // Bios
 class Bios {
 public:
-	BiosParams params;
 	uint8_t* data;
 	uint32_t size;
-	Bldr bldr;
-	Preldr preldr;
-	INIT_TBL* initTbl;
-	uint8_t* krnl;
-	uint8_t* krnlData;
-	uint8_t* romDigest;
-	int availableSpace;
-	uint8_t* decompressedKrnl;
-	uint32_t decompressedKrnlSize;
-	bool kernelEncryptionState;
+	BLDR bldr;
+	PRELDR preldr;
+	KERNEL kernel;
+	INIT_TBL* init_tbl;
+	uint8_t* rom_digest;
+	int available_space;
+	int bios_status;
+
+	BIOS_LOAD_PARAMS params;
 
 	Bios() {
 		resetValues();
@@ -160,13 +159,13 @@ public:
 	void unload();
 	
 	// load bios from memory.
-	int load(uint8_t* buff, const uint32_t binsize, const BiosParams* biosParams);
+	int load(uint8_t* buff, const uint32_t binsize, const BIOS_LOAD_PARAMS* bios_params);
 
 	// build bios. 
-	int build(BiosBuildParams* buildParams, uint32_t binsize, BiosParams* biosParams);
+	int build(BIOS_BUILD_PARAMS* build_params, uint32_t binsize, BIOS_LOAD_PARAMS* bios_params);
 
 	// initialize bios and calculate offsets and pointers.
-	int init(uint8_t* buff, const uint32_t binsize, const BiosParams* biosParams);
+	int init(uint8_t* buff, const uint32_t binsize, const BIOS_LOAD_PARAMS* bios_params);
 		
 	// calculate initial offsets for the bios. based on params.
 	// sets up bldr and preldr structs, initTbl and dataTbl pointers.
@@ -174,7 +173,7 @@ public:
 	void getOffsets();
 	
 	// calculate offsets and pointers. base on bios data.
-	// sets up 2bl, krnl and krnlData pointers.
+	// sets up 2bl, krnl and uncompressed_kernel_data pointers.
 	// Should be invoked when the 2bl is valid. (not encrypted).
 	void getOffsets2();
 	
@@ -210,11 +209,12 @@ private:
 	void resetValues();
 };
 
-void bios_init_preldr(Preldr* preldr);
-void bios_init_bldr(Bldr* bldr);
-void bios_init_params(BiosParams* params);
-void bios_init_build_params(BiosBuildParams* params);
-void bios_free_build_params(BiosBuildParams* params);
+void bios_init_preldr(PRELDR* preldr);
+void bios_init_bldr(BLDR* bldr);
+void bios_init_kernel(KERNEL* kernel);
+void bios_init_params(BIOS_LOAD_PARAMS* params);
+void bios_init_build_params(BIOS_BUILD_PARAMS* params);
+void bios_free_build_params(BIOS_BUILD_PARAMS* params);
 int bios_check_size(const uint32_t size);
 int bios_replicate_data(uint32_t from, uint32_t to, uint8_t* buffer, uint32_t buffersize);
 

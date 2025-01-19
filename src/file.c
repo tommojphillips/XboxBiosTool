@@ -29,36 +29,31 @@
 #include "mem_tracking.h"
 #endif
 
-uint8_t* readFile(const char* filename, uint32_t* bytesRead, const uint32_t expectedSize)
-{
+uint8_t* readFile(const char* filename, uint32_t* bytesRead, const uint32_t expectedSize) {
 	FILE* file = NULL;
 	uint32_t size = 0;
 
 	if (filename == NULL)
 		return NULL;
 
-	file = fopen(filename, "rb");
-	if (file == NULL)
-	{
+	fopen_s(&file, filename, "rb");
+	if (file == NULL) {
 		printf("Error: could not open file: %s\n", filename);
 		return NULL;
 	}
 
 	getFileSize(file, &size);
 
-	if (expectedSize != 0 && size != expectedSize)
-	{
+	if (expectedSize != 0 && size != expectedSize) {
 		printf("Error: invalid file size. Expected %u bytes. Got %u bytes\n", expectedSize, size);
 		fclose(file);
 		return NULL;
 	}
 
 	uint8_t* data = (uint8_t*)malloc(size);
-	if (data != NULL)
-	{
+	if (data != NULL) {
 		fread(data, 1, size, file);
-		if (bytesRead != NULL)
-		{
+		if (bytesRead != NULL) {
 			*bytesRead = size;
 		}
 	}
@@ -67,17 +62,15 @@ uint8_t* readFile(const char* filename, uint32_t* bytesRead, const uint32_t expe
 	return data;
 }
 
-int writeFile(const char* filename, void* ptr, const uint32_t bytesToWrite)
-{
+int writeFile(const char* filename, void* ptr, const uint32_t bytesToWrite) {
 	FILE* file = NULL;
 	uint32_t bytesWritten = 0;
 
 	if (filename == NULL)
 		return 1;
 
-	file = fopen(filename, "wb");
-	if (file == NULL)
-	{
+	fopen_s(&file, filename, "wb");
+	if (file == NULL) {
 		printf("Error: Could not open file: %s\n", filename);
 		return 1;
 	}
@@ -87,11 +80,9 @@ int writeFile(const char* filename, void* ptr, const uint32_t bytesToWrite)
 
 	return 0;
 }
-int writeFileF(const char* filename, void* ptr, const uint32_t bytesToWrite)
-{
-	static const char SUCCESS_OUT[] = "wrote %s ( %.2f %s )\n";
-	static const char FAIL_OUT[] = "Error failed to write %s\n";
-
+int writeFileF(const char* filename, const char* tag, void* ptr, const uint32_t bytesToWrite) {
+	static const char SUCCESS_OUT[] = "Writing %s to %s ( %.2f %s )\n";
+	static const char FAIL_OUT[] = "Error: Failed to write %s\n";
 	static const char* units[] = { "bytes", "kb", "mb", "gb" };
 
 	int result;
@@ -100,28 +91,24 @@ int writeFileF(const char* filename, void* ptr, const uint32_t bytesToWrite)
 	
 	bytesF = (float)bytesToWrite;
 	result = 0;
-	while (bytesF > 1024.0f && result < (sizeof(units) / sizeof(char*)) - 1)
-	{
+	while (bytesF > 1024.0f && result < (sizeof(units) / sizeof(char*)) - 1) {
 		bytesF /= 1024.0f;
 		result++;
 	}
 	sizeSuffix = units[result];
 
 	result = writeFile(filename, ptr, bytesToWrite);
-	if (result == 0)
-	{
-		printf(SUCCESS_OUT, filename, bytesF, sizeSuffix);
+	if (result == 0) {
+		printf(SUCCESS_OUT, tag, filename, bytesF, sizeSuffix);
 	}
-	else
-	{
+	else {
 		printf(FAIL_OUT, filename);
 	}
 
 	return result;
 }
 
-int getFileSize(FILE* file, uint32_t* fileSize)
-{
+int getFileSize(FILE* file, uint32_t* fileSize) {
 	if (file == NULL)
 		return 1;
 
@@ -130,22 +117,20 @@ int getFileSize(FILE* file, uint32_t* fileSize)
 	fseek(file, 0, SEEK_SET);
 	return 0;
 }
-bool fileExists(const char* filename)
-{
+bool fileExists(const char* filename) {
 	FILE* file = NULL;
 
 	if (filename == NULL)
 		return false;
 
-	file = fopen(filename, "rb");
+	fopen_s(&file, filename, "rb");
 	if (file == NULL)
 		return false;
 	fclose(file);
 	return true;
 }
 
-int deleteFile(const char* filename)
-{
+int deleteFile(const char* filename) {
 	if (filename == NULL)
 		return 1;
 

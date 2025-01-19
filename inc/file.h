@@ -44,7 +44,7 @@ uint8_t* readFile(const char* filename, uint32_t* bytesRead, const uint32_t expe
 int writeFile(const char* filename, void* ptr, const uint32_t bytesToWrite);
 
 // write to a file.
-int writeFileF(const char* filename, void* ptr, const uint32_t bytesToWrite);
+int writeFileF(const char* filename, const char* tag, void* ptr, const uint32_t bytesToWrite);
 
 // check if file exists.
 bool fileExists(const char* filename);

@@ -26,12 +26,12 @@
 
 #define XB_KEY_SIZE 16
 
-typedef struct _DRW_SLW_COUNTS {
+typedef struct {
     uint8_t countA;
     uint8_t countB;
 } DRV_SLW_COUNTS;
 
-typedef struct _DRV_SLW_CAL_PARAMS {
+typedef struct {
     uint16_t max_m_clk;
     DRV_SLW_COUNTS slowest;
     DRV_SLW_COUNTS slow;
@@ -40,7 +40,7 @@ typedef struct _DRV_SLW_CAL_PARAMS {
     DRV_SLW_COUNTS fastest;
 } DRV_SLW_CAL_PARAMS;
 
-typedef struct _DRV_SLW_PAD_PARAMS {
+typedef struct {
     uint8_t adr_drv_fall;
     uint8_t adr_drv_rise;
     uint8_t adr_slw_fall;
@@ -63,7 +63,7 @@ typedef struct _DRV_SLW_PAD_PARAMS {
 } DRV_SLW_PAD_PARAMS;
 
 // init table structure.
-typedef struct _INIT_TBL {
+typedef struct {
     uint32_t ptr1;
     uint32_t ptr2;
     uint32_t header;
@@ -88,7 +88,7 @@ typedef struct _INIT_TBL {
 } INIT_TBL;
 
 // rom table structure.
-typedef struct _ROM_DATA_TBL {
+typedef struct {
     DRV_SLW_CAL_PARAMS cal;
     DRV_SLW_PAD_PARAMS samsung[5];
     DRV_SLW_PAD_PARAMS micron[5];
@@ -104,61 +104,61 @@ typedef struct _XCODE {
 #pragma pack(pop)
 
 // loader parameters structure.
-typedef struct _BOOT_LDR_PARAMS {
-    uint32_t bldrEntryPoint;
-    char cli[64];
+typedef struct {
+    uint32_t bldr_entry_point;
+    char command_line[64];
 } BOOT_LDR_PARAM;
 
 // boot params structure.
-typedef struct _BOOT_PARAMS {
-    uint32_t krnlDataSize;
-    uint32_t inittblSize;
+typedef struct {
+    uint32_t uncompressed_kernel_data_size;
+    uint32_t init_tbl_size;
     uint32_t signature;
-    uint32_t krnlSize;
+    uint32_t compressed_kernel_size;
     uint8_t digest[20];
 } BOOT_PARAMS;
 
 // 2BL keys structure
-typedef struct _BLDR_KEYS {
-    uint8_t eepromKey[XB_KEY_SIZE];
-    uint8_t certKey[XB_KEY_SIZE];
-    uint8_t krnlKey[XB_KEY_SIZE];
+typedef struct {
+    uint8_t eeprom_key[XB_KEY_SIZE];
+    uint8_t cert_key[XB_KEY_SIZE];
+    uint8_t kernel_key[XB_KEY_SIZE];
 } BLDR_KEYS;
 
 // 2BL entry structure
-typedef struct _BLDR_ENTRY {
-    uint32_t keysPtr;
-    uint32_t bfmEntryPoint;
+typedef struct {
+    uint32_t keys_ptr;
+    uint32_t bfm_entry_point;
 } BLDR_ENTRY;
 
 // Preldr parameters structure
 #pragma pack(push, 1)
-typedef struct _PRELDR_PARAMS {
-    uint8_t jmpOpcode;
-    uint32_t jmpOffset;
+typedef struct {
+    uint8_t jmp_opcode;
+    uint32_t jmp_offset;
     uint8_t pad[3];
-    uint32_t funcBlockPtr;
+    uint32_t func_block_ptr;
 } PRELDR_PARAMS;
 #pragma pack(pop)
 
 // Preldr pointer block structure
-typedef struct _PRELDR_PTR_BLOCK {
-    uint32_t pubKeyPtr;
-    uint32_t funcBlockPtr;
+typedef struct {
+    uint32_t public_key_ptr;
+    uint32_t func_block_ptr;
 } PRELDR_PTR_BLOCK;
 
 // Preldr function block structure
-typedef struct _PRELDR_FUNC_BLOCK {
-    uint32_t shaInitFuncPtr;
-    uint32_t shaUpdateFuncPtr;
-    uint32_t shaResultFuncPtr;
-    uint32_t verifyDigestFuncPtr;
+typedef struct {
+    uint32_t sha_init_func_ptr;
+    uint32_t sha_update_func_ptr;
+    uint32_t sha_result_func_ptr;
+    uint32_t verify_digest_func_ptr;
 } PRELDR_FUNC_BLOCK;
 
 // Preldr entry structure
-typedef struct _PRELDR_ENTRY {
-    uint32_t bldrEntryOffset;
-    uint32_t bfmEntryPoint;
+typedef struct {
+    uint32_t bldr_entry_offset;
+    uint32_t bfm_entry_point;
 } PRELDR_ENTRY;
 
 #endif // !XB_BLDR_H

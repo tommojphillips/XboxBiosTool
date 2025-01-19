@@ -9,6 +9,7 @@ A command-line tool for extracting and decrypting components of An Original Xbox
   - [Encryption / Decryption](#encryption-decryption)
   - [What MCPX ROM do i use?](#what-mcpx-rom-do-i-use)
   - [Examples](#example-commands)
+  - [Building](#building)
   - [Credits / Resources](#credits-resources)
 
 ## Commands
@@ -20,18 +21,16 @@ A command-line tool for extracting and decrypting components of An Original Xbox
 | [`/bld`](#build-bios-command)            | Build a BIOS                               |
 | [`/split`](#split-bios-command)          | Split a BIOS into banks                    |
 | [`/combine`](#combine-bios-command)      | Combine multiple banks into a single BIOS  |
-| `/replicate`                             | replicate a BIOS                           |
+| [`/replicate`](#replicate-bios-command)  | replicate a single BIOS                           |
 | [`/xcode-sim`](#xcode-visor-sim-command) | Simulate xcodes and Decode x86             |
 | [`/xcode-decode`](#xcode-decode-command) | Decode Xcodes from a BIOS or init table    |
 | [`/x86-encode`](#x86-encode-command)     | Encode x86 as xcodes                       |
 | [`/compress`](#compress-file-command)    | Compress a file using lzx                  |
 | [`/decompress`](#decompress-file-command)| Decompress a file using lzx                |
 
-
 ## Switches
 | Switch            | Description                                                       |
 | ----------------- | ----------------------------------------------------------------- |
-| [`/?`](#help-command) | Get help about a specific command                                 |
 | `/enc-bldr`       | Assume the 2BL is unencrypted (Decryption will be skipped)        |
 | `/enc-krnl`       | Assume the kernel is unencrypted  (Decryption will be skipped)    |
 | `/key-bldr <path>`| 16-byte 2BL RC4 file                                              |
@@ -70,20 +69,22 @@ If the kernel has been decrypted, you will see a message like `decrypting kernel
 
 ## What MCPX ROM do i use?
 It depends on the BIOS version. The different revisions of the MCPX have
-different keys and different hashing algorithms
+different keys and different hashing algorithms.
 
-| Rev. 0           | MD5 Hash                           |
-| ---------------- |----------------------------------- |
-| MCPX v1.0        | `d49c52a4102f6df7bcf8d0617ac475ed` |
-| M.O.U.S.E rev. 0 | `58f414016093f289c46d21639435701e` |
+| `Rev. 0 `               | MD5 Hash                           |
+| ----------------        |----------------------------------- |
+| MCPX v1.0               | `d49c52a4102f6df7bcf8d0617ac475ed` |
+| M.O.U.S.E rev. 0 v0.9.0 | `da9e9f527c5cb716f7a2143e976f6091` |
 
-| Rev. 1           | MD5 Hash                           |
-| ---------------- | ----------------------------       |
-| MCPX v1.1        | `2870d58a459c745d7cc4c6122ceb3dcb` |
-| M.O.U.S.E rev. 1 | `06b227adbefc4dd55fb127c33590b735` |
+| `Rev. 1`                | MD5 Hash                           |
+| ----------------        | ----------------------------       |
+| MCPX v1.1               | `2870d58a459c745d7cc4c6122ceb3dcb` |
+| M.O.U.S.E rev. 1 v0.9.0 | `06b227adbefc4dd55fb127c33590b735` |
 
+- Use MCPX `Rev. 0` for BIOSes `< 4817`
+- Use MCPX `Rev. 1` for BIOSes `4817+`
 
-Typically, if the BIOS contains a Preldr (FBL), Use a ` Rev. 1  MCPX` .
+Typically, if the BIOS contains a Preldr (FBL), Use a `Rev. 1  MCPX` .
 This is only true if the FBL TEA Attack hasn't been applied. in that instance
 it's likely that the BIOS is not encrypted at all, and the startup format maybe different.
 
@@ -117,13 +118,13 @@ The list command has some flags to display specific infomation.
 | Switch        | Desc                                                |
 | ------------- | ------------------------------------------------    |
 | `/in <path> ` | BIOS file (req)                                     |
-| `/img`        | Display kernel image header info                    |
-| `/nv2a`       | Display init table magic values                     |
 | `/datatbl`    | Display ROM drive / slew calibration table data     |
+| `/nv2a`       | Display init table magic values                     |
+| `/img`        | Display kernel image header info                    |
 | `/keys`       | Display rc4, rsa keys                               |
 
 ```
-xbios.exe /ls <bios_file> /mcpx <mcpx_file> <extra_flags>
+xbios.exe /ls <bios_file> <extra_flags>
 ```
 
 ## Extract BIOS command
@@ -138,9 +139,9 @@ Extract components from a BIOS file
 | Switch              | Desc                                      |
 | ------------------- | ---------------------                     |
 | `/in <path> `       | BIOS file (req)                           |
-| `/dir <path>`       | Set output directory                      |
 | `/keys`             | Extract keys                              |
 | `/nobootparams`     | Dont restore 2BL boot params (FBL BIOSes) |
+| `/dir <path>`       | Set output directory                      |
 
 | Output file         | Desc                                      |
 | ------------------- | ---------------------                     |
@@ -153,7 +154,7 @@ Extract components from a BIOS file
 | `/certkey <path>`   | Output cert key file                      |
 
 ```
-xbios.exe /extr <bios_file> /mcpx <mcpx_file> <extra_flags>
+xbios.exe /extr <bios_file> <extra_flags>
 ```
 
 ## Build BIOS command
@@ -220,6 +221,14 @@ The `-bank[1-4]` switches are inferred with this command.
 xbios.exe /combine <bank1_file> <bank2_file> <bank3_file> <bank4_file>
 ```
 
+## Replicate BIOS command
+Replicate a single BIOS file.
+
+| Switch         | Desc                               |
+| -------------  | ---------------------------------- |
+| `/in <path> `  | BIOS file (req)                    |
+| `/out <path> ` | BIOS file; defaults to bios.bin    |
+| `/binsize`     | BIOS size (req) (256, 512, 1024)   |
 
 ## X86 encode command
 Encode x86 *machine code* as xcode *byte code* that writes to RAM.
@@ -236,20 +245,16 @@ Encode x86 *machine code* as xcode *byte code* that writes to RAM.
 xbios.exe /x86-encode <code_file> /out <output_xcodes>
 ```
 
-<details><summary>Example</summary>
+<details><summary>x2.25 Example</summary>
 
 ```
-X86:            --->    Xcodes:
- mov eax, 0xfff00bed      xc_mem_write 0x00, 0xf00bedb8
- jmp eax                  xc_mem_write 0x04, 0x90e0ffff
- nop
-
-Machine code:   --->    Byte code:
-  0000: B8 ED 0B F0       0000: 03 00 00 00
-  0004: FF FF E0 90       0004: 00 F0 0B ED
-                          0008: B8 03 00 00
-                          000C: 00 04 90 E0
-                          0010: FF FF
+Machine code:               --->          Byte code:
+  0000: B8 ED 0B F0  mov eax, 0xfff00bed  0000: 03 00 00 00   xc_mem_write 0x00, 0xf00bedb8
+  0004: FF FF E0     jmp eax              0004: 00 F0 0B ED
+  0007: 90           nop                  0008: B8  
+                                          0009: 03 00 00 00  xc_mem_write 0x04, 0x90e0ffff
+                                          000D: 04 90 E0 FF
+                                          0011: FF                          
 ```
 
 </details>
@@ -370,21 +375,10 @@ xbios.exe /decompress <in_file> /out <out_file>
 
 ## Example Commands
 
-Extract BIOS
-```
-xbios.exe /extr /mcpx <mcpx_file> <bios_file>
-```
-
 Extract BIOS + Keys
 ```
 xbios.exe /extr /keys /mcpx <mcpx_file> <bios_file>
 ```
-Extracts: 
- - 2BL
- - FBL (if applicable)
- - Init table (magic numbers, xcodes)
- - Compressed Kernel (.bin)
- - Decompressed Kernel (.img)
 
 List BIOS infomation
 ```
@@ -396,10 +390,26 @@ List BIOS Keys
 xbios.exe /ls /keys /mcpx <mcpx_file> <bios_file>
 ```
 
+Replicate BIOS (256 kb) to 512 kb
+```
+xbios.exe /replicate <bios_file> /binsize 512
+```
+
+## Building
+
+The project is built in Visual Studio 2022
+
+  1. Clone the repo
+  
+  ```
+  git clone https://github.com/tommojphillips/XboxBiosTool.git
+  ```
+
+  2. Open vc\XboxBiosTools.sln in visual studio and build and run
+
 ## Credits / Resources
 
- - https://github.com/XboxDev/xbedump - XboxDev sha1.c implementation
- - https://github.com/WulfyStylez/XBOverclock - WulfyStylez GPU clock calculations
- - https://xboxdevwiki.net/Boot_Process - Boot process
-
-
+ - [Xbox Dev Wiki](https://xboxdevwiki.net/Main_Page)
+ - [Deconstructing the Xbox Boot Rom](https://web.archive.org/web/20201108132438/https://mborgerson.com/deconstructing-the-xbox-boot-rom/) by [mborgerson](https://github.com/mborgerson)
+ - [xbedump](https://github.com/XboxDev/xbedump) by [XboxDev](https://github.com/XboxDev) - sha1.c implementation
+ - [XBOverclock](https://github.com/WulfyStylez/XBOverclock) by [WulfyStylez](https://github.com/WulfyStylez) - GPU clock calculations

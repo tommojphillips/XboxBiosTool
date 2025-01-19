@@ -12,8 +12,8 @@
 extern "C" {
 #endif
 
-void tea_encrypt(uint32_t* v, const uint32_t* k);
-void tea_decrypt(uint32_t* v, const uint32_t* k);
+void tea_encrypt(uint32_t v[2], const uint32_t k[4]);
+void tea_decrypt(uint32_t v[2], const uint32_t k[4]);
 
 #ifdef __cplusplus
 }

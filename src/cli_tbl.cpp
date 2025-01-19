@@ -27,7 +27,7 @@
 // user incl
 #include "cli_tbl.h"
 
-static int cli_flags[CLI_SWITCH_SIZE] = {};
+static int cli_flags[CLI_SWITCH_SIZE] = { 0 };
 
 void setParamValue(const PARAM_TBL* param, char* arg);
 
@@ -202,8 +202,7 @@ int parseCli(int argc, char* argv[], const CMD_TBL*& cmd, const CMD_TBL* cmds, c
 	return 0;
 }
 
-void setParamValue(const PARAM_TBL* param, char* arg)
-{
+void setParamValue(const PARAM_TBL* param, char* arg) {
 	if (param->var == NULL)
 		return;
 

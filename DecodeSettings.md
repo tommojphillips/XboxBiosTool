@@ -16,22 +16,37 @@ Specify the xcode format
 | `{data}`	    | The data string     |
 | `{comment}`   | The xcode comment   |
 
-`format_str={offset} {op} {addr} {data} {comment}` 
- - `0080:` `xc_mem_write` `0x0` `0xF4` `; write hlt instr to addr 0x0`
+```
+format_str={offset}: {op} {addr} {data} {comment}
+``` 
 
-`format_str=xcode<{op}, {addr}, {data}> {comment}` 
-- `xcode<` `xc_mem_write` `,` `0x0` `,` `0xF4` `>` `; write hlt instr to addr 0x0`
+`> 0080: xc_mem_write, 0x0, 0xF4 ; <comment>`
+
+```
+format_str=xcode<{op}, {addr}, {data}> {comment}
+```
+
+`> xcode<xc_mem_write, 0x0, 0xF4> ; <comment>`
 
 --- 
 
 Specify the address format in a jump instruction.
 
-| `jmp_str=`  |  Desc         |
-| ---------   | ------------- |
-| `{label}`   | The label     |
+| `jmp_str=<expression>`  |  Desc         |
+| ---------               | ------------- |
+| `{label}`               | The label     |
 
-- `xcode<xc_jmp, lb1, 0x0>`
-- `xcode<xc_jmp, lb1-$-4, 0x0>`
+```
+jmp_str={label}
+```
+
+`xcode<xc_jmp, label_1, 0x0>`
+
+```
+jmp_str={label}-$-4
+```
+
+`xcode<xc_jmp, labe1-$-4, 0x0>`
 
 --- 
 
@@ -44,10 +59,13 @@ Specify the number format.
 | `{HEX}`   | HEX     |
 | `{HEX8}`  | HEX8    |
 
-- `xcode<xc_mem_write, 0x0, 0xf4>`
-- `xcode<xc_mem_write, 0x00000000, 0x000000f4>`
-- `xcode<xc_mem_write, 0x0, 0xF4>`
-- `xcode<xc_mem_write, 0x00000000, 0x000000F4>`
+`xcode<xc_mem_write, 0x0, 0xf4>`
+
+`xcode<xc_mem_write, 0x00000000, 0x000000f4>`
+
+`xcode<xc_mem_write, 0x0, 0xF4>`
+
+`xcode<xc_mem_write, 0x00000000, 0x000000F4>`
 
 --- 
 

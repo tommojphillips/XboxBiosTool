@@ -93,30 +93,30 @@ static const FIELD_MAP format_map[] = {
 	{ "{comment}", DECODE_FIELD_COMMENT }
 };
 const LOADINI_SETTING settings_map[] = {
-	{ "format_str", LOADINI_SETTING_TYPE::STR },
-	{ "jmp_str", LOADINI_SETTING_TYPE::STR },
-	{ "no_operand_str", LOADINI_SETTING_TYPE::STR },
-	{ "num_str", LOADINI_SETTING_TYPE::STR, },
-	{ "comment_prefix", LOADINI_SETTING_TYPE::STR},
-	{ "label_on_new_line", LOADINI_SETTING_TYPE::BOOL },
-	{ "pad", LOADINI_SETTING_TYPE::BOOL },
-	{ "opcode_use_result", LOADINI_SETTING_TYPE::BOOL },
+	{ "format_str", LOADINI_SETTING_TYPE_STR },
+	{ "jmp_str", LOADINI_SETTING_TYPE_STR },
+	{ "no_operand_str", LOADINI_SETTING_TYPE_STR },
+	{ "num_str", LOADINI_SETTING_TYPE_STR, },
+	{ "comment_prefix", LOADINI_SETTING_TYPE_STR},
+	{ "label_on_new_line", LOADINI_SETTING_TYPE_BOOL },
+	{ "pad", LOADINI_SETTING_TYPE_BOOL },
+	{ "opcode_use_result", LOADINI_SETTING_TYPE_BOOL },
 
-	{ xcode_opcode_map[0].str, LOADINI_SETTING_TYPE::STR },
-	{ xcode_opcode_map[1].str, LOADINI_SETTING_TYPE::STR },
-	{ xcode_opcode_map[2].str, LOADINI_SETTING_TYPE::STR },
-	{ xcode_opcode_map[3].str, LOADINI_SETTING_TYPE::STR },
-	{ xcode_opcode_map[4].str, LOADINI_SETTING_TYPE::STR },
-	{ xcode_opcode_map[5].str, LOADINI_SETTING_TYPE::STR },
-	{ xcode_opcode_map[6].str, LOADINI_SETTING_TYPE::STR },
-	{ xcode_opcode_map[7].str, LOADINI_SETTING_TYPE::STR },
-	{ xcode_opcode_map[8].str, LOADINI_SETTING_TYPE::STR },
-	{ xcode_opcode_map[9].str, LOADINI_SETTING_TYPE::STR },
-	{ xcode_opcode_map[10].str, LOADINI_SETTING_TYPE::STR },
-	{ xcode_opcode_map[11].str, LOADINI_SETTING_TYPE::STR },
-	{ xcode_opcode_map[12].str, LOADINI_SETTING_TYPE::STR },
-	{ xcode_opcode_map[13].str, LOADINI_SETTING_TYPE::STR },
-	{ xcode_opcode_map[14].str, LOADINI_SETTING_TYPE::STR }
+	{ xcode_opcode_map[0].str, LOADINI_SETTING_TYPE_STR },
+	{ xcode_opcode_map[1].str, LOADINI_SETTING_TYPE_STR },
+	{ xcode_opcode_map[2].str, LOADINI_SETTING_TYPE_STR },
+	{ xcode_opcode_map[3].str, LOADINI_SETTING_TYPE_STR },
+	{ xcode_opcode_map[4].str, LOADINI_SETTING_TYPE_STR },
+	{ xcode_opcode_map[5].str, LOADINI_SETTING_TYPE_STR },
+	{ xcode_opcode_map[6].str, LOADINI_SETTING_TYPE_STR },
+	{ xcode_opcode_map[7].str, LOADINI_SETTING_TYPE_STR },
+	{ xcode_opcode_map[8].str, LOADINI_SETTING_TYPE_STR },
+	{ xcode_opcode_map[9].str, LOADINI_SETTING_TYPE_STR },
+	{ xcode_opcode_map[10].str, LOADINI_SETTING_TYPE_STR },
+	{ xcode_opcode_map[11].str, LOADINI_SETTING_TYPE_STR },
+	{ xcode_opcode_map[12].str, LOADINI_SETTING_TYPE_STR },
+	{ xcode_opcode_map[13].str, LOADINI_SETTING_TYPE_STR },
+	{ xcode_opcode_map[14].str, LOADINI_SETTING_TYPE_STR }
 };
 const LOADINI_RETURN_MAP decode_settings_map = { settings_map, sizeof(settings_map), sizeof(settings_map) / sizeof(LOADINI_SETTING_MAP) };
 

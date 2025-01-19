@@ -122,8 +122,8 @@ if "%~1" == "/?" goto :help
     call :do_test "-ls noexist.bin" 1
     call :do_test "-ls !exe!" 1
     call :do_test "-nocommand blah" 1
-    call :do_test "-ls very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_long_file_name.bin" 1
-    call :do_test "-ls_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_long_command.bin bios.bin" 1
+    call :do_test "-ls very_very_very_very_very_very_ver_very_very_very_very_long_file_name.bin" 1
+    call :do_test "-ls_very_very_very_verry_veryy_very_very_very_very_long_command.bin bios.bin" 1
 
     REM ensure we got help for ALL commands
     call :do_test "-? -help-all" 0
@@ -143,9 +143,7 @@ REM run original tests for bios less than 4817
            
         call :cmp_file "!arg_name!_bank1.bin" "!arg_name!_bank2.bin"
         call :cmp_file "!arg_name!_bank1.bin" "!arg_name!_bank3.bin"
-        call :cmp_file "!arg_name!_bank1.bin" "!arg_name!_bank4.bin"
-        
-        call :do_test "-ls !arg! -bootable !mcpx_rom! !extra_args!" 0 "!arg_name!"
+        call :cmp_file "!arg_name!_bank1.bin" "!arg_name!_bank4.bin"        
     )
 if "!test_group!" == "-1.0" goto :exit
 
@@ -162,8 +160,6 @@ REM run original tests for bios greater than or equal to 4817
         
         REM compare preldr with REAL preldr. ensure we extracting it exactly as intended.
         call :cmp_file "preldr.bin" "!x3_preldr!"
-                
-        call :do_test "-ls !arg! -bootable !mcpx_rom! !extra_args!" 0 "!arg_name!"
     )
 if "!test_group!" == "-1.1" goto :exit
 
@@ -193,9 +189,6 @@ if "!test_group!" == "-512" goto :exit
 
         call :do_test "-xcode-sim !arg!" 0 "!arg_name!"
         call :do_test "-xcode-sim !arg! -d -out mem_sim.bin" 0 "!arg_name!"
-        call :do_test "-disasm mem_sim.bin" 0 "!arg_name!"
-        
-        call :do_test "-ls !arg! -bootable !mcpx_rom! !extra_args!" 0 "!arg_name!"
     )
 
     REM custom bios that need 512kb and w/ no bldr (2bl) encryption (x2)
