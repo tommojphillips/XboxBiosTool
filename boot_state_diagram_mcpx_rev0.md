@@ -12,3 +12,7 @@ SB_IS_2BL_VALID-->|No|SB_SHUTDOWN
 2BL_ENTRY[Jump to 2BL Entry]
 SB_SHUTDOWN[SB Shutdown]
 ```
+
+- [MCPX V1.1](boot_state_diagram_mcpx_rev1.md)
+- [FBL](boot_state_diagram_fbl.md)
+- [2BL](boot_state_diagram_2bl.md)
