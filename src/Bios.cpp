@@ -20,11 +20,13 @@
 // GitHub: https:\\github.com\tommojphillips
 
 // std incl
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#if !__APPLE__
 #include <malloc.h>
+#endif
 
 // user incl
 #include "Bios.h"

@@ -20,6 +20,7 @@ extern "C" {
 #define strncpy_s strncpy
 #define strcat_s strcat
 #define strcpy_s strcpy
+#define _chdir chdir
 
 #ifdef __cplusplus
 }  // extern "C"

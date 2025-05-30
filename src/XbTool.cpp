@@ -24,11 +24,17 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <unistd.h>
 #if defined(_WIN32) || defined(_WIN64)
 #include <direct.h>
+#else
+#include <unistd.h>
+#include "posix_shims.h"
 #endif
+#if !__APPLE__
 #include <malloc.h>
+#else
+#include <cstdlib>
+#endif
 
 // user incl
 #include "XbTool.h"
@@ -283,7 +289,7 @@ int extractBios() {
 
 	// set working directory
 	if (isFlagSet(SW_WORKING_DIRECTORY)) {
-		if (chdir(params.working_directory_path) == -1) {
+		if (_chdir(params.working_directory_path) == -1) {
 			if (errno == ENOENT) { // directory not found
 				printf("Error: '%s' directory not found.\n", params.working_directory_path);				
 				return 1;

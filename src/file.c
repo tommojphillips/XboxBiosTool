@@ -21,7 +21,11 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#if !__APPLE__
 #include <malloc.h>
+#else
+#include <stdlib.h>
+#endif
 
 #include "file.h"
 #include "posix_shims.h"

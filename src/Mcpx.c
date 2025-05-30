@@ -21,7 +21,11 @@
 
 // std incl
 #include <string.h>
+#if !__APPLE__
 #include <malloc.h>
+#else
+#include <stdlib.h>
+#endif
 
 // user incl
 #include "Mcpx.h"

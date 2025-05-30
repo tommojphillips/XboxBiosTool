@@ -20,10 +20,14 @@
 // GitHub: https:\\github.com\tommojphillips
 
 // std incl
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#if !__APPLE__
 #include <malloc.h>
+#else
+#include <cstdlib>
+#endif
 
 // user incl
 #include "XcodeInterp.h"

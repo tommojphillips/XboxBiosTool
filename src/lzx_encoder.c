@@ -5,7 +5,9 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <memory.h>
+#if !__APPLE__
 #include <malloc.h>
+#endif
 
 // user incl
 #include "lzx.h"

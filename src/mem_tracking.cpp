@@ -18,7 +18,9 @@
 // Author: tommojphillips
  // GitHub: https:\\github.com\tommojphillips
 
+#if !__APPLE__
 #include <malloc.h>
+#endif
 #include <cstdio>
 #include <map>
 
@@ -49,7 +51,7 @@ extern "C" void* memtrack_malloc(size_t size)
 	return ptr;
 }
 
-void memtrack_free(void* ptr)
+extern "C" void memtrack_free(void* ptr)
 {
 #ifdef MEM_TRACKING_PRINT
 	if (ptr == NULL) {
@@ -82,7 +84,7 @@ void memtrack_free(void* ptr)
 #endif
 }
 
-void* memtrack_realloc(void* ptr, size_t size)
+extern "C" void* memtrack_realloc(void* ptr, size_t size)
 {
 	auto entry = allocation_map.find(ptr);
 	if (entry == allocation_map.end()) {
@@ -110,7 +112,7 @@ void* memtrack_realloc(void* ptr, size_t size)
 	return newPtr;
 }
 
-void* memtrack_calloc(size_t count, size_t size)
+extern "C" void* memtrack_calloc(size_t count, size_t size)
 {
 	if (count == 0 || size == 0)
 		return NULL;
@@ -123,6 +125,7 @@ void* memtrack_calloc(size_t count, size_t size)
 		return NULL;
 	}
 
+	allocation_map[ptr] = size;
 	memtrack_allocations++;
 	memtrack_allocatedBytes += size;
 
@@ -133,7 +136,7 @@ void* memtrack_calloc(size_t count, size_t size)
 	return ptr;
 }
 
-int memtrack_report()
+extern "C" int memtrack_report()
 {
 	if (memtrack_allocatedBytes != 0 || memtrack_allocations != 0) {
 		printf("\nLEAK DETECTED: %ld bytes in %d allocations\n", memtrack_allocatedBytes, memtrack_allocations);

@@ -3,7 +3,11 @@
 // std incl
 #include <stdint.h>
 #include <memory.h>
+#if !__APPLE__
 #include <malloc.h>
+#else
+#include <stdlib.h>
+#endif
 
 // user incl
 #include "lzx.h"
