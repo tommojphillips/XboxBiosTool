@@ -20,10 +20,14 @@
 // GitHub: https:\\github.com\tommojphillips
 
 // std incl
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
+#include <cerrno>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <unistd.h>
+#if defined(_WIN32) || defined(_WIN64)
 #include <direct.h>
+#endif
 #include <malloc.h>
 
 // user incl
@@ -279,7 +283,7 @@ int extractBios() {
 
 	// set working directory
 	if (isFlagSet(SW_WORKING_DIRECTORY)) {
-		if (_chdir(params.working_directory_path) == -1) {
+		if (chdir(params.working_directory_path) == -1) {
 			if (errno == ENOENT) { // directory not found
 				printf("Error: '%s' directory not found.\n", params.working_directory_path);				
 				return 1;

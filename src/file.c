@@ -24,6 +24,7 @@
 #include <malloc.h>
 
 #include "file.h"
+#include "posix_shims.h"
 
 #ifdef MEM_TRACKING
 #include "mem_tracking.h"

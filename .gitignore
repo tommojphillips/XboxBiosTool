@@ -18,3 +18,4 @@ obj/
 XbBiosTool.vcxproj.filters
 XbBiosTool.vcxproj.user
 /tests/xcodes_no_branching.txt
+.idea/

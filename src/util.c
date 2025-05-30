@@ -242,7 +242,7 @@ void uprinthl(const uint8_t* data, const size_t size, uint32_t per_line, const c
 	uint32_t j = 0;
 	for (uint32_t i = 0; i < size; i += per_line) {
 		if (prefix != NULL) {
-			printf(prefix);
+			printf("%s", prefix);
 		}
 		for (j = 0; j < per_line; ++j) {
 			if (i + j >= size) {

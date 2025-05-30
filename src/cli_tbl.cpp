@@ -23,9 +23,12 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 // user incl
 #include "cli_tbl.h"
+#include "posix_shims.h"
+
 
 static int cli_flags[CLI_SWITCH_SIZE] = { 0 };
 
