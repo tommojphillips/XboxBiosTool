@@ -1,7 +1,7 @@
 // Bios.cpp: Implements functions for loading an Original Xbox BIOS file, decrypting it, and extracting the bootloader, kernel, and other data.
- 
+
 /* Copyright(C) 2024 tommojphillips
- * 
+ *
  * This program is free software : you can redistribute it and /or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -73,14 +73,14 @@ int Bios::load(uint8_t* buff, const uint32_t binsize, const BIOS_LOAD_PARAMS* bi
 		if (sbkey != NULL) {
 			/*if we found FBL, dont mangle FBL section of 2BL.*/
 			if (preldr.status == PRELDR_STATUS_FOUND) {
-				preldrSymmetricEncDecBldr(sbkey, XB_KEY_SIZE); 
+				preldrSymmetricEncDecBldr(sbkey, XB_KEY_SIZE);
 			}
 			else {
 				symmetricEncDecBldr(sbkey, XB_KEY_SIZE);
 			}
 		}
 	}
-	
+
 	bios_status = validateBldrBootParams();
 	if (bios_status != 0) {
 		return bios_status;
@@ -109,6 +109,9 @@ int Bios::build(BIOS_BUILD_PARAMS* build_params, uint32_t binsize, BIOS_LOAD_PAR
 		bios_status = BIOS_LOAD_STATUS_FAILED;
 		return bios_status;
 	}
+        if (params.romsize != bios_params->romsize) {
+          printf("Adjusted rom size:\t%u kb\n", bios_params->romsize / 1024);
+        }
 
 	if (binsize < bios_params->romsize) {
 		binsize = bios_params->romsize;
@@ -255,7 +258,7 @@ int Bios::init(uint8_t* buff, const uint32_t binsize, const BIOS_LOAD_PARAMS* bi
 	if (bios_params != NULL) {
 		memcpy(&params, bios_params, sizeof(BIOS_LOAD_PARAMS));
 	}
-		
+
 	if (buff == NULL) {
 		data = (uint8_t*)malloc(binsize);
 		if (data == NULL)
@@ -296,13 +299,13 @@ void Bios::getOffsets() {
 void Bios::getOffsets2() {
 	// calculate the pointers to the 2bl entry and keys. 2BL needs to be unencrypted for this to work.
 
-	uint32_t entry_offset = (bldr.ldr_params->bldr_entry_point & 0x0000FFFF/*- BLDR_BASE*/); 
+	uint32_t entry_offset = (bldr.ldr_params->bldr_entry_point & 0x0000FFFF/*- BLDR_BASE*/);
 	bldr.entry = (BLDR_ENTRY*)(bldr.data + entry_offset - sizeof(BLDR_ENTRY));
 	if (IN_BOUNDS(bldr.entry, bldr.data, BLDR_BLOCK_SIZE) == false)	{
 		bldr.entry = NULL;
 	}
 	else {
-		uint32_t keys_offset = (bldr.entry->keys_ptr & 0x0000FFFF/*- BLDR_RELOC*/); 
+		uint32_t keys_offset = (bldr.entry->keys_ptr & 0x0000FFFF/*- BLDR_RELOC*/);
 		bldr.keys = (BLDR_KEYS*)(bldr.data + keys_offset);
 		if (IN_BOUNDS(bldr.keys, bldr.data, BLDR_BLOCK_SIZE) == false) {
 			bldr.keys = NULL;
@@ -327,11 +330,11 @@ int Bios::validateBldrBootParams() {
 
 	const uint32_t kernel_size = bldr.boot_params->compressed_kernel_size;
 	const uint32_t kernel_data_size = bldr.boot_params->uncompressed_kernel_data_size;
-	const uint32_t inittbl_size = bldr.boot_params->init_tbl_size;	
+	const uint32_t inittbl_size = bldr.boot_params->init_tbl_size;
 	const uint32_t kernel_size_valid = kernel_size >= 0 && kernel_size <= size;
 	const uint32_t kernel_data_size_valid = kernel_data_size >= 0 && kernel_data_size <= size;
 	const uint32_t inittbl_size_valid = inittbl_size >= 0 && inittbl_size <= size;
-	
+
 	return (kernel_size_valid && kernel_data_size_valid && inittbl_size_valid) ? BIOS_LOAD_STATUS_SUCCESS : BIOS_LOAD_STATUS_INVALID_BLDR;
 }
 
@@ -354,7 +357,7 @@ void Bios::preldrValidateAndDecryptBldr() {
 	preldr.status = PRELDR_STATUS_NOT_FOUND;
 	preldr.params = (PRELDR_PARAMS*)(preldr.data);
 	preldr.jmp_offset = preldr.params->jmp_offset + 5; // +5 bytes (opcode + offset)
-	
+
 	if (preldr.params->jmp_opcode != 0xE9) {
 		return;
 	}
@@ -414,11 +417,11 @@ void Bios::preldrValidateAndDecryptBldr() {
 
 	// restore 2BL loader params.
 	// the first 16 bytes of 2BL were zeroed during the build process.
-	// it makes up the 2BL entry point (4 bytes), and part of the 
+	// it makes up the 2BL entry point (4 bytes), and part of the
 	// command line argument buffer (12 bytes)
 	memset(bldr.data, 0, 16);
 	bldr.ldr_params->bldr_entry_point = BLDR_BASE + entry->bldr_entry_offset;
-	
+
 	if (params.restore_boot_params) {
 		// restore 2BL boot params; move the boot params 16 bytes right
 		// this will write over the preldr nonce.
@@ -471,7 +474,7 @@ void Bios::symmetricEncDecBldr(const uint8_t* key, const uint32_t len) {
 	}
 
 	printf("%s 2BL\n", bldr.encryption_state ? "Decrypting" : "Encrypting");
-	
+
 	RC4_CONTEXT context = { 0 };
 	rc4_key(&context, key, len);
 	rc4(&context, bldr.data, BLDR_BLOCK_SIZE);
@@ -486,7 +489,7 @@ void Bios::symmetricEncDecKernel() {
 	if (key == NULL) {
 		if (bldr.keys == NULL)
 			return;
-		
+
 		key = bldr.keys->kernel_key;
 		if (key == NULL)
 			return;
@@ -508,7 +511,7 @@ void Bios::symmetricEncDecKernel() {
 	}
 
 	printf("%s kernel\n", kernel.encryption_state ? "Decrypting" : "Encrypting");
-		
+
 	RC4_CONTEXT context = { 0 };
 	rc4_key(&context, key, XB_KEY_SIZE);
 	rc4(&context, kernel.compressed_kernel_ptr, bldr.boot_params->compressed_kernel_size);
@@ -529,7 +532,7 @@ int Bios::decompressKrnl() {
 	if (kernel.img == NULL)
 		return 1;
 	if (lzx_decompress(kernel.compressed_kernel_ptr, bldr.boot_params->compressed_kernel_size, &kernel.img, &buffer_size, &kernel.img_size) != 0)
-		return 1;		
+		return 1;
 	return 0;
 }
 int Bios::preldrDecryptPublicKey() {
@@ -549,7 +552,7 @@ int Bios::preldrDecryptPublicKey() {
 	else {
 		return 1;
 	}
-		
+
 	RC4_CONTEXT context = { 0 };
 	rc4_key(&context, sbkey, 12);
 	rc4(&context, (uint8_t*)preldr.public_key, sizeof(XB_PUBLIC_KEY));

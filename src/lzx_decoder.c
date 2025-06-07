@@ -93,7 +93,7 @@
         dec_bitbuf |= ((((uint32_t) *dec_input_curpos | (((uint32_t) *(dec_input_curpos+1)) << 8))) << (-dec_bitcount)); \
         dec_input_curpos += 2; \
 		dec_bitcount += 16; \
-    } 
+    }
 
 #define DECODE_LEN_TREE_NOEOFCHECK(matchlen) \
     matchlen = context->secondary_len_tree_table[dec_bitbuf >> (32-SECONDARY_LEN_TREE_TABLE_BITS)]; \
@@ -131,7 +131,7 @@ static const long match_pos_minus2[sizeof(lzx_extra_bits)] = {
     1835008 - 2,  1966080 - 2,  2097152 - 2
 };
 
-static void init_bitbuf(LZX_DECODER_CONTEXT* context) {   
+static void init_bitbuf(LZX_DECODER_CONTEXT* context) {
     if (context->block_type == LZX_BLOCK_TYPE_UNCOMPRESSED)
         return;
 
@@ -170,12 +170,12 @@ static void fill_bitbuf(LZX_DECODER_CONTEXT* context, int n) {
     }
 }
 
-static void decode_small(LZX_DECODER_CONTEXT* context, short* temp, short* small_table, uint32_t* mask, uint8_t* small_bitlen, short* leftright_s) {
+static void decode_small(LZX_DECODER_CONTEXT* context, int16_t* temp, int16_t* small_table, uint32_t* mask, uint8_t* small_bitlen, int16_t* leftright_s) {
     *temp = small_table[context->bitbuf >> (32 - DS_TABLE_BITS)];
     if (*temp < 0) {
-        
+
         *mask = (1L << (32 - 1 - DS_TABLE_BITS));
-        
+
         do {
             *temp = -(*temp);
             if (context->bitbuf & *mask)
@@ -247,10 +247,10 @@ static void translate_e8(LZX_DECODER_CONTEXT* context, uint8_t* mem, long bytes)
     memcpy(&mem_backup[bytes - 6], temp, 6);
 }
 
-static bool make_table(int nchar, const uint8_t* bitlen, uint8_t tablebits, short* table, short* leftright) {
+static bool make_table(int nchar, const uint8_t* bitlen, uint8_t tablebits, int16_t* table, int16_t* leftright) {
     uint32_t i;
     int ch;
-    short* p;
+    int16_t* p;
     uint32_t count[17] = { 0} ;
     uint32_t weight[17] = { 0 };
     uint32_t start[18] = { 0 };
@@ -259,6 +259,8 @@ static bool make_table(int nchar, const uint8_t* bitlen, uint8_t tablebits, shor
     uint32_t k;
     uint8_t len;
     uint8_t jutbits;
+
+    memset(table, 0, sizeof(int16_t) * (1 << tablebits));
 
     for (i = 0; i < (uint32_t)nchar; i++)
         count[bitlen[i]]++;
@@ -280,7 +282,7 @@ static bool make_table(int nchar, const uint8_t* bitlen, uint8_t tablebits, shor
         start[i] >>= jutbits;
         weight[i] = 1 << (tablebits - i);
     }
-    
+
     while (i <= 16) {
         weight[i] = 1 << (16 - i);
         i++;
@@ -305,7 +307,7 @@ static bool make_table(int nchar, const uint8_t* bitlen, uint8_t tablebits, shor
                 return false;
 
             for (i = start[len]; i < nextcode; i++)
-                table[i] = (short)ch;
+                table[i] = (int16_t)ch;
 
             start[len] = nextcode;
         }
@@ -319,21 +321,21 @@ static bool make_table(int nchar, const uint8_t* bitlen, uint8_t tablebits, shor
             do {
                 if (*p == 0) {
                     leftright[avail * 2] = leftright[avail * 2 + 1] = 0;
-                    *p = (short)-avail;
+                    *p = (int16_t)-avail;
                     avail++;
                 }
 
-                if ((short)k < 0)
+                if ((int16_t)k < 0)
                     p = &leftright[-(*p) * 2 + 1];
                 else
                     p = &leftright[-(*p) * 2];
 
                 k <<= 1;
                 i--;
-            } 
+            }
             while (i);
 
-            *p = (short)ch;
+            *p = (int16_t)ch;
         }
     }
 
@@ -387,14 +389,14 @@ static bool make_table_8bit(uint8_t bitlen[], uint8_t table[]) {
     return true;
 }
 
-static bool read_rep_tree(LZX_DECODER_CONTEXT* context, int num_elements, uint8_t* lastlen, uint8_t* len) {
+static bool read_rep_tree(LZX_DECODER_CONTEXT* context, int num_elements, const uint8_t* lastlen, uint8_t* len) {
     int i;
     int consecutive;
     uint32_t mask;
     uint8_t small_bitlen[24] = { 0 };
-    short small_table[1 << DS_TABLE_BITS];
-    short leftright_s[2 * (2 * 24 + 241)];
-    short temp;
+    int16_t small_table[1 << DS_TABLE_BITS];
+    int16_t leftright_s[2 * (2 * 24 + 241)];
+    int16_t temp;
 
     for (i = 0; i < NUM_DECODE_SMALL; i++) {
         small_bitlen[i] = (uint8_t)get_bits(context, 4);
@@ -470,7 +472,7 @@ static bool read_main_and_secondary_trees(LZX_DECODER_CONTEXT* context) {
         return false;
     }
 
-    if (!make_table(LZX_MAIN_TREE_ELEMENTS(context->num_position_slots), context->main_tree_len, MAIN_TREE_TABLE_BITS, 
+    if (!make_table(LZX_MAIN_TREE_ELEMENTS(context->num_position_slots), context->main_tree_len, MAIN_TREE_TABLE_BITS,
         context->main_tree_table, context->main_tree_left_right)) {
         return false;
     }
@@ -479,7 +481,7 @@ static bool read_main_and_secondary_trees(LZX_DECODER_CONTEXT* context) {
         return false;
     }
 
-    if (!make_table(LZX_NUM_SECONDARY_LEN, context->secondary_len_tree_len, SECONDARY_LEN_TREE_TABLE_BITS, 
+    if (!make_table(LZX_NUM_SECONDARY_LEN, context->secondary_len_tree_len, SECONDARY_LEN_TREE_TABLE_BITS,
         context->secondary_len_tree_table, context->secondary_len_tree_left_right)) {
         return false;
     }
@@ -487,7 +489,7 @@ static bool read_main_and_secondary_trees(LZX_DECODER_CONTEXT* context) {
     return true;
 }
 static bool read_aligned_offset_tree(LZX_DECODER_CONTEXT* context) {
-    
+
     for (int i = 0; i < 8; i++) {
         context->aligned_len[i] = (uint8_t)get_bits(context, 3);
     }
@@ -590,7 +592,7 @@ static long decode_aligned_block_special(LZX_DECODER_CONTEXT* context, long pos,
                 if (pos < 257)
                     dec_mem_window[context->window_size + pos] = dec_mem_window[pos];
                 pos++;
-            } 
+            }
             while (--match_length > 0);
         }
     }
@@ -680,7 +682,7 @@ static long decode_aligned_offset_block_fast(LZX_DECODER_CONTEXT* context, long 
 
             do {
                 dec_mem_window[pos++] = dec_mem_window[match_ptr++];
-            } 
+            }
             while (--match_length > 0);
         }
     }
@@ -698,7 +700,7 @@ static long decode_aligned_offset_block_fast(LZX_DECODER_CONTEXT* context, long 
 }
 static int decode_aligned_offset_block(LZX_DECODER_CONTEXT* context, long pos, int amount_to_decode)
 {
-    if (pos < 257) {        
+    if (pos < 257) {
         long amount_to_slowly_decode = min(257 - pos, amount_to_decode);
         long new_pos = decode_aligned_block_special(context, pos, amount_to_slowly_decode);
         amount_to_decode -= (new_pos - pos);
@@ -849,7 +851,7 @@ static long decode_verbatim_block_fast(LZX_DECODER_CONTEXT* context, long pos, i
 
             do {
                 context->mem_window[pos++] = context->mem_window[match_ptr++];
-            } 
+            }
             while (--match_length > 0);
         }
     }
@@ -1194,6 +1196,7 @@ int lzx_decompress_block(LZX_DECODER_CONTEXT* context, const uint8_t* src, uint3
     context->position_at_start += bytes_decoded;
     return 0;
 }
+
 int lzx_decompress_next_block(LZX_DECODER_CONTEXT* context, const uint8_t** src, uint32_t* bytes_compressed, uint8_t** dest, uint32_t* bytes_decompressed) {
     int result;
     LZX_BLOCK* block = (LZX_BLOCK*)*src;
@@ -1268,7 +1271,7 @@ int lzx_decompress(const uint8_t* src, const uint32_t src_size, uint8_t** dest, 
     if (decompressed_size != NULL) {
         *decompressed_size = total_decompressed_size;
     }
-        
+
 Cleanup:
 
     if (context != NULL) {

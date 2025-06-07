@@ -22,6 +22,10 @@
 #ifndef LZX_H
 #define LZX_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // std incl
 #include <stdint.h>
 #include <stdbool.h>
@@ -66,16 +70,16 @@ typedef struct {
     uint32_t window_size;
     uint32_t window_mask;
     uint32_t last_matchpos_offset[LZX_NUM_REPEATED_OFFSETS];
-    short main_tree_table[1 << MAIN_TREE_TABLE_BITS];
-    short secondary_len_tree_table[1 << SECONDARY_LEN_TREE_TABLE_BITS];
+    int16_t main_tree_table[1 << MAIN_TREE_TABLE_BITS];
+    int16_t secondary_len_tree_table[1 << SECONDARY_LEN_TREE_TABLE_BITS];
     uint8_t main_tree_len[LZX_MAX_MAIN_TREE_ELEMENTS];
     uint8_t secondary_len_tree_len[LZX_NUM_SECONDARY_LEN];
     uint8_t pad1[2];
     uint8_t num_position_slots;
     char aligned_table[1 << LZX_ALIGNED_TABLE_BITS];
     uint8_t aligned_len[LZX_ALIGNED_NUM_ELEMENTS];
-    short main_tree_left_right[LZX_MAX_MAIN_TREE_ELEMENTS * 4];
-    short secondary_len_tree_left_right[LZX_NUM_SECONDARY_LEN * 4];
+    int16_t main_tree_left_right[LZX_MAX_MAIN_TREE_ELEMENTS * 4];
+    int16_t secondary_len_tree_left_right[LZX_NUM_SECONDARY_LEN * 4];
     const uint8_t* input_curpos;
     const uint8_t* end_input_pos;
     uint8_t* output_buffer;
@@ -115,7 +119,7 @@ typedef struct {
     char depth;
     bool output_overflow;
     uint32_t literals;
-    uint32_t distances;
+    int32_t distances;
     uint32_t* dist_data;
     uint8_t* lit_data;
     uint8_t* item_type;
@@ -145,10 +149,10 @@ typedef struct {
     uint16_t* tree_freq;
     uint16_t* tree_sortptr;
     uint8_t* len;
-    short tree_heap[LZX_MAX_MAIN_TREE_ELEMENTS + 2];
+    uint16_t tree_heap[LZX_MAX_MAIN_TREE_ELEMENTS + 2];
     uint16_t tree_leftright[2 * (2 * LZX_MAX_MAIN_TREE_ELEMENTS - 1)];
-    uint16_t tree_len_cnt[17];
-    short tree_heapsize;
+    int16_t tree_len_cnt[17];
+    uint16_t tree_heapsize;
     int tree_n;
     uint32_t next_tree_create;
     uint32_t last_literals;
@@ -176,10 +180,6 @@ typedef struct {
     uint32_t output_buffer_block_count;
 } ENCODER_CONTEXT;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* Create lzx decoder */
 LZX_DECODER_CONTEXT* lzx_create_decompression();
 
@@ -199,7 +199,7 @@ int lzx_decompress_next_block(LZX_DECODER_CONTEXT* context, const uint8_t** src,
  dest_size: Output buffer size; returns the output buffer size. if output buffer is pre-allocated, this should be the size of the pre-allocated buffer.
  decompressed_size: Returns the decompressed size.
  returns 0 on SUCCESS, otherwise LZX_ERROR */
-int lzx_decompress(const uint8_t* src, const uint32_t src_size, uint8_t** dest, uint32_t* dest_size, uint32_t* decompressed_size);
+int lzx_decompress(const uint8_t* src, uint32_t src_size, uint8_t** dest, uint32_t* dest_size, uint32_t* decompressed_size);
 
 /* Create lzx encoder */
 ENCODER_CONTEXT* lzx_create_compression(uint8_t* dest);
@@ -222,7 +222,7 @@ void lzx_flush_compression(ENCODER_CONTEXT* context);
  dest: Address of the output buffer. pre-allocate or null buffer
  compressed_size: Returns the compressed size
  returns 0 on SUCCESS, otherwise LZX_ERROR */
-int lzx_compress(const uint8_t* src, const uint32_t src_size, uint8_t** dest, uint32_t* compressed_size);
+int lzx_compress(const uint8_t* src, uint32_t src_size, uint8_t** dest, uint32_t* compressed_size);
 
 #ifdef __cplusplus
 };

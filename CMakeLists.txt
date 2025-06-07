@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.30)
 
 project(XboxBiosTool)
 
@@ -11,8 +11,27 @@ include(CheckSymbolExists)
 include (ExternalProject)
 include(FindPkgConfig)
 
-set(CMAKE_CXX_FLAGS_DEBUG "-ggdb -O0")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+#set(CMAKE_CXX_FLAGS_DEBUG "-ggdb -O0")
+#set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
+add_library(
+        compressor_lib
+        src/lzx_decoder.c
+        src/lzx_encoder.c
+)
+
+target_include_directories(
+        compressor_lib
+        PUBLIC
+        inc
+)
+
+target_compile_options(
+        compressor_lib
+        PRIVATE
+        -fstrict-aliasing
+        -Wstrict-aliasing
+)
 
 add_executable(
         xbox_bios_tool
@@ -24,8 +43,6 @@ add_executable(
         src/cli_tbl.cpp
         src/file.c
         src/loadini.c
-        src/lzx_decoder.c
-        src/lzx_encoder.c
         src/mem_tracking.cpp
         src/nt_headers.c
         src/rc4.c
@@ -48,3 +65,12 @@ target_compile_definitions(
         PUBLIC
         -D __STDC_WANT_LIB_EXT1__=1
 )
+
+target_link_libraries(
+        xbox_bios_tool
+        PRIVATE
+        compressor_lib
+)
+
+
+add_subdirectory(tests)

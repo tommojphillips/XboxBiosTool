@@ -164,7 +164,7 @@ int XcodeDecoder::load(uint8_t* data, uint32_t size, uint32_t base, const char* 
 	if (result != 0) {
 		return result;
 	}
-	
+
 	interp.reset();
 	while (interp.interpretNext(xcode) == 0) {
 		if (xcode->opcode == XC_JMP || xcode->opcode == XC_JNE) {
@@ -179,7 +179,7 @@ int XcodeDecoder::load(uint8_t* data, uint32_t size, uint32_t base, const char* 
 		if (context->labels == NULL) {
 			return ERROR_OUT_OF_MEMORY;
 		}
-		memset(context->labels, 0, labelArraySize);	
+		memset(context->labels, 0, labelArraySize);
 
 		// initialize jmp array;
 		jmpArraySize = sizeof(JMP_XCODE) * jmpCount;
@@ -194,7 +194,7 @@ int XcodeDecoder::load(uint8_t* data, uint32_t size, uint32_t base, const char* 
 	interp.reset();
 	while (interp.interpretNext(xcode) == 0) {
 		if (xcode->opcode == XC_JMP || xcode->opcode == XC_JNE) {
-			
+
 			// create a label
 			if (context->labels != NULL) {
 				if (searchLabel(context, interp.offset + xcode->data, &label) == 0) {
@@ -219,7 +219,7 @@ int XcodeDecoder::load(uint8_t* data, uint32_t size, uint32_t base, const char* 
 		lbi /= 10;
 	}
 	context->settings.labelMaxLen += strlen(label_format) - 4; // 4 for %02d
-	
+
 	// xcode info
 	context->xcodeSize = interp.offset;
 	context->xcodeCount = interp.offset / sizeof(XCODE);
@@ -237,7 +237,7 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 	char buf[128] = {};
 
 	static const char* default_format_str = "{offset}: {op} {addr} {data} {comment}";
-	
+
 	static const LOADINI_SETTING_MAP var_map[] = {
 		{ &decode_settings_map.s[0], &settings->format_str},
 		{ &decode_settings_map.s[1], &settings->jmp_str },
@@ -281,7 +281,7 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 	}
 
 	// default format_str
-	if (settings->format_str == NULL) {		
+	if (settings->format_str == NULL) {
 		settings->format_str = (char*)malloc(strlen(default_format_str) + 1);
 		if (settings->format_str == NULL) {
 			result = ERROR_OUT_OF_MEMORY;
@@ -292,7 +292,7 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 
 	len = strlen(settings->format_str);
 	k = 1;
-	
+
 	for (i = 0; i < len; i++) {
 		result = ll2(buf, settings->format_str, i, j, len);
 		if (result == ERROR_INVALID_DATA) {
@@ -450,7 +450,7 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 			result = 1;
 			goto Cleanup;
 		}
-		
+
 		// set default opcode string
 		if (settings->opcodes[i].str == NULL) {
 			settings->opcodes[i].str = (char*)malloc(strlen(str) + 1);
@@ -572,11 +572,11 @@ int XcodeDecoder::decode() {
 
 			// append part of the decode str depending on the seq.
 			switch (context->settings.format_map[j].type) {
-				
+
 				// output OFFSET
 				case DECODE_FIELD_OFFSET: {
-					sprintf(str_tmp, context->settings.format_map[j].str, "%04x");
-					sprintf(str, str_tmp, context->xcodeBase + interp.offset - sizeof(XCODE));
+					snprintf(str_tmp, sizeof(str_tmp), context->settings.format_map[j].str, "%04x");
+					snprintf(str, sizeof(str), str_tmp, context->xcodeBase + interp.offset - sizeof(XCODE));
 				} break;
 
 				// output OPCODE
@@ -584,7 +584,7 @@ int XcodeDecoder::decode() {
 					const char* str_opcode;
 					if (getOpcodeStr(context->settings.opcodes, context->xcode->opcode, str_opcode) != 0)
 						return 1;
-					sprintf(str, context->settings.format_map[j].str, str_opcode);
+                                        snprintf(str, sizeof(str), context->settings.format_map[j].str, str_opcode);
 					if (context->settings.pad) {
 						rpad(str, op_len, ' ');
 					}
@@ -600,7 +600,7 @@ int XcodeDecoder::decode() {
 							}
 
 							if (searchLabel(context, interp.offset + context->xcode->data, &label) == 0) {
-								sprintf(str_tmp, context->settings.jmp_str, label->name);
+                                                            snprintf(str_tmp, sizeof(str_tmp), context->settings.jmp_str, label->name);
 							}
 						} break;
 
@@ -615,7 +615,7 @@ int XcodeDecoder::decode() {
 						} // fall through to default
 
 						default: {
-							sprintf(str_tmp, context->settings.num_str_format, context->xcode->addr);
+                                                    snprintf(str_tmp, sizeof(str_tmp), context->settings.num_str_format, context->xcode->addr);
 							break;
 						}
 					}
@@ -655,7 +655,7 @@ int XcodeDecoder::decode() {
 							}
 							break;
 
-						case XC_JNE:							
+						case XC_JNE:
 							if (searchLabel(context, interp.offset + context->xcode->data, &label) == 0) {
 								sprintf(str_tmp, context->settings.jmp_str, label->name);
 							}
@@ -742,7 +742,7 @@ int XcodeDecoder::getCommentStr(char* str) {
 
 	// xcalibur
 	XC_WRITE_COMMENT("xcalibur slave address", XC_IO_WRITE, SMB_BASE + 0x04, 0xE1);
-	
+
 	XC_WRITE_COMMENT_NEXT_XCODE("report memory type",
 		XC_IO_WRITE, SMB_BASE + 0x04, 0x20,
 		XC_IO_WRITE, SMB_CMD_REGISTER, 0x13);
@@ -863,7 +863,7 @@ int XcodeDecoder::getCommentStr(char* str) {
 	XC_WRITE_COMMENT("set ctrim2 ( micron )", XC_MEM_WRITE, 0x0f0010b8, 0xEEEE0000);
 	XC_WRITE_COMMENT("ctrim continue", XC_MEM_WRITE, 0x0f0010d4, 0x9);
 	XC_WRITE_COMMENT("ctrim common", XC_MEM_WRITE, 0x0f0010b4, 0x0);
-	
+
 	XC_WRITE_COMMENT("pll_select", XC_MEM_WRITE, 0x0f68050c, 0x000a0400);
 
 	XC_WRITE_COMMENT("quit xcodes", XC_EXIT, 0x806, 0);
@@ -918,7 +918,7 @@ static int ll2(char* output, char* str, uint32_t i, uint32_t& j, uint32_t len) {
 
 	if (str[i] != '{') {
 		j = i;
-		
+
 		while (j < len && str[j] != '{') {
 			j++;
 		}
@@ -970,15 +970,15 @@ static void walkBranch(DECODE_CONTEXT* context, XcodeInterp* interp) {
 	jmpOffset = offset + context->xcode->data;
 
 	//fprintf(context->stream, "; walking branch\n");
-	
+
 	if (jmpOffset > offset) {
-		// jmp offset is below; 
+		// jmp offset is below;
 		// walk from jmp-definition to jmp-offset
 
 		endOffset = jmpOffset;
 	}
 	else {
-		// jmp offset is above or equal; 
+		// jmp offset is above or equal;
 		// walk from jmp-offset to jmp-definition
 
 		interp->offset = jmpOffset;

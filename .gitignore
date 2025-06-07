@@ -19,3 +19,6 @@ XbBiosTool.vcxproj.filters
 XbBiosTool.vcxproj.user
 /tests/xcodes_no_branching.txt
 .idea/
+
+cmake-build-debug/
+cmake-build-release/
