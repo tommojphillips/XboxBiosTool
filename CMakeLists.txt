@@ -11,9 +11,6 @@ include(CheckSymbolExists)
 include (ExternalProject)
 include(FindPkgConfig)
 
-#set(CMAKE_CXX_FLAGS_DEBUG "-ggdb -O0")
-#set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-
 add_library(
         compressor_lib
         src/lzx_decoder.c
@@ -29,7 +26,6 @@ target_include_directories(
 target_compile_options(
         compressor_lib
         PRIVATE
-        -fstrict-aliasing
         -Wstrict-aliasing
 )
 
@@ -72,5 +68,10 @@ target_link_libraries(
         compressor_lib
 )
 
+target_compile_options(
+        xbox_bios_tool
+        PRIVATE
+        -Wstrict-aliasing
+)
 
 add_subdirectory(tests)

@@ -115,8 +115,8 @@ typedef struct {
     uint32_t* left;
     uint32_t* right;
     uint32_t bitbuf;
-    char bitcount;
-    char depth;
+    uint8_t bitcount;
+    uint8_t depth;
     bool output_overflow;
     uint32_t literals;
     int32_t distances;
@@ -144,7 +144,7 @@ typedef struct {
     uint32_t earliest_window_data_remaining;
     uint32_t bufpos_at_last_block;
     uint8_t* input_ptr;
-    long input_left;
+    uint32_t input_left;
     uint32_t instr_pos;
     uint16_t* tree_freq;
     uint16_t* tree_sortptr;

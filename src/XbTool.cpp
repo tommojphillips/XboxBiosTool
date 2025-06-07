@@ -925,7 +925,7 @@ int simulateXcodes() {
 		}
 
 		// print the xcode
-		printf("\t%04x: %s 0x%02x, 0x%08X\n", (base + interp.offset - sizeof(XCODE)), opcode_str, xcode->addr, xcode->data);
+		printf("\t%04lx: %s 0x%02x, 0x%08X\n", (unsigned long)(base + interp.offset - sizeof(XCODE)), opcode_str, xcode->addr, xcode->data);
 	}
 
 	if (!hasMemChanges_total) {
@@ -1406,7 +1406,7 @@ int inject_xcodes(uint8_t* data, uint32_t size, uint8_t* xcodes, uint32_t xcodes
 	xcode = (XCODE*)(data + 0x80 + interp.offset - sizeof(XCODE));
 
 	if (jmp) {
-		printf("XCODE: replacing quit xcode at 0x%x with jump to free space at 0x%x\n", (uint8_t*)xcode - data, 0x80 + interp.offset + offset);
+		printf("XCODE: replacing quit xcode at 0x%lx with jump to free space at 0x%x\n", (unsigned long)((uint8_t*)xcode - data), 0x80 + interp.offset + offset);
 
 		// patch quit xcode to a jmp xcode.
 		xcode->opcode = XC_JMP;
@@ -1657,6 +1657,7 @@ void printInitTblInfo(Bios* bios) {
 	printf("\nRevision:\t\trev %d.%02d\n", init_tbl->revision >> 8, init_tbl->revision & 0xFF);
 	printf("\n");
 }
+
 void printNv2aInfo(Bios* bios) {
 	INIT_TBL* init_tbl = bios->init_tbl;
 	int i;
@@ -1689,13 +1690,13 @@ void printNv2aInfo(Bios* bios) {
 
 	for (i = 0; i < ARRAY_SIZE; ++i) {
 		cHasValue = false;
-		if (*(uint32_t*)&valArray[i] != 0) {
+		if (valArray[i] != 0) {
 			cHasValue = true;
 			hasValue = true;
 		}
 
 		if (cHasValue && hasValue)
-			sprintf(str + i * 3, "%02X ", *(uint32_t*)valArray[i]);
+			snprintf(str + i * 3, sizeof(str) - (i * 3), "%02lX ", (unsigned long)valArray[i]);
 	}
 	if (hasValue) {
 		if (str[0] == '\0') {

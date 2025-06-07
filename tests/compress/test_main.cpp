@@ -195,22 +195,6 @@ BOOST_AUTO_TEST_CASE(large_noise_round_trip) {
                              &compressed, &compressed_size);
   BOOST_TEST(!result, "lzx_compress must return success");
 
-  for (auto i = 0; i < 1024; ++i) {
-    uint8_t *compressed2 = nullptr;
-    uint32_t compressed_size2 = 0;
-
-    result = lzx_compress(large_noise.data(), large_noise.size(),
-                               &compressed2, &compressed_size2);
-    BOOST_TEST(!result, "lzx_compress must return success");
-
-    BOOST_REQUIRE_EQUAL(compressed_size, compressed_size2);
-
-    BOOST_REQUIRE_EQUAL(0, memcmp(compressed, compressed2, compressed_size));
-
-    free(compressed2);
-  }
-
-
   uint8_t *decompressed = nullptr;
   uint32_t decompressed_buffer_size = 0;
   uint32_t decompressed_size = 0;

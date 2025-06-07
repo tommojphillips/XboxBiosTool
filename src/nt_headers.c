@@ -1,4 +1,4 @@
-// nt_headers.c 
+// nt_headers.c
 
 /* Copyright(C) 2024 tommojphillips
  *
@@ -32,7 +32,7 @@ void print_image_dos_header(IMAGE_DOS_HEADER* dos_header)
 {
     char magic[3] = { 0 };
     memcpy(magic, &dos_header->e_magic, 2);
-    
+
     printf("Magic:\t\t%s ( %02X )\n" \
         "cblp:\t\t0x%02x\n" \
         "cp:\t\t0x%02x\n" \
@@ -43,16 +43,16 @@ void print_image_dos_header(IMAGE_DOS_HEADER* dos_header)
         "sp:\t\t0x%02x\n" \
         "ip:\t\t0x%02x\n" \
         "cs:\t\t0x%02x\n" \
-        
+
         "\nchecksum:\t0x%02x\n" \
         "lfarlc:\t\t0x%02x\n" \
         "ovno:\t\t0x%02x\n" \
-        
+
         "oem id:\t\t0x%02x\n" \
         "oem info:\t0x%02x\n" \
-        
+
         "nt header ptr:\t0x%02x\n", \
-        &magic, dos_header->e_magic, dos_header->e_cblp, dos_header->e_cp, dos_header->e_crlc, dos_header->e_cparhdr,
+        magic, dos_header->e_magic, dos_header->e_cblp, dos_header->e_cp, dos_header->e_crlc, dos_header->e_cparhdr,
         dos_header->e_minalloc, dos_header->e_maxalloc, dos_header->e_ss, dos_header->e_sp,
         dos_header->e_ip, dos_header->e_cs, dos_header->e_csum, dos_header->e_lfarlc, dos_header->e_ovno, dos_header->e_oemid,
         dos_header->e_oeminfo, dos_header->e_lfanew);
@@ -82,7 +82,7 @@ void print_krnl_data_section_header(IMAGE_DOS_HEADER* dos_header)
         data_section->uninitializedDataSize, data_section->initializedDataSize, data_section->rawDataPtr, data_section->virtualAddr);
 }
 void print_image_file_header(COFF_FILE_HEADER* file_header, bool basic)
-{ 
+{
     char datetime[28] = { 0 };
     const char* machine_str = { 0 };
 

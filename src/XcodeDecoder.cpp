@@ -390,12 +390,13 @@ int XcodeDecoder::loadSettings(const char* ini, DECODE_SETTINGS* settings) const
 
 			for (j = 0; j < sizeof(num_str_fields) / sizeof(DECODE_SETTING_MAP); ++j) {
 				if (strcmp(buf, num_str_fields[j].field) == 0) {
-					settings->num_str_format = (char*)malloc(strlen(settings->num_str) - 2 + 8 + 1); // +8 for digits
+					size_t buf_size = strlen(settings->num_str) - 2 + 8 + 1;
+					settings->num_str_format = (char*)malloc(buf_size); // +8 for digits
 					if (settings->num_str_format == NULL) {
 						result = ERROR_OUT_OF_MEMORY;
 						goto Cleanup;
 					}
-					sprintf(settings->num_str_format, settings->num_str, num_str_fields[j].value);
+					snprintf(settings->num_str_format, buf_size, settings->num_str, num_str_fields[j].value);
 					break;
 				}
 			}
@@ -488,8 +489,8 @@ int XcodeDecoder::decodeXcodes() {
 				printf("Error: decode format too large.\n");
 			}
 			else {
-				printf("Error: decoding xcode:\n\t%04X, OP: %02X, ADDR: %04X, DATA: %04X\n",
-					(context->xcodeBase + interp.offset - sizeof(XCODE)), context->xcode->opcode, context->xcode->addr, context->xcode->data);
+				printf("Error: decoding xcode:\n\t%04lX, OP: %02X, ADDR: %04X, DATA: %04X\n",
+					(unsigned long)(context->xcodeBase + interp.offset - sizeof(XCODE)), context->xcode->opcode, context->xcode->addr, context->xcode->data);
 			}
 			return result;
 		}
@@ -533,7 +534,7 @@ int XcodeDecoder::decode() {
 	// output label
 	if (searchLabel(context, interp.offset - sizeof(XCODE), &label) == 0) {
 		label->defined = true;
-		sprintf(str, "%s:", label->name);
+		snprintf(str, sizeof(str), "%s:", label->name);
 		if (context->settings.label_on_new_line)
 			strcat(str, "\n");
 	}
@@ -620,7 +621,7 @@ int XcodeDecoder::decode() {
 						}
 					}
 
-					sprintf(str, context->settings.format_map[j].str, str_tmp);
+					snprintf(str, sizeof(str), context->settings.format_map[j].str, str_tmp);
 					if (context->settings.pad) {
 
 						if (context->settings.opcode_use_result && operand_len < op_len)
@@ -650,23 +651,23 @@ int XcodeDecoder::decode() {
 						case XC_JMP:
 							if (context->settings.no_operand_str != NULL) {
 								if (searchLabel(context, interp.offset + context->xcode->data, &label) == 0) {
-									sprintf(str_tmp, context->settings.jmp_str, label->name);
+                                                                	snprintf(str_tmp, sizeof(str_tmp), context->settings.jmp_str, label->name);
 								}
 							}
 							break;
 
 						case XC_JNE:
 							if (searchLabel(context, interp.offset + context->xcode->data, &label) == 0) {
-								sprintf(str_tmp, context->settings.jmp_str, label->name);
+                                                        	snprintf(str_tmp, sizeof(str_tmp), context->settings.jmp_str, label->name);
 							}
 							break;
 
 						default:
-							sprintf(str_tmp, context->settings.num_str_format, context->xcode->data);
+							snprintf(str_tmp, sizeof(str_tmp), context->settings.num_str_format, context->xcode->data);
 							break;
 					}
 
-					sprintf(str, context->settings.format_map[j].str, str_tmp);
+					snprintf(str, sizeof(str), context->settings.format_map[j].str, str_tmp);
 					if (context->settings.pad) {
 						if (operand_len < jmp_len)
 							operand_len = jmp_len;
@@ -679,11 +680,11 @@ int XcodeDecoder::decode() {
 				// output COMMENT
 				case DECODE_FIELD_COMMENT: {
 					uint32_t prefixLen = strlen(context->settings.comment_prefix);
-					getCommentStr(str_tmp + prefixLen);
+                                        getCommentStr(str_tmp + prefixLen, sizeof(str_tmp) - prefixLen);
 					if (str_tmp[prefixLen] != '\0') {
 						memcpy(str_tmp, context->settings.comment_prefix, prefixLen);
 					}
-					sprintf(str, context->settings.format_map[j].str, str_tmp);
+					snprintf(str, sizeof(str), context->settings.format_map[j].str, str_tmp);
 				} break;
 			}
 
@@ -702,7 +703,7 @@ int XcodeDecoder::decode() {
 
 	return 0;
 }
-int XcodeDecoder::getCommentStr(char* str) {
+int XcodeDecoder::getCommentStr(char* str, size_t buf_size) {
 	// -1 = dont care about field
 
 	XCODE* _ptr = interp.ptr;
@@ -792,12 +793,13 @@ int XcodeDecoder::getCommentStr(char* str) {
 	// nv clk
 	XC_WRITE_COMMENT("set nv clk 155 MHz", XC_MEM_WRITE, NV2A_BASE + NV_CLK_REG, 0x11701);
 
+        size_t str_len = strlen(str);
 	XC_WRITE_STATEMENT(XC_MEM_WRITE, NV2A_BASE + NV_CLK_REG, -1,
 		uint32_t base = 16667;
 		uint32_t nvclk = base * ((_ptr->data & 0xFF00) >> 8);
 		nvclk /= 1 << ((_ptr->data & 0x70000) >> 16);
 		nvclk /= _ptr->data & 0xFF; nvclk /= 1000;
-		sprintf(str + strlen(str), "set nv clk %dMHz (@ %.3fMHz)", nvclk, (float)(base / 1000.00f)));
+		snprintf(str + str_len, buf_size - str_len, "set nv clk %dMHz (@ %.3fMHz)", nvclk, (float)(base / 1000.00f)));
 
 	// nv gpu revision
 	XC_WRITE_COMMENT_NEXT_XCODE("get nv rev",
@@ -828,8 +830,9 @@ int XcodeDecoder::getCommentStr(char* str) {
 		XC_MEM_WRITE, NV2A_BASE + 0x1234, 0xAAAAAAAA,
 		XC_MEM_WRITE, NV2A_BASE + 0x1238, 0xAAAAAAAA);
 
+        str_len = strlen(str);
 	XC_WRITE_STATEMENT(XC_PCI_WRITE, 0x80000084, -1,
-		sprintf(str + strlen(str), "set memory size %d Mb\n", (_ptr->data + 1) / 1024 / 1024));
+		snprintf(str + str_len, buf_size - str_len, "set memory size %d Mb\n", (_ptr->data + 1) / 1024 / 1024));
 
 	XC_WRITE_COMMENT("set extbank bit (00000F00)", XC_MEM_WRITE, NV2A_BASE + 0x100200, 0x03070103);
 	XC_WRITE_COMMENT("clear extbank bit (00000F00)", XC_MEM_WRITE, NV2A_BASE + 0x100200, 0x03070003);
@@ -1031,7 +1034,7 @@ static int searchJmp(DECODE_CONTEXT* context, uint32_t offset, JMP_XCODE** jmp) 
 static int createLabel(DECODE_CONTEXT* context, uint32_t offset, const char* label_format) {
 	// create a label; add to label count.
 	LABEL* label = &context->labels[context->labelCount];
-	sprintf(label->name, label_format, context->labelCount);
+	snprintf(label->name, sizeof(label->name), label_format, context->labelCount);
 	label->offset = offset;
 	label->references = 1;
 	label->defined = false;
