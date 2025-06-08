@@ -3,7 +3,7 @@ name: Build
 on:
   push:
     branches:
-      - main  
+      - main
     paths-ignore:
       - '.github/**'
       - '!.github/workflows/**'
@@ -31,11 +31,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             cmake \
+            libboost-all-dev \
             llvm
       - name: Compile
         run: |
           cmake -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build -- -j$(grep -c processor /proc/cpuinfo)
+      - name: Test
+        run: |
+          ctest --test-dir build --output-on-failure
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -55,12 +59,16 @@ jobs:
           brew install \
             cmake \
             coreutils \
-            llvm@18
+            boost \
+            llvm
       - name: Compile
         run: |
           export PATH="$(brew --prefix llvm@18)/bin:$PATH"
           cmake -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build -- -j
+      - name: Test
+        run: |
+          ctest --test-dir build --output-on-failure
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
