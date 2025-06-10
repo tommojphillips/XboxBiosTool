@@ -20,12 +20,16 @@
 // GitHub: https:\\github.com\tommojphillips
 
 // std incl
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 // user incl
 #include "cli_tbl.h"
+#include "posix_shims.h"
+
 
 static int cli_flags[CLI_SWITCH_SIZE] = { 0 };
 
@@ -52,19 +56,19 @@ int parseCli(int argc, char* argv[], const CMD_TBL*& cmd, const CMD_TBL* cmds, c
 	int startIndex;
 	bool swNeedValue;
 	char arg[CLI_SWITCH_MAX_LEN] = {};
-		
-	if (CLI_SWITCH_MAX_COUNT - 1 < param_size / sizeof(PARAM_TBL)) 
+
+	if (CLI_SWITCH_MAX_COUNT - 1 < param_size / sizeof(PARAM_TBL))
 		return CLI_ERROR_INVALID_SW;
-	if (argc == 1) 
+	if (argc == 1)
 		return CLI_ERROR_NO_CMD;
-	if (strlen(argv[1]) < 2) 
+	if (strlen(argv[1]) < 2)
 		return CLI_ERROR_INVALID_CMD;
 
 	if (argv[1][0] != '-' && argv[1][0] != '/')
 		strncpy_s(arg, argv[1], CLI_SWITCH_MAX_LEN-1);
 	else
 		strncpy_s(arg, argv[1] + 1, CLI_SWITCH_MAX_LEN-1);
-	
+
 	if(getCmd(cmds, cmd_size, arg, &cmd) == 0)
 		startIndex = 2;
 	else
@@ -75,7 +79,7 @@ int parseCli(int argc, char* argv[], const CMD_TBL*& cmd, const CMD_TBL* cmds, c
 		printf("Error: Unknown command. %s\n", arg);
 		return CLI_ERROR_UNKNOWN_CMD;
 	}
-		
+
 	for (i = startIndex; i < argc; i++)
 	{
 
@@ -112,7 +116,7 @@ int parseCli(int argc, char* argv[], const CMD_TBL*& cmd, const CMD_TBL* cmds, c
 		NextArg:
 			continue;
 		}
-		
+
 		/*if (strlen(argv[i]) > CLI_SWITCH_MAX_LEN - 1)
 		{
 			printf("Error: Invalid switch: %s\n", arg);
@@ -174,7 +178,7 @@ int parseCli(int argc, char* argv[], const CMD_TBL*& cmd, const CMD_TBL* cmds, c
 		return 0;
 
 	// check for required switches
-	
+
 	bool missing = false;
 	for (i = 0; i < (int)(param_size / sizeof(PARAM_TBL)); i++)
 	{
@@ -198,7 +202,7 @@ int parseCli(int argc, char* argv[], const CMD_TBL*& cmd, const CMD_TBL* cmds, c
 
 	if (missing)
 		return CLI_ERROR_MISSING_SW;
-	
+
 	return 0;
 }
 
@@ -226,6 +230,9 @@ void setParamValue(const PARAM_TBL* param, char* arg) {
 	case PARAM_TBL::FLAG:
 			*(int*)param->var |= param->swType;
 		break;
+
+        case PARAM_TBL::NONE:
+          assert(!"Unsupported command type NONE");
 	}
 }
 void setFlag(const CLI_SWITCH sw)

@@ -23,7 +23,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#if !__APPLE__
 #include <malloc.h>
+#else
+#include <stdlib.h>
+#endif
 
 // user incl
 #include "loadini.h"

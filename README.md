@@ -397,6 +397,7 @@ xbios.exe /replicate <bios_file> /binsize 512
 
 ## Building
 
+### Windows
 The project is built in Visual Studio 2022
 
   1. Clone the repo
@@ -406,6 +407,22 @@ The project is built in Visual Studio 2022
   ```
 
   2. Open vc\XboxBiosTools.sln in visual studio and build and run
+
+### Linux/macOS
+This project is built using CMake and Clang or GCC.
+
+  1. Clone the repo
+
+  ```
+  git clone https://github.com/tommojphillips/XboxBiosTool.git
+  ```
+
+  2. Inside the cloned workspace:
+
+  ```
+  cmake -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  ```
 
 ## Credits / Resources
 

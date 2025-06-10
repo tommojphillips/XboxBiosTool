@@ -22,6 +22,7 @@
 #ifndef RC4_H
 #define RC4_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 typedef struct _RC4_CONTEXT {

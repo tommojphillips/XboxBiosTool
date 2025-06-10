@@ -121,7 +121,7 @@ public:
 
 private:
     int loadSettings(const char* ini, DECODE_SETTINGS* settings) const;
-    int getCommentStr(char* str);
+    int getCommentStr(char* str, size_t buf_size);
 };
 
 #endif // !XCODE_DECODER_H

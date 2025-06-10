@@ -20,11 +20,21 @@
 // GitHub: https:\\github.com\tommojphillips
 
 // std incl
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
+#include <cerrno>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#if defined(_WIN32) || defined(_WIN64)
 #include <direct.h>
+#else
+#include <unistd.h>
+#include "posix_shims.h"
+#endif
+#if !__APPLE__
 #include <malloc.h>
+#else
+#include <cstdlib>
+#endif
 
 // user incl
 #include "XbTool.h"
@@ -71,8 +81,8 @@ static const PARAM_TBL param_tbl[] = {
 	{ "romsize", &params.romsize, SW_ROMSIZE, PARAM_TBL::INT },
 	{ "binsize", &params.binsize, SW_BINSIZE, PARAM_TBL::INT },
 
-	{ "enc-bldr", NULL, SW_ENC_BLDR, PARAM_TBL::FLAG },
-	{ "enc-krnl", NULL, SW_ENC_KRNL, PARAM_TBL::FLAG },
+	{ "enc-bldr", nullptr, SW_ENC_BLDR, PARAM_TBL::FLAG },
+	{ "enc-krnl", nullptr, SW_ENC_KRNL, PARAM_TBL::FLAG },
 	{ "key-krnl", &params.kernel_key_file, SW_KEY_KRNL_FILE, PARAM_TBL::STR },
 	{ "key-bldr", &params.bldr_key_file, SW_KEY_BLDR_FILE, PARAM_TBL::STR},
 	{ "mcpx", &params.mcpx_file, SW_MCPX_FILE, PARAM_TBL::STR },
@@ -83,18 +93,18 @@ static const PARAM_TBL param_tbl[] = {
 	{ "krnldata", &params.kernel_data_file, SW_KRNL_DATA_FILE, PARAM_TBL::STR },
 	{ "inittbl", &params.init_tbl_file, SW_INITTBL_FILE, PARAM_TBL::STR },
 
-	{ "nv2a", NULL, SW_LS_NV2A_TBL, PARAM_TBL::FLAG },
-	{ "datatbl", NULL, SW_LS_DATA_TBL, PARAM_TBL::FLAG },
-	{ "img", NULL, SW_DUMP_KRNL, PARAM_TBL::FLAG },
+	{ "nv2a", nullptr, SW_LS_NV2A_TBL, PARAM_TBL::FLAG },
+	{ "datatbl", nullptr, SW_LS_DATA_TBL, PARAM_TBL::FLAG },
+	{ "img", nullptr, SW_DUMP_KRNL, PARAM_TBL::FLAG },
 
 	{ "pubkey", &params.public_key_file, SW_PUB_KEY_FILE, PARAM_TBL::STR },
 	{ "certkey", &params.cert_key_file, SW_CERT_KEY_FILE, PARAM_TBL::STR },
 	{ "eepromkey", &params.eeprom_key_file, SW_EEPROM_KEY_FILE, PARAM_TBL::STR },
 
-	{ "bfm", NULL, SW_BLD_BFM, PARAM_TBL::FLAG },
-	{ "d", NULL, SW_DMP, PARAM_TBL::FLAG },
+	{ "bfm", nullptr, SW_BLD_BFM, PARAM_TBL::FLAG },
+	{ "d", nullptr, SW_DMP, PARAM_TBL::FLAG },
 	{ "simsize", &params.simSize, SW_SIM_SIZE, PARAM_TBL::INT },
-	{ "nomaxsize", NULL, SW_NO_MAX_SIZE, PARAM_TBL::FLAG },
+	{ "nomaxsize", nullptr, SW_NO_MAX_SIZE, PARAM_TBL::FLAG },
 
 	{ "bank1", &params.bank_files[0], SW_BANK1_FILE, PARAM_TBL::STR },
 	{ "bank2", &params.bank_files[1], SW_BANK2_FILE, PARAM_TBL::STR },
@@ -102,15 +112,15 @@ static const PARAM_TBL param_tbl[] = {
 	{ "bank4", &params.bank_files[3], SW_BANK4_FILE, PARAM_TBL::STR },
 
 	{ "ini", &params.settings_file, SW_INI_FILE, PARAM_TBL::STR },
-	{ "?", NULL, SW_HELP, PARAM_TBL::FLAG },
-	{ "keys", NULL, SW_KEYS, PARAM_TBL::FLAG },
+	{ "?", nullptr, SW_HELP, PARAM_TBL::FLAG },
+	{ "keys", nullptr, SW_KEYS, PARAM_TBL::FLAG },
 	{ "base", &params.base, SW_BASE, PARAM_TBL::INT },
-	{ "hackinittbl", NULL, SW_HACK_INITTBL, PARAM_TBL::FLAG },
-	{ "hacksignature", NULL, SW_HACK_SIGNATURE, PARAM_TBL::FLAG },
-	{ "nobootparams", NULL, SW_UPDATE_BOOT_PARAMS, PARAM_TBL::FLAG },
-	{ "help-all", NULL, SW_HELP_ALL, PARAM_TBL::FLAG },
-	{ "help-enc", NULL, SW_HELP_ENCRYPTION, PARAM_TBL::FLAG },
-	{ "branch", NULL, SW_BRANCH, PARAM_TBL::FLAG },
+	{ "hackinittbl", nullptr, SW_HACK_INITTBL, PARAM_TBL::FLAG },
+	{ "hacksignature", nullptr, SW_HACK_SIGNATURE, PARAM_TBL::FLAG },
+	{ "nobootparams", nullptr, SW_UPDATE_BOOT_PARAMS, PARAM_TBL::FLAG },
+	{ "help-all", nullptr, SW_HELP_ALL, PARAM_TBL::FLAG },
+	{ "help-enc", nullptr, SW_HELP_ENCRYPTION, PARAM_TBL::FLAG },
+	{ "branch", nullptr, SW_BRANCH, PARAM_TBL::FLAG },
 	{ "dir", &params.working_directory_path, SW_WORKING_DIRECTORY, PARAM_TBL::STR },
 	{ "xcodes", &params.xcodes_file, SW_XCODES, PARAM_TBL::STR },
 	{ "offset", &params.offset, SW_OFFSET, PARAM_TBL::INT },
@@ -124,7 +134,7 @@ void lzx_print_error(int error);
 int buildBios() {
 	int result = 0;
 	const char* filename = params.out_file;
-	
+
 	Bios bios;
 	BIOS_LOAD_PARAMS bios_params;
 	BIOS_BUILD_PARAMS build_params;
@@ -145,22 +155,22 @@ int buildBios() {
 	build_params.hacksignature = isFlagSet(SW_HACK_SIGNATURE);
 	build_params.nobootparams = isFlagSet(SW_UPDATE_BOOT_PARAMS);
 
-	if (params.mcpx_file != NULL)
+	if (params.mcpx_file != nullptr)
 		printf("mcpx file:\t\t%s\n", params.mcpx_file);
 
-	// init tbl file	
+	// init tbl file
 	printf("Init tbl file:\t\t%s\n", params.init_tbl_file);
 	build_params.init_tbl = readFile(params.init_tbl_file, &build_params.init_tbl_size, 0);
-	if (build_params.init_tbl == NULL) {
+	if (build_params.init_tbl == nullptr) {
 		result = 1;
 		goto Cleanup;
 	}
 
 	// preldr file
 	printf("Preldr file:\t\t%s\n", params.preldr_file);
-	if (params.preldr_file != NULL) {
+	if (params.preldr_file != nullptr) {
 		build_params.preldr = readFile(params.preldr_file, &build_params.preldr_size, 0);
-		if (build_params.preldr == NULL) {
+		if (build_params.preldr == nullptr) {
 			build_params.preldr_size = 0;
 		}
 	}
@@ -168,7 +178,7 @@ int buildBios() {
 	// 2bl file
 	printf("2BL file:\t\t%s\n", params.bldr_file);
 	build_params.bldr = readFile(params.bldr_file, &build_params.bldrSize, 0);
-	if (build_params.bldr == NULL) {
+	if (build_params.bldr == nullptr) {
 		result = 1;
 		goto Cleanup;
 	}
@@ -176,7 +186,7 @@ int buildBios() {
 	// compressed krnl image
 	printf("Kernel file:\t\t%s\n", params.kernel_file);
 	build_params.compressed_kernel = readFile(params.kernel_file, &build_params.kernel_size, 0);
-	if (build_params.compressed_kernel == NULL) {
+	if (build_params.compressed_kernel == nullptr) {
 		result = 1;
 		goto Cleanup;
 	}
@@ -184,21 +194,21 @@ int buildBios() {
 	// uncompressed kernel data
 	printf("Kernel data file:\t%s\n", params.kernel_data_file);
 	build_params.kernel_data = readFile(params.kernel_data_file, &build_params.kernel_data_size, 0);
-	if (build_params.kernel_data == NULL) {
+	if (build_params.kernel_data == nullptr) {
 		result = 1;
 		goto Cleanup;
 	}
 
 	// eeprom key
-	if (params.eeprom_key_file != NULL) {
+	if (params.eeprom_key_file != nullptr) {
 		printf("Eeprom key file:\t\t%s\n", params.eeprom_key_file);
-		build_params.eeprom_key = readFile(params.eeprom_key_file, NULL, XB_KEY_SIZE);		
+		build_params.eeprom_key = readFile(params.eeprom_key_file, nullptr, XB_KEY_SIZE);
 	}
 
 	// cert key
-	if (params.cert_key_file != NULL) {
+	if (params.cert_key_file != nullptr) {
 		printf("Cert key file:\t\t%s\n", params.cert_key_file);
-		build_params.cert_key = readFile(params.cert_key_file, NULL, XB_KEY_SIZE);		
+		build_params.cert_key = readFile(params.cert_key_file, nullptr, XB_KEY_SIZE);
 	}
 
 	printf("rom size:\t\t%u kb\n\n", params.romsize / 1024);
@@ -209,13 +219,13 @@ int buildBios() {
 	if (isFlagSet(SW_XCODES)) {
 		uint32_t xcodesSize;
 		uint8_t* xcodes = readFile(params.xcodes_file, &xcodesSize, 0);
-		if (xcodes == NULL) {
+		if (xcodes == nullptr) {
 			result = 1;
 		}
 		else {
 			result = inject_xcodes(bios.data, bios.size, xcodes, xcodesSize);
 			free(xcodes);
-			xcodes = NULL;
+			xcodes = nullptr;
 		}
 	}
 
@@ -224,22 +234,22 @@ int buildBios() {
 	}
 	else {
 		filename = params.out_file;
-		if (filename == NULL)
+		if (filename == nullptr)
 			filename = "bios.bin";
 		result = writeFileF(filename, "bios", bios.data, bios.size);
 	}
 
 Cleanup:
-		
+
 	bios_free_build_params(&build_params);
-	
+
 	return result;
 }
 int extractBios() {
 	// Extract components from the bios file.
 
 	int result = 0;
-	const char* filename;	
+	const char* filename;
 	size_t init_tbl_size = 0;
 	Bios bios;
 	BIOS_LOAD_PARAMS bios_params;
@@ -253,12 +263,12 @@ int extractBios() {
 	bios_params.enc_bldr = isFlagSet(SW_ENC_BLDR);
 	bios_params.enc_kernel = isFlagSet(SW_ENC_KRNL);
 	bios_params.restore_boot_params = isFlagClear(SW_UPDATE_BOOT_PARAMS);
-	
+
 	printf("Extract BIOS\n\n");
 
 	uint32_t size = 0;
 	uint8_t* buffer = readFile(params.in_file, &size, 0);
-	if (buffer == NULL) {
+	if (buffer == nullptr) {
 		return 1;
 	}
 
@@ -267,13 +277,13 @@ int extractBios() {
 		return 1;
 	}
 
-	if (params.mcpx_file != NULL)
+	if (params.mcpx_file != nullptr)
 		printf("mcpx file: %s\n", params.mcpx_file);
 	printf("bios file: %s\nbios size: %d kb\nrom size:  %d kb\n\n", params.in_file, size / 1024, params.romsize / 1024);
 
 	result = bios.load(buffer, size, &bios_params);
 	if (result != BIOS_LOAD_STATUS_SUCCESS) {
-		printf("Error: invalid 2BL\n");		
+		printf("Error: invalid 2BL\n");
 		return 1;
 	}
 
@@ -281,21 +291,21 @@ int extractBios() {
 	if (isFlagSet(SW_WORKING_DIRECTORY)) {
 		if (_chdir(params.working_directory_path) == -1) {
 			if (errno == ENOENT) { // directory not found
-				printf("Error: '%s' directory not found.\n", params.working_directory_path);				
+				printf("Error: '%s' directory not found.\n", params.working_directory_path);
 				return 1;
 			}
 		}
 	}
 
 	// zero rom digest so we have a clean 2bl;
-	if (bios.rom_digest != NULL) {
+	if (bios.rom_digest != nullptr) {
 		memset(bios.rom_digest, 0, ROM_DIGEST_SIZE);
 	}
 
 	// preldr
 	if (bios.preldr.status < PRELDR_STATUS_NOT_FOUND) {
 		filename = params.preldr_file;
-		if (filename == NULL)
+		if (filename == nullptr)
 			filename = "preldr.bin";
 		writeFileF(filename, "preldr", bios.preldr.data, PRELDR_SIZE);
 
@@ -307,35 +317,35 @@ int extractBios() {
 
 	// 2bl
 	filename = params.bldr_file;
-	if (filename == NULL)
+	if (filename == nullptr)
 		filename = "bldr.bin";
 	writeFileF(filename, "2BL", bios.bldr.data, BLDR_BLOCK_SIZE);
-	
+
 	// extract init tbl
 	init_tbl_size = bios.bldr.boot_params->init_tbl_size;
 	if (init_tbl_size > 0) {
 		filename = params.init_tbl_file;
-		if (filename == NULL)
+		if (filename == nullptr)
 			filename = "inittbl.bin";
 		writeFileF(filename, "init table", bios.data, init_tbl_size);
 	}
 
 	// extract compressed kernel
 	filename = params.kernel_file;
-	if (filename == NULL)
+	if (filename == nullptr)
 		filename = "krnl.bin";
 	writeFileF(filename, "compressed kernel", bios.kernel.compressed_kernel_ptr, bios.bldr.boot_params->compressed_kernel_size);
-	
+
 	// extract uncompressed kernel section data
 	filename = params.kernel_data_file;
-	if (filename == NULL)
+	if (filename == nullptr)
 		filename = "krnl_data.bin";
 	writeFileF(filename, "kernel data", bios.kernel.uncompressed_data_ptr, bios.bldr.boot_params->uncompressed_kernel_data_size);
-	
+
 	// decompress the kernel now so the public key can be extracted.
 	if (bios.decompressKrnl() == 0) {
 		// extract decompressed kernel image ( pe/coff executable )
-		if (bios.kernel.img != NULL) {
+		if (bios.kernel.img != nullptr) {
 			writeFileF("krnl.img", "decompressed kernel", bios.kernel.img, bios.kernel.img_size);
 		}
 	}
@@ -343,41 +353,41 @@ int extractBios() {
 	if (isFlagSet(SW_KEYS)) {
 		// 2BL rc4 keys
 
-		if (bios.bldr.keys != NULL) {
-			
+		if (bios.bldr.keys != nullptr) {
+
 			// eeprom rc4 key
 			filename = params.eeprom_key_file;
-			if (filename == NULL)
+			if (filename == nullptr)
 				filename = "eeprom_key.bin";
 			writeFileF(filename, "eeprom key", bios.bldr.keys->eeprom_key, XB_KEY_SIZE);
 
 			// cert rc4 key
 			filename = params.cert_key_file;
-			if (filename == NULL)
+			if (filename == nullptr)
 				filename = "cert_key.bin";
 			writeFileF(filename, "cert key", bios.bldr.keys->cert_key, XB_KEY_SIZE);
-			
+
 			// kernel rc4 key
 			writeFileF("krnl_key.bin", "kernel key", bios.bldr.keys->kernel_key, XB_KEY_SIZE);
 		}
 
 		// bfm key
-		if (bios.bldr.bfm_key != NULL) {
+		if (bios.bldr.bfm_key != nullptr) {
 			writeFileF("bfm_key.bin", "bfm key", bios.bldr.bfm_key, XB_KEY_SIZE);
 		}
 
 		// secret boot key
-		if (params.mcpx.sbkey != NULL) {
+		if (params.mcpx.sbkey != nullptr) {
 			writeFileF("sb_key.bin", "secret boot key", params.mcpx.sbkey, XB_KEY_SIZE);
 		}
 
 		// extract decompressed kernel rsa pub key
-		if (bios.kernel.img != NULL) {
+		if (bios.kernel.img != nullptr) {
 			PUBLIC_KEY* pubkey;
 			filename = params.public_key_file;
-			if (filename == NULL)
+			if (filename == nullptr)
 				filename = "pubkey.bin";
-			if (rsa_findPublicKey(bios.kernel.img, bios.kernel.img_size, &pubkey, NULL) == RSA_ERROR_SUCCESS)
+			if (rsa_findPublicKey(bios.kernel.img, bios.kernel.img_size, &pubkey, nullptr) == RSA_ERROR_SUCCESS)
 				writeFileF(filename, "public key", pubkey, RSA_PUBKEY_SIZE(&pubkey->header));
 		}
 
@@ -391,7 +401,7 @@ int extractBios() {
 }
 int splitBios() {
 	int result = 0;
-	uint8_t* data = NULL;
+	uint8_t* data = nullptr;
 	uint32_t size = 0;
 	uint32_t fnLen = 0;
 	uint32_t bankFnLen = 0;
@@ -399,20 +409,20 @@ int splitBios() {
 	uint32_t loopCount = 0;
 	int bank = 0;
 	const char suffix[] = "_bank";
-	char* biosFn = NULL;
-	char* ext = NULL;
-	char* bankFn = NULL;
+	char* biosFn = nullptr;
+	char* ext = nullptr;
+	char* bankFn = nullptr;
 	int i;
 	int j;
 
 	printf("Split BIOS\n\n");
-	
+
 	//romsize sanity check
 	if (params.romsize < MIN_BIOS_SIZE)
 		return 1;
-		
+
 	data = readFile(params.in_file, &size, 0);
-	if (data == NULL)
+	if (data == nullptr)
 		return 1;
 
 	result = bios_check_size(size);
@@ -420,7 +430,7 @@ int splitBios() {
 		printf("Error: Invalid bios file size: %d\n", size);
 		goto Cleanup;
 	}
-	
+
 	printf("bios file: %s\nbios size: %dkb\nrom size:  %dkb\n\n", params.in_file, size / 1024, params.romsize / 1024);
 
 	// check if bios size is less than or equal to rom size
@@ -432,7 +442,7 @@ int splitBios() {
 
 	fnLen = strlen(params.in_file);
 	biosFn = (char*)malloc(fnLen + 1);
-	if (biosFn == NULL) {
+	if (biosFn == nullptr) {
 		result = 1;
 		goto Cleanup;
 	}
@@ -449,7 +459,7 @@ int splitBios() {
 	for (i = fnLen - 1; i >= 0; i--) {
 		if (biosFn[i] == '.') {
 			ext = (char*)malloc(fnLen - i + 1); // +1 for null terminator
-			if (ext == NULL) {
+			if (ext == nullptr) {
 				result = 1;
 				goto Cleanup;
 			}
@@ -460,7 +470,7 @@ int splitBios() {
 		}
 	}
 
-	if (ext == NULL) {
+	if (ext == nullptr) {
 		printf("Error: Invalid bios file name. no file extension.\n");
 		result = 1;
 		goto Cleanup;
@@ -468,7 +478,7 @@ int splitBios() {
 
 	bankFnLen = strlen(biosFn) + strlen(suffix) + strlen(ext) + 3U; // +3 for the bank number
 	bankFn = (char*)malloc(bankFnLen);
-	if (bankFn == NULL) {
+	if (bankFn == nullptr) {
 		result = 1;
 		goto Cleanup;
 	}
@@ -479,7 +489,7 @@ int splitBios() {
 	loopCount = 0;
 	while (dataLeft > 0) {
 		// safe guard
-		if (loopCount > 4) { 
+		if (loopCount > 4) {
 			printf("Error: LoopCount exceeded 5\n");
 			result = 1;
 			break;
@@ -488,7 +498,7 @@ int splitBios() {
 
 		// set bank filename = [name][suffix][number].[ext] = bios_bank1.bin
 		bankFn[0] = '\0';
-		sprintf(bankFn, "%s%s%d%s", biosFn, suffix, bank + 1, ext);
+		snprintf(bankFn, bankFnLen, "%s%s%d%s", biosFn, suffix, bank + 1, ext);
 
 		// write bank to file
 		printf("Writing bank %d to %s\n", bank + 1, bankFn);
@@ -504,16 +514,16 @@ int splitBios() {
 	printf("BIOS split into %d banks\n", bank);
 
 Cleanup:
-	if (data != NULL) {
+	if (data != nullptr) {
 		free(data);
 	}
-	if (biosFn != NULL) {
+	if (biosFn != nullptr) {
 		free(biosFn);
 	}
-	if (bankFn != NULL) {
+	if (bankFn != nullptr) {
 		free(bankFn);
 	}
-	if (ext != NULL) {
+	if (ext != nullptr) {
 		free(ext);
 	}
 
@@ -527,27 +537,27 @@ int combineBios() {
 	int result = 0;
 	int numBanks = 0;
 
-	uint8_t* data = NULL;
+	uint8_t* data = nullptr;
 
-	uint8_t* banks[MAX_BANKS] = { NULL };
+	uint8_t* banks[MAX_BANKS] = { nullptr };
 	uint32_t bankSizes[MAX_BANKS] = { 0 };
 
 	printf("Combine BIOS\n\n");
 
 	const char* filename = params.out_file;
-	if (filename == NULL) {
+	if (filename == nullptr) {
 		filename = "bios.bin";
 	}
 
 	for (i = 0; i < MAX_BANKS; i++) {
 
-		if (params.bank_files[i] == NULL)
+		if (params.bank_files[i] == nullptr)
 			continue;
 
 		numBanks++;
-		
+
 		banks[i] = readFile(params.bank_files[i], &bankSizes[i], 0);
-		if (banks[i] == NULL) {
+		if (banks[i] == nullptr) {
 			result = 1;
 			goto Cleanup;
 		}
@@ -557,7 +567,7 @@ int combineBios() {
 			result = 1;
 			goto Cleanup;
 		}
-		
+
 		totalSize += bankSizes[i];
 	}
 
@@ -574,13 +584,13 @@ int combineBios() {
 	}
 
 	data = (uint8_t*)malloc(totalSize);
-	if (data == NULL) {
+	if (data == nullptr) {
 		result = 1;
 		goto Cleanup;
 	}
 
 	for (i = 0; i < MAX_BANKS; i++) {
-		if (banks[i] != NULL) {
+		if (banks[i] != nullptr) {
 			printf("Copying %s %d kb into offset 0x%x (bank %d)\n", params.bank_files[i], bankSizes[i] / 1024, offset, i + 1);
 			memcpy(data + offset, banks[i], bankSizes[i]);
 			offset += bankSizes[i];
@@ -588,17 +598,17 @@ int combineBios() {
 	}
 
 	result = writeFileF(filename, "bios", data, totalSize);
-	
+
 Cleanup:
 
-	if (data != NULL) {
+	if (data != nullptr) {
 		free(data);
 	}
 
 	for (i = 0; i < MAX_BANKS; i++) {
-		if (banks[i] != NULL) {
+		if (banks[i] != nullptr) {
 			free(banks[i]);
-			banks[i] = NULL;
+			banks[i] = nullptr;
 		}
 	}
 
@@ -623,7 +633,7 @@ int listBios() {
 
 	uint32_t size = 0;
 	uint8_t* buffer = readFile(params.in_file, &size, 0);
-	if (buffer == NULL) {
+	if (buffer == nullptr) {
 		return 1;
 	}
 
@@ -632,10 +642,10 @@ int listBios() {
 		return 1;
 	}
 
-	if (params.mcpx_file != NULL) printf("mcpx file: %s\n", params.mcpx_file);
+	if (params.mcpx_file != nullptr) printf("mcpx file: %s\n", params.mcpx_file);
 	printf("bios file: %s\nbios size: %d kb\nrom size:  %d kb\n\n", params.in_file, size / 1024, params.romsize / 1024);
 
-	biosStatus = bios.load(buffer, size, &bios_params);	
+	biosStatus = bios.load(buffer, size, &bios_params);
 	if (biosStatus > BIOS_LOAD_STATUS_INVALID_BLDR) {
 		printf("Error: Failed to load BIOS\n");
 		return 1;
@@ -674,7 +684,7 @@ int listBios() {
 		bios.decompressKrnl();
 
 		printf("Kernel:\n");
-		if (bios.kernel.img != NULL) {
+		if (bios.kernel.img != nullptr) {
 			printf("Image size: %d bytes\n", bios.kernel.img_size);
 			dump_nt_headers(bios.kernel.img, bios.kernel.img_size, false);
 			print_krnl_data_section_header((IMAGE_DOS_HEADER*)bios.kernel.img);
@@ -695,25 +705,25 @@ int listBios() {
 		uprintc(valid, "%d", bios.available_space);
 		printf(" bytes\n");
 	}
-	
+
 	return result;
 }
 int replicateBios() {
 	uint32_t size;
-	uint8_t* bios = NULL;
-	uint8_t* bank = NULL;
+	uint8_t* bios = nullptr;
+	uint8_t* bank = nullptr;
 	int result = 0;
 	uint32_t binsize;
 
 	const char* filename = params.out_file;
-	if (filename == NULL) {
+	if (filename == nullptr) {
 		filename = "bios.bin";
 	}
 
 	printf("Replicate BIOS\n\n");
 
 	bank = readFile(params.in_file, &size, 0);
-	if (bank == NULL) {
+	if (bank == nullptr) {
 		result = 1;
 		goto Cleanup;
 	}
@@ -741,7 +751,7 @@ int replicateBios() {
 	}
 
 	bios = (uint8_t*)malloc(binsize);
-	if (bios == NULL) {
+	if (bios == nullptr) {
 		result = 1;
 		goto Cleanup;
 	}
@@ -754,25 +764,25 @@ int replicateBios() {
 	}
 
 	result = writeFileF(filename, "bios", bios, binsize);
-	
+
 Cleanup:
 
-	if (bank != NULL) {
+	if (bank != nullptr) {
 		free(bank);
-		bank = NULL;
+		bank = nullptr;
 	}
 
-	if (bios != NULL) {
+	if (bios != nullptr) {
 		free(bios);
-		bios = NULL;
+		bios = nullptr;
 	}
-	
+
 	return result;
 }
 int decodeXcodes() {
 	XcodeDecoder decoder;
 	DECODE_CONTEXT* context;
-	uint8_t* init_tbl = NULL;
+	uint8_t* init_tbl = nullptr;
 	uint32_t size = 0;
 	uint32_t base = 0;
 	int result = 0;
@@ -780,11 +790,11 @@ int decodeXcodes() {
 	printf("Decode Xcodes\n\n");
 
 	init_tbl = load_init_tbl_file(&size, &base);
-	if (init_tbl == NULL) {
+	if (init_tbl == nullptr) {
 		return 1;
 	}
-	
-	if (params.settings_file != NULL) {
+
+	if (params.settings_file != nullptr) {
 		if (!fileExists(params.settings_file)) {
 			printf("Error: Settings file not found.\n");
 			result = 1;
@@ -804,11 +814,11 @@ int decodeXcodes() {
 
 	printf("init tbl file: %s\nxcode count: %d\nxcode size: %d bytes\nxcode base: 0x%x\n\n",
 		params.in_file, context->xcodeCount, context->xcodeSize, context->xcodeBase);
-	
+
 	// setup the file stream, if -d flag is set
 	if (isFlagSet(SW_DMP)) {
 		const char* filename = params.out_file;
-		if (filename == NULL) {
+		if (filename == nullptr) {
 			filename = "xcodes.txt";
 		}
 
@@ -817,17 +827,17 @@ int decodeXcodes() {
 
 		printf("Writing xcodes to %s\n", filename);
 		FILE* stream = fopen(filename, "w");
-		if (stream == NULL) {
+		if (stream == nullptr) {
 			printf("Error: Failed to open file %s\n", filename);
 			result = 1;
 			goto Cleanup;
 		}
 		context->stream = stream;
 	}
-	else { 
+	else {
 		context->stream = stdout;
 	}
-	
+
 	result = decoder.decodeXcodes();
 
 	if (isFlagSet(SW_DMP)) {
@@ -837,23 +847,23 @@ int decodeXcodes() {
 
 Cleanup:
 
-	if (init_tbl != NULL) {
+	if (init_tbl != nullptr) {
 		free(init_tbl);
-		init_tbl = NULL;
+		init_tbl = nullptr;
 	}
 
 	return result;
 }
 int simulateXcodes() {
 	XcodeInterp interp;
-	XCODE* xcode = NULL;
+	XCODE* xcode = nullptr;
 	uint32_t size = 0;
 	uint32_t base = 0;
 	int result = 0;
 	bool hasMemChanges_total = false;
-	const char* opcode_str = NULL;
-	uint8_t* mem_sim = NULL;
-	uint8_t* init_tbl = NULL;
+	const char* opcode_str = nullptr;
+	uint8_t* mem_sim = nullptr;
+	uint8_t* init_tbl = nullptr;
 	uint32_t code_size = 0;
 	uint32_t mem_size = 0;
 	uint32_t offset = 0;
@@ -861,7 +871,7 @@ int simulateXcodes() {
 	printf("Simulate Xcodes\n\n");
 
 	init_tbl = load_init_tbl_file(&size, &base);
-	if (init_tbl == NULL)
+	if (init_tbl == nullptr)
 		return 1;
 
 	result = interp.load(init_tbl + base, size - base);
@@ -885,7 +895,7 @@ int simulateXcodes() {
 	printf("init tbl file: %s\nxcode base: 0x%x\nxcode offset: 0x%x\nmem space: %d bytes\n\n", params.in_file, base, offset, mem_size);
 
 	mem_sim = (uint8_t*)malloc(mem_size);
-	if (mem_sim == NULL) {
+	if (mem_sim == nullptr) {
 		result = 1;
 		goto Cleanup;
 	}
@@ -915,9 +925,9 @@ int simulateXcodes() {
 		}
 
 		// print the xcode
-		printf("\t%04x: %s 0x%02x, 0x%08X\n", (base + interp.offset - sizeof(XCODE)), opcode_str, xcode->addr, xcode->data);
+		printf("\t%04lx: %s 0x%02x, 0x%08X\n", (unsigned long)(base + interp.offset - sizeof(XCODE)), opcode_str, xcode->addr, xcode->data);
 	}
-	
+
 	if (!hasMemChanges_total) {
 		printf("0 memory changes in range 0x0 - 0x%x\n", mem_size);
 		goto Cleanup;
@@ -926,7 +936,7 @@ int simulateXcodes() {
 	// if -d flag is set, dump the memory to a file, otherwise print the memory dump
 	if (isFlagSet(SW_DMP)) {
 		const char* filename = params.out_file;
-		if (filename == NULL)
+		if (filename == nullptr)
 			filename = "mem_sim.bin";
 
 		printf("\n");
@@ -952,14 +962,14 @@ int simulateXcodes() {
 
 Cleanup:
 
-	if (init_tbl != NULL) {
+	if (init_tbl != nullptr) {
 		free(init_tbl);
-		init_tbl = NULL;
+		init_tbl = nullptr;
 	}
 
-	if (mem_sim != NULL) {
+	if (mem_sim != nullptr) {
 		free(mem_sim);
-		mem_sim = NULL;
+		mem_sim = nullptr;
 	}
 
 	return result;
@@ -967,18 +977,18 @@ Cleanup:
 int encodeX86() {
 	// encode x86 instructions to xcodes
 
-	uint8_t* data = NULL;
-	uint8_t* buffer = NULL;
+	uint8_t* data = nullptr;
+	uint8_t* buffer = nullptr;
 	uint32_t dataSize = 0;
 	uint32_t xcodeSize = 0;
 	int result = 0;
 
-	const char* filename = NULL;
+	const char* filename = nullptr;
 
 	printf("Encode X86\n\n");
 
 	data = readFile(params.in_file, &dataSize, 0);
-	if (data == NULL) {
+	if (data == nullptr) {
 		return 1;
 	}
 
@@ -990,11 +1000,11 @@ int encodeX86() {
 		goto Cleanup;
 	}
 
-	printf("xcodes: %d\n", xcodeSize / sizeof(XCODE));
-		
+	printf("xcodes: %ld\n", xcodeSize / sizeof(XCODE));
+
 	// write the xcodes to file
 	filename = params.out_file;
-	if (filename == NULL) {
+	if (filename == nullptr) {
 		filename = "xcodes.bin";
 	}
 
@@ -1002,11 +1012,11 @@ int encodeX86() {
 
 Cleanup:
 
-	if (data != NULL) {
+	if (data != nullptr) {
 		free(data);
 	}
 
-	if (buffer != NULL) {
+	if (buffer != nullptr) {
 		free(buffer);
 	}
 
@@ -1015,8 +1025,8 @@ Cleanup:
 int compressFile() {
 	// lzx compress file
 
-	uint8_t* data = NULL;
-	uint8_t* buff = NULL;
+	uint8_t* data = nullptr;
+	uint8_t* buff = nullptr;
 	uint32_t dataSize = 0;
 	uint32_t compressedSize = 0;
 	int result = 0;
@@ -1025,7 +1035,7 @@ int compressFile() {
 	printf("Compress File\n\n");
 
 	data = readFile(params.in_file, &dataSize, 0);
-	if (data == NULL) {
+	if (data == nullptr) {
 		return 1;
 	}
 
@@ -1046,14 +1056,14 @@ int compressFile() {
 
 Cleanup:
 
-	if (data != NULL) {
+	if (data != nullptr) {
 		free(data);
-		data = NULL;
+		data = nullptr;
 	}
 
-	if (buff != NULL) {
+	if (buff != nullptr) {
 		free(buff);
-		buff = NULL;
+		buff = nullptr;
 	}
 
 	return result;
@@ -1062,11 +1072,11 @@ Cleanup:
 int decompressFile() {
 	// lzx decompress file
 
-	uint8_t* data = NULL;
+	uint8_t* data = nullptr;
 	uint32_t dataSize = 0;
 	float savings = 0;
 
-	uint8_t* buff = NULL;
+	uint8_t* buff = nullptr;
 	uint32_t decompressedSize = 0;
 
 	int result = 0;
@@ -1074,48 +1084,48 @@ int decompressFile() {
 	printf("Decompress File\n\n");
 
 	data = readFile(params.in_file, &dataSize, 0);
-	if (data == NULL) {
+	if (data == nullptr) {
 		return 1;
 	}
 
 	printf("file: %s\n\n", params.in_file);
 
 	printf("Decompressing file\n");
-	result = lzx_decompress(data, dataSize, &buff, NULL, &decompressedSize);
+	result = lzx_decompress(data, dataSize, &buff, nullptr, &decompressedSize);
 	if (result != 0) {
 		printf("Error: Decompression failed, ");
 		lzx_print_error(result);
 		goto Cleanup;
 	}
 
-	savings = (1 - ((float)dataSize / (float)decompressedSize)) * 100;	
+	savings = (1 - ((float)dataSize / (float)decompressedSize)) * 100;
 	printf("Decompressed %u -> %u bytes (%.3f%% compression)\n", dataSize, decompressedSize, savings);
 
 	result = writeFileF(params.out_file, "decompressed file", buff, decompressedSize);
 
 Cleanup:
 
-	if (data != NULL) {
+	if (data != nullptr) {
 		free(data);
-		data = NULL;
+		data = nullptr;
 	}
 
-	if (buff != NULL) {
+	if (buff != nullptr) {
 		free(buff);
-		buff = NULL;
+		buff = nullptr;
 	}
 
 	return result;
 }
 int dumpCoffPeImg() {
 	int result = 0;
-	uint8_t* data = NULL;
-	uint32_t size = NULL;
+	uint8_t* data = nullptr;
+	uint32_t size = 0;
 
 	printf("List NT Header\n\n");
 
 	data = readFile(params.in_file, &size, 0);
-	if (data == NULL)
+	if (data == nullptr)
 		return 1;
 
 	printf("file: %s\nimage size: %d bytes\n\n", params.in_file, size);
@@ -1123,7 +1133,7 @@ int dumpCoffPeImg() {
 	result = dump_nt_headers(data, size, false);
 
 	free(data);
-	data = NULL;
+	data = nullptr;
 
 	return result;
 }
@@ -1148,7 +1158,7 @@ int info() {
 	return 0;
 }
 int help() {
-	
+
 	if (isFlagSet(SW_HELP_ENCRYPTION)) {
 		helpEncryption();
 		return 0;
@@ -1263,7 +1273,7 @@ int help() {
 				printf("# %s\n\n %s (req) *inferred\n %s (req) %s\n %s\n\n",
 					HELP_STR_REPLICATE, HELP_STR_PARAM_IN_BIOS_FILE, HELP_STR_PARAM_BINSIZE, HELP_STR_VALID_ROM_SIZES, HELP_STR_PARAM_OUT_FILE);
 				return 0;
-							
+
 			case CMD_HELP:
 				break;
 
@@ -1274,12 +1284,12 @@ int help() {
 
 	printf("Help\n\nSee command help, use xbios -? <command>\n");
 	printf("See encryption help, use xbios -? -help-enc\n");
-	
+
 	printf("\nCommands:\n");
 	for (int i = CMD_INFO + 1; i < sizeof(cmd_tbl) / sizeof(CMD_TBL); ++i) {
 		printf(" %s\n", cmd_tbl[i].sw);
 	}
-	
+
 	printf("\n%s\n", HELP_USAGE_STR);
 
 	return 0;
@@ -1288,7 +1298,7 @@ int helpEncryption() {
 	printf("Help\n\n2BL encryption / decryption:\n" \
 		"Use one of the switches below to specify a key for 2BL encryption / decryption.\n"\
 		"Not providing a switch results in 2BL not being encrypted / decrypted\n\n");
-	
+
 	// mcpx rom
 	printf(" %s\n", HELP_STR_MCPX_ROM);
 
@@ -1296,7 +1306,7 @@ int helpEncryption() {
 	printf("\n -key-bldr");
 	printf(HELP_STR_RC4_KEY, "2BL");
 
-	// kernel 
+	// kernel
 	printf("\n\nKernel encryption / decryption:\nOnly needed for custom BIOSes as keys are located in the 2BL.\n\n");
 	printf(" -key-krnl");
 	printf(HELP_STR_RC4_KEY, "kernel");
@@ -1332,13 +1342,13 @@ void init_parameters(XbToolParameters* _params) {
 	memset(_params, 0, sizeof(XbToolParameters));
 }
 void free_parameters(XbToolParameters* _params) {
-	if (_params->bldr_key != NULL) {
+	if (_params->bldr_key != nullptr) {
 		free(_params->bldr_key);
-		_params->bldr_key = NULL;
+		_params->bldr_key = nullptr;
 	}
-	if (_params->kernel_key != NULL) {
+	if (_params->kernel_key != nullptr) {
 		free(_params->kernel_key);
-		_params->kernel_key = NULL;
+		_params->kernel_key = nullptr;
 	}
 	mcpx_free(&_params->mcpx);
 }
@@ -1352,7 +1362,7 @@ int inject_xcodes(uint8_t* data, uint32_t size, uint8_t* xcodes, uint32_t xcodes
 	}
 
 	INIT_TBL* init_tbl = (INIT_TBL*)data;
-	XCODE* xcode = NULL;
+	XCODE* xcode = nullptr;
 
 	while (interp.interpretNext(xcode) == 0) {
 		if (xcode->opcode == XC_EXIT)
@@ -1396,7 +1406,7 @@ int inject_xcodes(uint8_t* data, uint32_t size, uint8_t* xcodes, uint32_t xcodes
 	xcode = (XCODE*)(data + 0x80 + interp.offset - sizeof(XCODE));
 
 	if (jmp) {
-		printf("XCODE: replacing quit xcode at 0x%x with jump to free space at 0x%x\n", (uint8_t*)xcode - data, 0x80 + interp.offset + offset);
+		printf("XCODE: replacing quit xcode at 0x%lx with jump to free space at 0x%x\n", (unsigned long)((uint8_t*)xcode - data), 0x80 + interp.offset + offset);
 
 		// patch quit xcode to a jmp xcode.
 		xcode->opcode = XC_JMP;
@@ -1426,25 +1436,25 @@ int inject_xcodes(uint8_t* data, uint32_t size, uint8_t* xcodes, uint32_t xcodes
 int read_keys() {
 	// read key files from command line.
 
-	if (params.bldr_key_file != NULL) {
+	if (params.bldr_key_file != nullptr) {
 		printf("bldr key file: %s\n", params.bldr_key_file);
-		params.bldr_key = readFile(params.bldr_key_file, NULL, XB_KEY_SIZE);
-		if (params.bldr_key == NULL)
+		params.bldr_key = readFile(params.bldr_key_file, nullptr, XB_KEY_SIZE);
+		if (params.bldr_key == nullptr)
 			return 1;
 		printf("bldr key: ");
 		uprinth(params.bldr_key, XB_KEY_SIZE);
 	}
 
-	if (params.kernel_key_file != NULL) {
+	if (params.kernel_key_file != nullptr) {
 		printf("krnl key file: %s\n", params.kernel_key_file);
-		params.kernel_key = readFile(params.kernel_key_file, NULL, XB_KEY_SIZE);
-		if (params.kernel_key == NULL)
+		params.kernel_key = readFile(params.kernel_key_file, nullptr, XB_KEY_SIZE);
+		if (params.kernel_key == nullptr)
 			return 1;
 		printf("krnl key: ");
 		uprinth(params.kernel_key, XB_KEY_SIZE);
 	}
 
-	if (params.bldr_key != NULL || params.kernel_key != NULL) 
+	if (params.bldr_key != nullptr || params.kernel_key != nullptr)
 		printf("\n");
 
 	return 0;
@@ -1452,14 +1462,14 @@ int read_keys() {
 int read_mcpx() {
 	// read and verify mcpx rom file.
 
-	uint8_t* mcpxData = NULL;
+	uint8_t* mcpxData = nullptr;
 	int result = 0;
 
-	if (params.mcpx_file == NULL)
+	if (params.mcpx_file == nullptr)
 		return 0;
 
-	mcpxData = readFile(params.mcpx_file, NULL, MCPX_BLOCK_SIZE);
-	if (mcpxData == NULL)
+	mcpxData = readFile(params.mcpx_file, nullptr, MCPX_BLOCK_SIZE);
+	if (mcpxData == nullptr)
 		return 1;
 
 	result = mcpx_load(&params.mcpx, mcpxData);
@@ -1476,12 +1486,12 @@ int read_mcpx() {
 }
 
 uint8_t* load_init_tbl_file(uint32_t* size, uint32_t* base) {
-	uint8_t* init_tbl = NULL;
+	uint8_t* init_tbl = nullptr;
 	int result = 0;
 
 	init_tbl = readFile(params.in_file, size, 0);
-	if (init_tbl == NULL)
-		return NULL;
+	if (init_tbl == nullptr)
+		return nullptr;
 
 	if (isFlagSet(SW_BASE)) {
 		*base = params.base;
@@ -1510,11 +1520,11 @@ uint8_t* load_init_tbl_file(uint32_t* size, uint32_t* base) {
 Cleanup:
 
 	if (result != 0) {
-		if (init_tbl != NULL) {
+		if (init_tbl != nullptr) {
 			free(init_tbl);
-			init_tbl = NULL;
+			init_tbl = nullptr;
 		}
-		return NULL;
+		return nullptr;
 	}
 
 	return init_tbl;
@@ -1547,12 +1557,12 @@ void lzx_print_error(int error) {
 
 void printBldrInfo(Bios* bios) {
 	BIOS_LOAD_PARAMS bios_params = bios->params;
-	
+
 	printf("2BL:\n");
 
 	if (bios->bios_status == BIOS_LOAD_STATUS_SUCCESS) {
 		printf("Entry point:\t\t0x%08x\n", bios->bldr.ldr_params->bldr_entry_point);
-		if (bios->bldr.entry != NULL && bios->bldr.entry->bfm_entry_point != 0) {
+		if (bios->bldr.entry != nullptr && bios->bldr.entry->bfm_entry_point != 0) {
 			printf("BFM Entry point:\t0x%08x\n", bios->bldr.entry->bfm_entry_point);
 		}
 	}
@@ -1647,6 +1657,7 @@ void printInitTblInfo(Bios* bios) {
 	printf("\nRevision:\t\trev %d.%02d\n", init_tbl->revision >> 8, init_tbl->revision & 0xFF);
 	printf("\n");
 }
+
 void printNv2aInfo(Bios* bios) {
 	INIT_TBL* init_tbl = bios->init_tbl;
 	int i;
@@ -1679,13 +1690,13 @@ void printNv2aInfo(Bios* bios) {
 
 	for (i = 0; i < ARRAY_SIZE; ++i) {
 		cHasValue = false;
-		if (*(uint32_t*)&valArray[i] != 0) {
+		if (valArray[i] != 0) {
 			cHasValue = true;
 			hasValue = true;
 		}
 
 		if (cHasValue && hasValue)
-			sprintf(str + i * 3, "%02X ", *(uint32_t*)valArray[i]);
+			snprintf(str + i * 3, sizeof(str) - (i * 3), "%02lX ", (unsigned long)valArray[i]);
 	}
 	if (hasValue) {
 		if (str[0] == '\0') {
@@ -1710,7 +1721,7 @@ void printNv2aInfo(Bios* bios) {
 	printf("\n");
 }
 void printDataTblInfo(Bios* bios) {
-	
+
 	if (bios->init_tbl->data_tbl_offset == 0  || bios->size < bios->init_tbl->data_tbl_offset + sizeof(ROM_DATA_TBL)) {
 		printf("Error: Rom Data Table not found.\n");
 		return;
@@ -1772,18 +1783,18 @@ void printKeyInfo(Bios* bios) {
 
 	MCPX* mcpx = bios->params.mcpx;
 	PUBLIC_KEY* pubkey;
-	
-	if (mcpx->sbkey != NULL) {
-		printf("SB key (+%d):\t", mcpx->sbkey - mcpx->data);
+
+	if (mcpx->sbkey != nullptr) {
+		printf("SB key (+%ld):\t", mcpx->sbkey - mcpx->data);
 		uprinth(mcpx->sbkey, XB_KEY_SIZE);
 	}
 
-	if (bios->bldr.bfm_key != NULL) {
+	if (bios->bldr.bfm_key != nullptr) {
 		printf("BFM key:\t");
 		uprinth(bios->bldr.bfm_key, XB_KEY_SIZE);
 	}
 
-	if (bios->bldr.keys != NULL) {
+	if (bios->bldr.keys != nullptr) {
 		printf("EEPROM key:\t");
 		uprinth(bios->bldr.keys->eeprom_key, XB_KEY_SIZE);
 		printf("Cert key:\t");
@@ -1797,8 +1808,8 @@ void printKeyInfo(Bios* bios) {
 		uprinth(bios->preldr.bldr_key, SHA1_DIGEST_LEN);
 	}
 
-	if (bios->kernel.img != NULL) {
-		if (rsa_findPublicKey(bios->kernel.img, bios->kernel.img_size, &pubkey, NULL) == RSA_ERROR_SUCCESS) {
+	if (bios->kernel.img != nullptr) {
+		if (rsa_findPublicKey(bios->kernel.img, bios->kernel.img_size, &pubkey, nullptr) == RSA_ERROR_SUCCESS) {
 			printf("\nPublic key:\b\b\b\b");
 			uprinthl((uint8_t*)&pubkey->modulus, RSA_MOD_SIZE(&pubkey->header), 16, "\t\t", 0);
 		}
@@ -1855,7 +1866,7 @@ int main(int argc, char** argv) {
 	printf("Xbox Bios Tools by tommojphillips\n\n");
 
 	int result = 0;
-	cmd = NULL;
+	cmd = nullptr;
 	init_parameters(&params);
 
 	result = parseCli(argc, argv, cmd, cmd_tbl, sizeof(cmd_tbl), param_tbl, sizeof(param_tbl));
@@ -1889,7 +1900,7 @@ int main(int argc, char** argv) {
 
 	if (read_mcpx() != 0)
 		goto Exit;
-	
+
 	switch (cmd->type) {
 		case CMD_INFO:
 			result = info();
@@ -1946,7 +1957,7 @@ int main(int argc, char** argv) {
 		case CMD_DUMP_PE_IMG:
 			result = dumpCoffPeImg();
 			break;
-		
+
 		default:
 			result = ERROR_FAILED;
 			break;

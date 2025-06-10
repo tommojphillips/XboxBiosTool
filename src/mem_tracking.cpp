@@ -18,15 +18,20 @@
 // Author: tommojphillips
  // GitHub: https:\\github.com\tommojphillips
 
+#if !__APPLE__
 #include <malloc.h>
-#include <stdio.h>
+#endif
+#include <cstdio>
+#include <map>
 
 //#define MEM_TRACKING_PRINT
 
-long memtrack_allocatedBytes = 0;
-int memtrack_allocations = 0;
+static long memtrack_allocatedBytes = 0;
+static int memtrack_allocations = 0;
 
-void* memtrack_malloc(size_t size)
+static std::map<void*, size_t> allocation_map;
+
+extern "C" void* memtrack_malloc(size_t size)
 {
 	void* ptr = malloc(size);
 	if (ptr == NULL) {
@@ -36,6 +41,7 @@ void* memtrack_malloc(size_t size)
 		return NULL;
 	}
 
+	allocation_map[ptr] = size;
 	memtrack_allocations++;
 	memtrack_allocatedBytes += size;
 
@@ -45,7 +51,7 @@ void* memtrack_malloc(size_t size)
 	return ptr;
 }
 
-void memtrack_free(void* ptr)
+extern "C" void memtrack_free(void* ptr)
 {
 #ifdef MEM_TRACKING_PRINT
 	if (ptr == NULL) {
@@ -54,8 +60,13 @@ void memtrack_free(void* ptr)
 	}
 #endif
 
-	size_t size = _msize(ptr);
+	auto entry = allocation_map.find(ptr);
+	if (entry == allocation_map.end()) {
+		printf("Error untracked free 0x%p.\n", ptr);
+	}
+	size_t size = entry->second;
 	free(ptr);
+	allocation_map.erase(entry);
 
 	memtrack_allocations--;
 	memtrack_allocatedBytes -= size;
@@ -73,10 +84,16 @@ void memtrack_free(void* ptr)
 #endif
 }
 
-void* memtrack_realloc(void* ptr, size_t size)
+extern "C" void* memtrack_realloc(void* ptr, size_t size)
 {
-	size_t oldSize = _msize(ptr);
+	auto entry = allocation_map.find(ptr);
+	if (entry == allocation_map.end()) {
+		printf("Error untracked free 0x%p.\n", ptr);
+	}
+	size_t oldSize = entry->second;
 	void* newPtr = realloc(ptr, size);
+	allocation_map.erase(entry);
+	allocation_map.insert(std::make_pair(newPtr, size));
 
 	if (newPtr == NULL)	{
 #ifdef MEM_TRACKING_PRINT
@@ -95,7 +112,7 @@ void* memtrack_realloc(void* ptr, size_t size)
 	return newPtr;
 }
 
-void* memtrack_calloc(size_t count, size_t size)
+extern "C" void* memtrack_calloc(size_t count, size_t size)
 {
 	if (count == 0 || size == 0)
 		return NULL;
@@ -108,6 +125,7 @@ void* memtrack_calloc(size_t count, size_t size)
 		return NULL;
 	}
 
+	allocation_map[ptr] = size;
 	memtrack_allocations++;
 	memtrack_allocatedBytes += size;
 
@@ -118,7 +136,7 @@ void* memtrack_calloc(size_t count, size_t size)
 	return ptr;
 }
 
-int memtrack_report()
+extern "C" int memtrack_report()
 {
 	if (memtrack_allocatedBytes != 0 || memtrack_allocations != 0) {
 		printf("\nLEAK DETECTED: %ld bytes in %d allocations\n", memtrack_allocatedBytes, memtrack_allocations);

@@ -1,11 +1,14 @@
 // lzx_encoder.c: lzx compression algorithm
 
 // std incl
-#include <stdint.h>
-#include <stdbool.h>
-#include <stdlib.h>
+#include <assert.h>
 #include <memory.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#if !__APPLE__
 #include <malloc.h>
+#endif
 
 // user incl
 #include "lzx.h"
@@ -64,27 +67,28 @@
 
 #define IS_MATCH(l) (context->item_type[(l) >> 3] & (1 << ((l) & 7)))
 #define CHAR_EST(c) (uint32_t)(context->main_tree_len[(c)])
-#define MATCH_EST(ml,mp,result) { \
+#define MATCH_EST(ml,mp,result) do { \
 	uint8_t mp_slot = (uint8_t)MP_SLOT(mp); \
 	if (ml < (LZX_NUM_PRIMARY_LEN+2)) \
 		result = (uint32_t)(context->main_tree_len[(NUM_CHARS-2)+(mp_slot<<NL_SHIFT)+ml] +	lzx_extra_bits[mp_slot]); \
 	else \
 		result = (uint32_t)(context->main_tree_len[(NUM_CHARS+LZX_NUM_PRIMARY_LEN) + (mp_slot<<NL_SHIFT)] + context->secondary_tree_len[ml-(LZX_NUM_PRIMARY_LEN+2)] + lzx_extra_bits[mp_slot]); \
-}
+} while (0)
 
-#define OUT_MATCH(len, pos) { \
+#define OUT_MATCH(len, pos) do { \
     context->item_type[(context->literals >> 3)] |= (1 << (context->literals & 7)); \
-    context->lit_data [context->literals++] = (uint8_t)(len-2); \
+    context->lit_data [context->literals++] = (uint8_t)(((len)-2) & 0xFF); \
     context->dist_data[context->distances++] = pos; \
-}
+} while (0)
 
-#define TREE_CREATE_CHECK()	\
-if (context->literals >= context->next_tree_create) { \
-    update_tree_estimates(context); \
-    context->next_tree_create += TREE_CREATE_INTERVAL; \
-}
+#define TREE_CREATE_CHECK() do {	\
+    if (context->literals >= context->next_tree_create) { \
+        update_tree_estimates(context); \
+        context->next_tree_create += TREE_CREATE_INTERVAL; \
+    } \
+} while (0)
 
-#define OUTPUT_BITS(N, X) { \
+#define OUTPUT_BITS(N, X) do { \
    context->bitbuf |= (((uint32_t) (X)) << (context->bitcount-(N))); \
    context->bitcount -= (N); \
    while (context->bitcount <= 16) { \
@@ -97,11 +101,13 @@ if (context->literals >= context->next_tree_create) { \
       context->bitbuf <<= 16; \
       context->bitcount += 16; \
    } \
-}
+} while (0)
 
-#define OUT_CHAR_BITS OUTPUT_BITS(context->main_tree_len[context->lit_data[l]], context->main_tree_code[context->lit_data[l]]);
+#define OUT_CHAR_BITS do { \
+    OUTPUT_BITS(context->main_tree_len[context->lit_data[l]], context->main_tree_code[context->lit_data[l]]); \
+  } while (0)
 
-static const long square_table[17] = {
+static const int32_t square_table[17] = {
     0,1,4,9,16,25,36,49,64,81,100,121,144,169,196,225,256
 };
 static const uint8_t log2_table[256] = {
@@ -204,13 +210,13 @@ static void create_slot_lookup_table(ENCODER_CONTEXT* context) {
 
         slotnum++;
         elements_to_init <<= 1;
-    } 
+    }
     while (p < 1024);
 }
 
-static void translate_e8(ENCODER_CONTEXT* context, uint8_t* mem, long bytes) {
-    long offset;
-    long absolute;
+static void translate_e8(ENCODER_CONTEXT* context, uint8_t* mem, uint32_t bytes) {
+    uint32_t offset;
+    uint32_t absolute;
     uint32_t end_instr_pos;
     uint8_t temp[6];
     uint8_t* mem_backup;
@@ -234,7 +240,7 @@ static void translate_e8(ENCODER_CONTEXT* context, uint8_t* mem, long bytes) {
         if (context->instr_pos >= end_instr_pos)
             break;
 
-        offset = *(long*)mem;
+        offset = *(uint32_t*)mem;
         absolute = context->instr_pos + offset;
 
         if (absolute >= 0) {
@@ -253,9 +259,11 @@ static void translate_e8(ENCODER_CONTEXT* context, uint8_t* mem, long bytes) {
 
     context->instr_pos = end_instr_pos + 10;
 }
+
 static void output_bits(ENCODER_CONTEXT* context, int n, uint32_t x) {
     context->bitbuf |= (x << (context->bitcount - n));
-    context->bitcount -= (char)n;
+    assert(n <= context->bitcount);
+    context->bitcount -= n;
 
     while (context->bitcount <= 16) {
         if (context->output_buffer_curpos >= context->output_buffer_end) {
@@ -271,7 +279,7 @@ static void output_bits(ENCODER_CONTEXT* context, int n, uint32_t x) {
     }
 }
 
-static long read_input_data(ENCODER_CONTEXT* context, uint8_t* mem, long amount) {
+static uint32_t read_input_data(ENCODER_CONTEXT* context, uint8_t* mem, uint32_t amount) {
     if (amount <= context->input_left) {
         memcpy(mem, context->input_ptr, amount);
         context->input_left -= amount;
@@ -281,7 +289,7 @@ static long read_input_data(ENCODER_CONTEXT* context, uint8_t* mem, long amount)
     else {
         if (context->input_left <= 0)
             return 0;
-        long bytes_read = context->input_left;
+        uint32_t bytes_read = context->input_left;
         memcpy(mem, context->input_ptr, context->input_left);
         context->input_ptr += context->input_left;
         context->input_left = 0;
@@ -418,25 +426,25 @@ static bool alloc_compress_memory(ENCODER_CONTEXT* context) {
             break;
     }
 
-    context->tree_root = (uint32_t*)malloc(sizeof(context->tree_root[0]) * NUM_SEARCH_TREES);
+    context->tree_root = (uint32_t*)calloc(1, sizeof(context->tree_root[0]) * NUM_SEARCH_TREES);
     if (context->tree_root == NULL) {
         free_compress_memory(context);
         return false;
     }
 
-    context->real_left = (uint32_t*)malloc(sizeof(uint32_t) * MEM_WINDOW_ALLOC_SIZE);
+    context->real_left = (uint32_t*)calloc(1, sizeof(uint32_t) * MEM_WINDOW_ALLOC_SIZE);
     if (context->real_left == NULL) {
         free_compress_memory(context);
         return false;
     }
 
-    context->real_right = (uint32_t*)malloc(sizeof(uint32_t) * MEM_WINDOW_ALLOC_SIZE);
+    context->real_right = (uint32_t*)calloc(1, sizeof(uint32_t) * MEM_WINDOW_ALLOC_SIZE);
     if (context->real_right == NULL) {
         free_compress_memory(context);
         return false;
     }
 
-    context->real_mem_window = (uint8_t*)malloc(MEM_WINDOW_ALLOC_SIZE);
+    context->real_mem_window = (uint8_t*)calloc(1, MEM_WINDOW_ALLOC_SIZE);
     if (context->real_mem_window == NULL) {
         free_compress_memory(context);
         return false;
@@ -444,19 +452,19 @@ static bool alloc_compress_memory(ENCODER_CONTEXT* context) {
 
     context->mem_window = context->real_mem_window;
 
-    context->lit_data = (uint8_t*)malloc(MAX_LITERAL_ITEMS * sizeof(uint8_t));
+    context->lit_data = (uint8_t*)calloc(1, MAX_LITERAL_ITEMS * sizeof(uint8_t));
     if (context->lit_data == NULL) {
         free_compress_memory(context);
         return false;
     }
 
-    context->dist_data = (uint32_t*)malloc(MAX_DIST_ITEMS * sizeof(*context->dist_data));
+    context->dist_data = (uint32_t*)calloc(1, MAX_DIST_ITEMS * sizeof(*context->dist_data));
     if (context->dist_data == NULL) {
         free_compress_memory(context);
         return false;
     }
 
-    context->item_type = (uint8_t*)malloc(MAX_LITERAL_ITEMS / 8);
+    context->item_type = (uint8_t*)calloc(1, MAX_LITERAL_ITEMS / 8);
 
     if (context->item_type == NULL) {
         free_compress_memory(context);
@@ -471,13 +479,13 @@ static bool alloc_compress_memory(ENCODER_CONTEXT* context) {
         return false;
     }
 
-    context->decision_node = (DECISION_NODE*)malloc(sizeof(DECISION_NODE) * (LOOK + LZX_MAX_MATCH + 16));
+    context->decision_node = (DECISION_NODE*)calloc(1, sizeof(DECISION_NODE) * (LOOK + LZX_MAX_MATCH + 16));
     if (context->decision_node == NULL) {
         free_compress_memory(context);
         return false;
     }
 
-    context->input_buffer = (uint8_t*)malloc(LZX_CHUNK_SIZE);
+    context->input_buffer = (uint8_t*)calloc(1, LZX_CHUNK_SIZE);
     if (context->input_buffer == NULL) {
 		free_compress_memory(context);
 		return false;
@@ -486,11 +494,11 @@ static bool alloc_compress_memory(ENCODER_CONTEXT* context) {
     return true;
 }
 
-static long read_input(ENCODER_CONTEXT* context, uint32_t buf_pos, long size) {
+static uint32_t read_input(ENCODER_CONTEXT* context, uint32_t buf_pos, uint32_t size) {
     if (size <= 0)
         return 0;
 
-    long bytes_read = read_input_data(context, &context->real_mem_window[buf_pos], size);
+    uint32_t bytes_read = read_input_data(context, &context->real_mem_window[buf_pos], size);
     if (bytes_read < 0)
         return 0;
 
@@ -555,13 +563,13 @@ static uint32_t return_difference(ENCODER_CONTEXT* context, uint32_t item_start1
     for (i = 0; i < (uint32_t)LZX_MAIN_TREE_ELEMENTS(context->num_position_slots); i++) {
         uint32_t log2a = (uint32_t)log2(freq1[i]);
         uint32_t log2b = (uint32_t)log2(freq2[i]);
-        uint32_t diff = square_table[log2a] - square_table[log2b];
-        cum_diff += abs((long)diff);
+        int32_t diff = square_table[log2a] - square_table[log2b];
+        cum_diff += abs(diff);
     }
 
     return cum_diff;
 }
-static bool split_block(ENCODER_CONTEXT* context, uint32_t start, uint32_t end, uint32_t distance_to_end_at, uint32_t* split_at_literal, uint32_t* split_at_distance) {
+static bool split_block(ENCODER_CONTEXT* context, uint32_t start, uint32_t end, int32_t distance_to_end_at, uint32_t* split_at_literal, int32_t* split_at_distance) {
     uint32_t i, j;
     uint32_t d = 0;
     int nd = 0;
@@ -614,7 +622,7 @@ static bool split_block(ENCODER_CONTEXT* context, uint32_t start, uint32_t end, 
     return false;
 }
 
-static void count_len(ENCODER_CONTEXT* context, short i) {
+static void count_len(ENCODER_CONTEXT* context, uint16_t i) {
     if (i < context->tree_n) {
         context->tree_len_cnt[(context->depth < 16) ? context->depth : 16]++;
     }
@@ -625,8 +633,8 @@ static void count_len(ENCODER_CONTEXT* context, short i) {
         context->depth--;
     }
 }
-static void make_len(ENCODER_CONTEXT* context, short root) {
-    short k;
+static void make_len(ENCODER_CONTEXT* context, uint16_t root) {
+    int16_t k;
     uint16_t cum;
     uint8_t i;
 
@@ -662,9 +670,9 @@ static void make_len(ENCODER_CONTEXT* context, short root) {
     }
 }
 
-static void down_heap(ENCODER_CONTEXT* context, short i) {
-    short k = context->tree_heap[i];
-    short j;
+static void down_heap(ENCODER_CONTEXT* context, uint32_t i) {
+  uint32_t k = context->tree_heap[i];
+    uint32_t j;
     while ((j = (i << 1)) <= context->tree_heapsize) {
         if (j < context->tree_heapsize && context->tree_freq[context->tree_heap[j]] > context->tree_freq[context->tree_heap[j + 1]])
             j++;
@@ -676,9 +684,10 @@ static void down_heap(ENCODER_CONTEXT* context, short i) {
         i = j;
     }
 
-    context->tree_heap[i] = k;
+    context->tree_heap[i] = (short)(k & 0xFFFF);
 }
-static void make_code(ENCODER_CONTEXT* context, int n, char len[], uint16_t code[]) {
+
+static void make_code(ENCODER_CONTEXT* context, int n, const uint8_t len[], uint16_t code[]) {
     int i;
     uint16_t start[18] = { 0 };
     for (i = 1; i <= 16; i++)
@@ -688,8 +697,9 @@ static void make_code(ENCODER_CONTEXT* context, int n, char len[], uint16_t code
         code[i] = start[len[i]]++;
     }
 }
-static void make_tree2(ENCODER_CONTEXT* context, short avail, uint16_t freqparm[], uint16_t codeparm[]) {
-    short i, j, k;
+
+static void make_tree2(ENCODER_CONTEXT* context, uint32_t avail, uint16_t freqparm[], uint16_t codeparm[]) {
+    uint32_t i, j, k;
     for (i = context->tree_heapsize >> 1; i >= 1; i--)
         down_heap(context, i);
 
@@ -719,10 +729,10 @@ static void make_tree2(ENCODER_CONTEXT* context, short avail, uint16_t freqparm[
     } while (context->tree_heapsize > 1);
 
     context->tree_sortptr = codeparm;
-    make_len(context, k);
+    make_len(context, (short)(k & 0xFFFF));
 }
 static void make_tree(ENCODER_CONTEXT* context, int nparm, uint16_t* freqparm, uint8_t* lenparm, uint16_t* codeparm, bool make_codes) {
-    short i, avail;
+    uint32_t i, avail;
 RedoTree:
     context->tree_n = nparm;
     context->tree_freq = freqparm;
@@ -735,7 +745,7 @@ RedoTree:
     for (i = 0; i < nparm; i++) {
         context->len[i] = 0;
         if (freqparm[i])
-            context->tree_heap[++context->tree_heapsize] = i;
+            context->tree_heap[++context->tree_heapsize] = (short)(i & 0xFFFF);
     }
 
     if (context->tree_heapsize < 2) {
@@ -755,7 +765,7 @@ RedoTree:
     make_tree2(context, avail, freqparm, codeparm);
 
     if (make_codes)
-        make_code(context, nparm, (char*)lenparm, codeparm);
+        make_code(context, nparm, lenparm, codeparm);
 }
 static void create_trees(ENCODER_CONTEXT* context, bool generate_codes) {
     make_tree(context, NUM_CHARS + (context->num_position_slots * (LZX_NUM_PRIMARY_LEN + 1)), context->main_tree_freq, context->main_tree_len, context->main_tree_code, generate_codes);
@@ -810,11 +820,13 @@ static void fix_tree_cost_estimates(ENCODER_CONTEXT* context) {
 
     prevent_far_matches(context);
 }
+
 static uint32_t get_block_stats(ENCODER_CONTEXT* context, uint32_t start, uint32_t start_at, uint32_t end) {
     memset(context->main_tree_freq, 0, LZX_MAIN_TREE_ELEMENTS(context->num_position_slots) * sizeof(context->main_tree_freq[0]));
     memset(context->secondary_tree_freq, 0, LZX_NUM_SECONDARY_LEN * sizeof(context->secondary_tree_freq[0]));
     return tally_frequency(context, start, start_at, end);
 }
+
 static void update_tree_estimates(ENCODER_CONTEXT* context) {
     if (context->literals) {
         if (context->need_to_recalc_stats) {
@@ -848,6 +860,7 @@ static void tally_aligned_bits(ENCODER_CONTEXT* context, uint32_t end_at) {
             context->aligned_tree_freq[match_pos & 7]++;
     }
 }
+
 static int get_aligned_stats(ENCODER_CONTEXT* context, uint32_t end_at) {
     uint8_t i;
     uint32_t total_L3 = 0;
@@ -870,7 +883,7 @@ static int get_aligned_stats(ENCODER_CONTEXT* context, uint32_t end_at) {
 static uint32_t estimate_compressed_block_size(ENCODER_CONTEXT* context) {
     uint32_t block_size = 0;
     uint32_t i;
-    uint8_t mpslot;
+    uint32_t mpslot;
 
     block_size = 150 * 8;
     for (i = 0; i < NUM_CHARS; i++) {
@@ -878,7 +891,7 @@ static uint32_t estimate_compressed_block_size(ENCODER_CONTEXT* context) {
     }
 
     for (mpslot = 0; mpslot < context->num_position_slots; mpslot++) {
-        long element = NUM_CHARS + (mpslot << NL_SHIFT);
+        uint32_t element = NUM_CHARS + (mpslot << NL_SHIFT);
         for (int primary = 0; primary <= LZX_NUM_PRIMARY_LEN; primary++) {
             block_size += ((context->main_tree_len[element] + lzx_extra_bits[mpslot]) * context->main_tree_freq[element]);
             element++;
@@ -892,15 +905,15 @@ static uint32_t estimate_compressed_block_size(ENCODER_CONTEXT* context) {
     return (block_size + 7) >> 3;
 }
 
-static void write_rep_tree(ENCODER_CONTEXT* context, uint8_t* pLen, uint8_t* pLastLen, int Num) {
+static void write_rep_tree(ENCODER_CONTEXT* context, uint8_t* pLen, uint8_t* pLastLen, uint32_t Num) {
     int i;
     int	j;
     int	same;
     uint16_t small_freq[2 * 24] = {0};
     uint16_t mini_code[24] = {0};
-    char mini_len[24] = {0};
+    uint8_t mini_len[24] = {0};
 
-    char k;
+    uint8_t k;
     uint8_t temp_store;
 
     temp_store = pLen[Num];
@@ -965,7 +978,7 @@ static void write_rep_tree(ENCODER_CONTEXT* context, uint8_t* pLen, uint8_t* pLa
             }
         }
         else {
-            k = (pLastLen[i] - pLen[i] + 17) % 17;
+            k = (uint8_t)((pLastLen[i] - pLen[i] + 17) % 17);
         }
 
         output_bits(context, mini_len[k], mini_code[k]);
@@ -980,7 +993,7 @@ static void write_rep_tree(ENCODER_CONTEXT* context, uint8_t* pLen, uint8_t* pLa
         }
         else if (k == 19) {
             output_bits(context, TREE_ENC_REP_SAME_EXTRA_BITS, same - TREE_ENC_REP_MIN);
-            k = (pLastLen[i] - pLen[i] + 17) % 17;            
+            k = (uint8_t)((pLastLen[i] - pLen[i] + 17) % 17);
             output_bits(context, mini_len[k], mini_code[k]);
             i += same - 1;
         }
@@ -1093,10 +1106,10 @@ static void encode_uncompressed_block(ENCODER_CONTEXT* context, uint32_t bufpos,
     bool block_size_odd;
     uint32_t val;
 
-    output_bits(context, context->bitcount - 16, 0);
+    output_bits(context, (context->bitcount - 16) & 0xFF, 0);
     for (int i = 0; i < NUM_REPEATED_OFFSETS; i++) {
         val = context->repeated_offset_at_literal_zero[i];
-        for (int j = 0; j < sizeof(long); j++) {
+        for (int j = 0; j < sizeof(uint32_t); j++) {
             *context->output_buffer_curpos++ = (uint8_t)val;
             val >>= 8;
         }
@@ -1123,7 +1136,7 @@ static void encode_uncompressed_block(ENCODER_CONTEXT* context, uint32_t bufpos,
     context->bitbuf = 0;
 }
 
-static long binary_search_findmatch(ENCODER_CONTEXT* context, long buf_pos) {
+static uint32_t binary_search_findmatch(ENCODER_CONTEXT* context, uint32_t buf_pos) {
     uint32_t ptr;
     uint32_t a, b;
     uint32_t* small_ptr, * big_ptr;
@@ -1137,7 +1150,9 @@ static long binary_search_findmatch(ENCODER_CONTEXT* context, long buf_pos) {
     int i, best_repeated_offset;
     uint16_t tree_to_use;
 
-    tree_to_use = *((uint16_t*)&context->mem_window[buf_pos]);
+    memset(context->matchpos_table, 0, sizeof(uint32_t) * (LZX_MAX_MATCH + 1));
+
+    memcpy(&tree_to_use, &context->mem_window[buf_pos], sizeof(uint16_t));
     ptr = context->tree_root[tree_to_use];
     context->tree_root[tree_to_use] = buf_pos;
 
@@ -1147,7 +1162,7 @@ static long binary_search_findmatch(ENCODER_CONTEXT* context, long buf_pos) {
         context->left[buf_pos] = context->right[buf_pos] = 0;
         return 0;
     }
-  
+
     clen = 2;
     match_length = 2;
     small_len = 2;
@@ -1173,7 +1188,7 @@ static long binary_search_findmatch(ENCODER_CONTEXT* context, long buf_pos) {
                 long_match:
                     do {
                         context->matchpos_table[++match_length] = buf_pos - ptr + (NUM_REPEATED_OFFSETS - 1);
-                    } 
+                    }
                     while (match_length < same);
 
                     if (same >= BREAK_LENGTH) {
@@ -1196,7 +1211,7 @@ static long binary_search_findmatch(ENCODER_CONTEXT* context, long buf_pos) {
                 if (same > match_length) {
                     do {
                         context->matchpos_table[++match_length] = buf_pos - ptr + (NUM_REPEATED_OFFSETS - 1);
-                    } 
+                    }
                     while (match_length < same);
 
                     if (same >= BREAK_LENGTH) {
@@ -1232,7 +1247,7 @@ end_bsearch:
     if (i >= LZX_MIN_MATCH) {
         do {
             context->matchpos_table[i] = 0;
-        } 
+        }
         while (--i >= LZX_MIN_MATCH);
 
         if (best_repeated_offset > BREAK_LENGTH)
@@ -1258,7 +1273,7 @@ end_bsearch:
     if (i > best_repeated_offset) {
         do {
             context->matchpos_table[++best_repeated_offset] = 2;
-        } 
+        }
         while (best_repeated_offset < i);
     }
 
@@ -1273,11 +1288,14 @@ quick_return:
             match_length = 0;
     }
 
-    return (long)match_length;
+    return match_length;
 }
-static void binary_search_remove_node(ENCODER_CONTEXT* context, long buf_pos, uint32_t end_pos) {
-    
-    uint16_t tree_to_use = *((uint16_t*)&context->mem_window[buf_pos]);
+
+static void binary_search_remove_node(ENCODER_CONTEXT* context, uint32_t buf_pos, uint32_t end_pos) {
+
+    uint16_t tree_to_use;
+    memcpy(&tree_to_use, &context->mem_window[buf_pos], sizeof(uint16_t));
+
     if (context->tree_root[tree_to_use] != (uint32_t)buf_pos) {
         return;
     }
@@ -1325,7 +1343,7 @@ static void binary_search_remove_node(ENCODER_CONTEXT* context, long buf_pos, ui
         }
     }
 }
-static void quick_insert_bsearch_findmatch(ENCODER_CONTEXT* context, long buf_pos, long end_pos) {
+static void quick_insert_bsearch_findmatch(ENCODER_CONTEXT* context, uint32_t buf_pos, uint32_t end_pos) {
     uint32_t a, b;
     uint32_t* small_ptr;
     uint32_t* big_ptr;
@@ -1335,8 +1353,9 @@ static void quick_insert_bsearch_findmatch(ENCODER_CONTEXT* context, long buf_po
     int same;
     int clen;
 
-    uint16_t tree_to_use = *((uint16_t*)&context->mem_window[buf_pos]);
-    long ptr = context->tree_root[tree_to_use];
+    uint16_t tree_to_use;
+    memcpy(&tree_to_use, &context->mem_window[buf_pos], sizeof(uint16_t));
+    uint32_t ptr = context->tree_root[tree_to_use];
     context->tree_root[tree_to_use] = buf_pos;
 
     if (ptr <= end_pos) {
@@ -1356,7 +1375,7 @@ static void quick_insert_bsearch_findmatch(ENCODER_CONTEXT* context, long buf_po
         a = ptr + clen;
         b = buf_pos + clen;
 
-        while ((val = ((int)context->mem_window[a++]) - ((int)context->mem_window[b++])) == 0) {
+        while ((val = ((int32_t)context->mem_window[a++]) - ((int32_t)context->mem_window[b++])) == 0) {
             if (++same >= BREAK_LENGTH)
                 break;
         }
@@ -1394,16 +1413,16 @@ static void quick_insert_bsearch_findmatch(ENCODER_CONTEXT* context, long buf_po
             small_ptr = &context->right[ptr];
             ptr = *small_ptr;
         }
-    } 
+    }
     while (ptr > end_pos);
 
     *small_ptr = 0;
     *big_ptr = 0;
 }
 
-static void get_final_repeated_offset_states(ENCODER_CONTEXT* context, uint32_t distances) {
+static void get_final_repeated_offset_states(ENCODER_CONTEXT* context, int32_t distances) {
     uint8_t consecutive = 0;
-    long d = distances - 1;
+    int32_t d = distances - 1;
 
     for (; d >= 0; d--) {
         if (context->dist_data[d] > 2)
@@ -1423,7 +1442,7 @@ static void get_final_repeated_offset_states(ENCODER_CONTEXT* context, uint32_t 
     }
 
     uint32_t match_pos;
-    for (; d < (long)distances; d++) {
+    for (; d < (uint32_t)distances; d++) {
         match_pos = context->dist_data[d];
 
         if (match_pos == 0) {
@@ -1442,7 +1461,8 @@ static void get_final_repeated_offset_states(ENCODER_CONTEXT* context, uint32_t 
         }
     }
 }
-static void do_block_output(ENCODER_CONTEXT* context, long end, long distance_to_end_at) {
+
+static void do_block_output(ENCODER_CONTEXT* context, uint32_t end, int32_t distance_to_end_at) {
     uint32_t bytes_compressed = get_block_stats(context, 0, 0, end);
     int block_type = get_aligned_stats(context, distance_to_end_at);
 
@@ -1480,7 +1500,7 @@ static void do_block_output(ENCODER_CONTEXT* context, long end, long distance_to
 }
 static void output_block(ENCODER_CONTEXT* context) {
     uint32_t where_to_split;
-    uint32_t distances;
+    int32_t distances;
 
     context->first_block = 0;
 
@@ -1505,7 +1525,7 @@ static void output_block(ENCODER_CONTEXT* context) {
 
     fix_tree_cost_estimates(context);
 }
-static void block_end(ENCODER_CONTEXT* context, long buf_pos) {
+static void block_end(ENCODER_CONTEXT* context, uint32_t buf_pos) {
     context->first_block = false;
     context->need_to_recalc_stats = true;
 
@@ -1522,11 +1542,11 @@ static void block_end(ENCODER_CONTEXT* context, long buf_pos) {
 }
 
 static bool redo_first_block(ENCODER_CONTEXT* context, uint32_t* bufpos_ptr) {
-    long start_at;
-    long earliest_can_start_at;
-    long pos_in_file;
-    long history_needed;
-    long history_avail;
+    uint32_t start_at;
+    uint32_t earliest_can_start_at;
+    uint32_t pos_in_file;
+    uint32_t history_needed;
+    uint32_t history_avail;
     uint32_t split_at_literal;
     uint32_t buf_pos;
 
@@ -1541,7 +1561,7 @@ static bool redo_first_block(ENCODER_CONTEXT* context, uint32_t* bufpos_ptr) {
     else
         history_needed += context->window_size;
 
-    history_avail = (long)(&context->mem_window[buf_pos] - &context->real_mem_window[0]);
+    history_avail = (uint32_t)(&context->mem_window[buf_pos] - &context->real_mem_window[0]);
 
     if (history_needed <= history_avail) {
         earliest_can_start_at = context->bufpos_last_output_block;
@@ -1584,13 +1604,13 @@ static bool redo_first_block(ENCODER_CONTEXT* context, uint32_t* bufpos_ptr) {
 
     return true;
 }
-static void opt_encode_top(ENCODER_CONTEXT* context, long bytes_read) {
+static void opt_encode_top(ENCODER_CONTEXT* context, uint32_t bytes_read) {
     uint32_t real_buf_pos;
     uint32_t buf_pos_end_this_chunk;
     uint32_t match_pos;
     uint32_t i;
     uint32_t end_pos;
-    int enc_match_len;
+    uint32_t enc_match_len;
 
     uint32_t buf_pos = context->bufpos;
     uint32_t buf_pos_end = context->bufpos + bytes_read;
@@ -1611,7 +1631,7 @@ static void opt_encode_top(ENCODER_CONTEXT* context, long bytes_read) {
     }
     else {
         for (i = BREAK_LENGTH; i > 0; --i) {
-            quick_insert_bsearch_findmatch(context, (buf_pos - (long)i), (buf_pos - context->window_size + 4));
+            quick_insert_bsearch_findmatch(context, (buf_pos - (uint32_t)i), (buf_pos - context->window_size + 4));
         }
     }
 
@@ -1644,7 +1664,7 @@ static void opt_encode_top(ENCODER_CONTEXT* context, long bytes_read) {
             if (enc_match_len < FAST_DECISION_THRESHOLD) {
                 uint32_t span, epos, bpos, NextPrevPos;
                 DECISION_NODE* decision_node_ptr;
-                long iterations;
+                uint32_t iterations;
 
                 span = buf_pos + enc_match_len;
                 epos = buf_pos + LOOK;
@@ -1664,7 +1684,7 @@ static void opt_encode_top(ENCODER_CONTEXT* context, long bytes_read) {
                 context->decision_node[0].repeated_offset[1] = context->last_matchpos_offset[1];
                 context->decision_node[0].repeated_offset[2] = context->last_matchpos_offset[2];
 
-                decision_node_ptr = &context->decision_node[-(long)bpos];
+                decision_node_ptr = &context->decision_node[-(int32_t)bpos];
 
                 #define rpt_offset_ptr(where,which_offset) decision_node_ptr[(where)].repeated_offset[(which_offset)]
 
@@ -1744,8 +1764,8 @@ static void opt_encode_top(ENCODER_CONTEXT* context, long bytes_read) {
 
                     if (enc_match_len > 2 || (enc_match_len == 2 && context->matchpos_table[2] < BREAK_MAX_LENGTH_TWO_OFFSET)) {
                         if (span < (uint32_t)(buf_pos + enc_match_len)) {
-                            long end = min(buf_pos + enc_match_len - bpos, LOOK - 1);
-                            for (long j = span - bpos + 1; j <= end; j++)
+                            uint32_t end = min(buf_pos + enc_match_len - bpos, LOOK - 1);
+                            for (uint32_t j = span - bpos + 1; j <= end; j++)
                                 context->decision_node[j].numbits = (uint32_t)-1;
                             span = buf_pos + enc_match_len;
                         }
@@ -1781,7 +1801,7 @@ static void opt_encode_top(ENCODER_CONTEXT* context, long bytes_read) {
                     decision_node_ptr[PrevPos].path = buf_pos;
                     buf_pos = PrevPos;
                     iterations++;
-                } 
+                }
                 while (buf_pos != bpos);
 
                 while (context->literals + iterations >= (MAX_LITERAL_ITEMS - 8) || context->distances + iterations >= (MAX_DIST_ITEMS - 8)) {
@@ -1814,7 +1834,7 @@ static void opt_encode_top(ENCODER_CONTEXT* context, long bytes_read) {
                     quick_insert_bsearch_findmatch(context, buf_pos + 1, buf_pos - context->window_size + 5);
                 }
                 else {
-                    for (i = 1; i < (uint32_t)enc_match_len; i++) 
+                    for (i = 1; i < (uint32_t)enc_match_len; i++)
                         quick_insert_bsearch_findmatch(context, buf_pos + i, buf_pos + i - context->window_size + 4);
                 }
 
@@ -1879,33 +1899,33 @@ static void opt_encode_top(ENCODER_CONTEXT* context, long bytes_read) {
 }
 
 static void encode_flush(ENCODER_CONTEXT* context) {
-    long output_size = 0;
+    uint32_t output_size = 0;
     LZX_BLOCK block;
 
     if (context->input_running_total > 0) {
         // output the bit buffer
         if (context->bitcount < 32) {
-            output_bits(context, (context->bitcount - 16), 0);
+            output_bits(context, context->bitcount - 16, 0);
         }
 
-        output_size = (long)(context->output_buffer_curpos - context->output_buffer_start);
+        output_size = (uint32_t)(context->output_buffer_curpos - context->output_buffer_start);
 
-        if (output_size > 0) {   
+        if (output_size > 0) {
             block.compressed_size = (uint16_t)(context->output_buffer_curpos - context->output_buffer_start);
             block.uncompressed_size = (uint16_t)context->input_running_total;
-            
+
             context->output_buffer_size += sizeof(LZX_BLOCK) + block.compressed_size;
             context->output_buffer_block_count++;
 
             // write block header
             memcpy(context->output_buffer, &block, sizeof(LZX_BLOCK));
             context->output_buffer += sizeof(LZX_BLOCK);
-            
+
             // write compressed data
             memcpy(context->output_buffer, context->output_buffer_start, block.compressed_size);
             context->output_buffer += block.compressed_size;
 
-            //printf("block %d: %5d -> %d\n", context->output_buffer_block_count, block.uncompressedSize, block.compressedSize);
+            //printf("block %d: %5d -> %d\n", context->output_buffer_block_count, block.uncompressed_size, block.compressed_size);
         }
     }
 
@@ -1915,13 +1935,15 @@ static void encode_flush(ENCODER_CONTEXT* context) {
     context->bitcount = 32;
     context->bitbuf = 0;
 }
+
 static void encode_start(ENCODER_CONTEXT* context) {
-    long buf_pos = context->bufpos - (long)(context->real_mem_window - context->mem_window);
-    long bytes_read = read_input(context, buf_pos, LZX_CHUNK_SIZE);
+    uint32_t buf_pos = context->bufpos - (uint32_t)(context->real_mem_window - context->mem_window);
+    uint32_t bytes_read = read_input(context, buf_pos, LZX_CHUNK_SIZE);
     if (bytes_read > 0)
         opt_encode_top(context, bytes_read);
 }
-static long encode_data(ENCODER_CONTEXT* context, long input_size) {
+
+static int encode_data(ENCODER_CONTEXT* context, uint32_t input_size) {
     context->input_ptr = context->input_buffer;
     context->input_left = input_size;
     context->file_size_for_translation = DEFAULT_FILE_XLAT_SIZE;
@@ -1956,8 +1978,8 @@ void lzx_flush_compression(ENCODER_CONTEXT* context) {
     encode_flush(context);
 }
 
-ENCODER_CONTEXT* lzx_create_compression(uint8_t* dest) {    
-    ENCODER_CONTEXT* context = (ENCODER_CONTEXT*)malloc(sizeof(ENCODER_CONTEXT));
+ENCODER_CONTEXT* lzx_create_compression(uint8_t* dest) {
+    ENCODER_CONTEXT* context = (ENCODER_CONTEXT*)calloc(1, sizeof(ENCODER_CONTEXT));
     if (context == NULL)
         return NULL;
 
@@ -1975,14 +1997,14 @@ void lzx_destroy_compression(ENCODER_CONTEXT* context) {
     }
 }
 
-int lzx_compress_block(ENCODER_CONTEXT* context, const uint8_t* src, uint32_t bytes_read) {   
+int lzx_compress_block(ENCODER_CONTEXT* context, const uint8_t* src, uint32_t bytes_read) {
     if (bytes_read > LZX_CHUNK_SIZE) {
         return LZX_ERROR_INVALID_DATA;
     }
-    memcpy(context->input_buffer, src, bytes_read);        
+    memcpy(context->input_buffer, src, bytes_read);
     return encode_data(context, bytes_read);
 }
-int lzx_compress_next_block(ENCODER_CONTEXT* context, const uint8_t** src, uint32_t bytes_read, uint32_t* bytes_remaining) {   
+int lzx_compress_next_block(ENCODER_CONTEXT* context, const uint8_t** src, uint32_t bytes_read, uint32_t* bytes_remaining) {
     int result = lzx_compress_block(context, *src, bytes_read);
     *src += bytes_read;
     if (bytes_remaining != NULL) {
@@ -2001,7 +2023,8 @@ int lzx_compress(const uint8_t* src, const uint32_t src_size, uint8_t** dest, ui
 
     // Allocate a buffer if one was not provided
     if (*dest == NULL) {
-        *dest = (uint8_t*)malloc(src_size);
+        // Compression may expand the block, so extra room is allocated.
+        *dest = (uint8_t*)malloc(src_size + (src_size >> 3) + 1024);
         if (*dest == NULL) {
             result = LZX_ERROR_OUT_OF_MEMORY;
             goto Cleanup;
@@ -2017,7 +2040,7 @@ int lzx_compress(const uint8_t* src, const uint32_t src_size, uint8_t** dest, ui
 
     bytes_remaining = src_size;
     src_ptr = src;
-    
+
     lzx_flush_compression(context);
 
     for (;;) {
@@ -2043,7 +2066,7 @@ int lzx_compress(const uint8_t* src, const uint32_t src_size, uint8_t** dest, ui
     }
 
 Cleanup:
-    
+
     if (context != NULL) {
         lzx_destroy_compression(context);
         context = NULL;
