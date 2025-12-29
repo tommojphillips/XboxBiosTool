@@ -79,6 +79,7 @@ typedef struct {
 	uint8_t bldr_key[SHA1_DIGEST_LEN];
 	uint32_t jmp_offset;
 	int status;
+	uint32_t hash[4];
 } PRELDR;
 
 // 2BL structure
@@ -189,6 +190,8 @@ public:
 	// validate the preldr and decrypt the 2bl.
 	// sets up the preldr struct and decrypts the 2bl.
 	void preldrValidateAndDecryptBldr();
+
+	void preldr_hash();
 
 	// symmetric encryption and decryption for the 2BL.
 	void symmetricEncDecBldr(const uint8_t* key, const uint32_t len);

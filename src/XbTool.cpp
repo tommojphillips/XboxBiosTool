@@ -1581,13 +1581,28 @@ void printBldrInfo(Bios* bios) {
 void printPreldrInfo(Bios* bios) {
 	BIOS_LOAD_PARAMS bios_params = bios->params;
 
-	if (bios->preldr.status > PRELDR_STATUS_FOUND)
+	if (bios->preldr.status > PRELDR_STATUS_FOUND) {
 		return;
+	}
 
-	int jmp_offset = (int)bios->preldr.params->jmp_offset + 5;
-	int jmp_address = PRELDR_REAL_BASE + jmp_offset;
+	uint32_t jmp_offset = bios->preldr.params->jmp_offset + 5;
+	uint32_t jmp_address = PRELDR_REAL_BASE + jmp_offset;
 
 	printf("FBL:\n");
+
+	printf("TEA Hash:\t\t");
+	if (bios->params.mcpx->teahash != NULL) {
+		if (memcmp(bios->preldr.hash, bios->params.mcpx->teahash, 16) == 0) {
+			uprintc(1, "Passed\n");
+		}
+		else {
+			uprintc(0, "Failed\n");
+		}
+	}
+	else {
+		printf("Unknown\n");
+	}
+
 	printf("Entry point:\t\t0x%08x", jmp_address);
 	if (jmp_address == PRELDR_TEA_ATTACK_ENTRY_POINT) {
 		printf(" ( TEA Attack )\n");
@@ -1776,25 +1791,30 @@ void printKeyInfo(Bios* bios) {
 	if (mcpx->sbkey != NULL) {
 		printf("SB key (+%d):\t", mcpx->sbkey - mcpx->data);
 		uprinth(mcpx->sbkey, XB_KEY_SIZE);
+		printf("\n");
+	}
+
+	if (bios->preldr.status <= PRELDR_STATUS_FOUND) {
+		if (bios->params.mcpx->teahash != NULL) {
+			printf("TEA hash:\t");
+			uprinth((uint8_t*)bios->preldr.hash, 16);
+		}
+		printf("Preldr key:\t");
+		uprinth(bios->preldr.bldr_key, SHA1_DIGEST_LEN);
 	}
 
 	if (bios->bldr.bfm_key != NULL) {
-		printf("BFM key:\t");
+		printf("\nBFM key:\t");
 		uprinth(bios->bldr.bfm_key, XB_KEY_SIZE);
 	}
 
 	if (bios->bldr.keys != NULL) {
-		printf("EEPROM key:\t");
+		printf("\nEEPROM key:\t");
 		uprinth(bios->bldr.keys->eeprom_key, XB_KEY_SIZE);
 		printf("Cert key:\t");
 		uprinth(bios->bldr.keys->cert_key, XB_KEY_SIZE);
 		printf("Kernel key:\t");
 		uprinth(bios->bldr.keys->kernel_key, XB_KEY_SIZE);
-	}
-
-	if (bios->preldr.status == PRELDR_STATUS_BLDR_DECRYPTED) {
-		printf("\nPreldr key:\t");
-		uprinth(bios->preldr.bldr_key, SHA1_DIGEST_LEN);
 	}
 
 	if (bios->kernel.img != NULL) {

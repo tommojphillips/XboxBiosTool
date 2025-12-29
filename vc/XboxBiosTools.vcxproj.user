@@ -1,10 +1,11 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommandArguments>-extr bios\og_1_0\3944.bin -mcpx mcpx\mcpx_1.0.bin  -krnl krnl.bin</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-ls bios\custom_512kb_noenc\x2.5035.bin -mcpx mcpx\mcpx_1.1.bin </LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests</LocalDebuggerWorkingDirectory>
     <LocalDebuggerCommand>$(TargetPath)</LocalDebuggerCommand>
+    <LocalDebuggerCommandArgumentsHistory>-ls bios\og_1_1\331_5101.bin -mcpx mcpx\mcpx_1.1.bin |-ls bios\custom_512kb_noenc1\331_5101.bin -mcpx mcpx\mcpx_1.1.bin |-ls bios\custom_512kb_noenc1\ -mcpx mcpx\mcpx_1.1.bin |-ls bios\custom_512kb_noenc1\x2.5035.bin -mcpx mcpx\mcpx_1.1.bin |-ls bios\custom_512kb_noenc\x2.5035.bin -mcpx mcpx\mcpx_1.1.bin |</LocalDebuggerCommandArgumentsHistory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_NO_MEM_TRACKING|Win32'">
     <LocalDebuggerCommandArguments>-extr bios\og_1_0\3944.bin -mcpx mcpx\mcpx_1.0.bin  -krnl krnl.bin</LocalDebuggerCommandArguments>
@@ -16,10 +17,12 @@
     <LocalDebuggerCommandArguments>-extr bios\og_1_0\3944.bin -mcpx mcpx\mcpx_1.0.bin  -krnl krnl.bin</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArgumentsHistory>-extr bios\og_1_0\3944.bin -mcpx mcpx\mcpx_1.0.bin  -krnl krnl.bin|</LocalDebuggerCommandArgumentsHistory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_NO_MEM_TRACKING|Win32'">
-    <LocalDebuggerCommandArguments>-extr bios\og_1_0\3944.bin -mcpx mcpx\mcpx_1.0.bin  -krnl krnl.bin</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-extr bios\og_1_1\331_5101.bin -mcpx mcpx\mcpx_1.1.bin  -keys</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArgumentsHistory>-extr bios\og_1_0\3944.bin -mcpx mcpx\mcpx_1.0.bin  -krnl krnl.bin|-extr bios\og_1_0\3944.bin -mcpx mcpx\mcpx_1.0.bin  -krnl krnl.bin -keys|-extr bios\og_1_1\331_5101.bin -mcpx mcpx\mcpx_1.1.bin  -keys|</LocalDebuggerCommandArgumentsHistory>
   </PropertyGroup>
 </Project>

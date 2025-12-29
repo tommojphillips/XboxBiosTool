@@ -35,6 +35,7 @@
 #include "rc4.h"
 #include "rsa.h"
 #include "sha1.h"
+#include "tea.h"
 
 #ifdef MEM_TRACKING
 #include "mem_tracking.h"
@@ -384,6 +385,8 @@ void Bios::preldrValidateAndDecryptBldr() {
 		return;
 	}
 
+	preldr_hash();
+
 	// get sbkey
 	uint8_t* sbkey = NULL;
 	if (params.bldr_key != NULL) {
@@ -435,6 +438,57 @@ void Bios::preldrValidateAndDecryptBldr() {
 	preldr.status = PRELDR_STATUS_BLDR_DECRYPTED;
 }
 
+void Bios::preldr_hash() {
+
+	const uint32_t* p = (uint32_t*)preldr.data;
+	const uint32_t* end = (uint32_t*)(preldr.data + PRELDR_SIZE);
+	uint32_t k[4] = { 0 };
+	uint32_t h[4] = { 0 };
+	uint32_t tmp;
+
+	/* Initial state; acts as a seed */
+	h[0] = PRELDR_REAL_BASE;  /* EAX */
+	h[1] = PRELDR_REAL_END;   /* EBX */
+
+	if (params.mcpx->flavor == MCPX_FLAVOR_AUTH) {
+		h[2] = PRELDR_REAL_END;   /* [ESP+14] */
+		h[3] = 0x8F000;           /* [ESP+18] (ESP) */
+	}
+	else if (params.mcpx->flavor == MCPX_FLAVOR_MOUSE) {
+		h[2] = PRELDR_REAL_END;
+		h[3] = PRELDR_REAL_BASE;
+	}
+	
+	uint32_t stride = 0;      /* [ESP+1C] */
+
+	while (p < end) {
+		k[0] = h[0];
+		k[1] = h[1];
+		k[2] = p[0];
+		k[3] = p[1];
+
+		tea_encrypt(h, k);
+
+		/* Exchange h0 <-> h2 */
+		tmp = h[2]; 
+		h[2] = h[0];
+		h[0] = tmp;
+
+		/* Exchange h1 <-> h3 */
+		tmp = h[3]; 
+		h[3] = h[1];
+		h[1] = tmp;
+
+		/* Add 8 every other run to hash all 16 bytes */
+		p += stride;
+		stride ^= 2; /* 2 dwords (8 bytes) */
+	}
+
+	preldr.hash[0] = h[0];
+	preldr.hash[1] = h[1];
+	preldr.hash[2] = h[2];
+	preldr.hash[3] = h[3];
+}
 void Bios::preldrSymmetricEncDecBldr(const uint8_t* key, const uint32_t len) {
 	// encrypt / decrypt 2bl ( preserve preldr block )
 
@@ -460,6 +514,7 @@ void Bios::preldrSymmetricEncDecBldr(const uint8_t* key, const uint32_t len) {
 
 	bldr.encryption_state = !bldr.encryption_state;
 }
+
 void Bios::symmetricEncDecBldr(const uint8_t* key, const uint32_t len) {
 	// encrypt / decrypt 2bl
 

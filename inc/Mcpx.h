@@ -32,10 +32,18 @@ typedef enum {
 	MCPX_REV_1,
 } MCPX_REV;
 
+typedef enum {
+	MCPX_FLAVOR_UNK,
+	MCPX_FLAVOR_AUTH,
+	MCPX_FLAVOR_MOUSE,
+} MCPX_FLAVOR;
+
 typedef struct {	
 	uint8_t* data;
 	uint8_t* sbkey;
+	uint8_t* teahash;
 	MCPX_REV rev;
+	MCPX_FLAVOR flavor;
 	uint8_t hash[20];
 } MCPX;
 

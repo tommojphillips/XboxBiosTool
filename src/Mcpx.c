@@ -20,6 +20,7 @@
 // GitHub: https:\\github.com\tommojphillips
 
 // std incl
+#include <stdint.h>
 #include <string.h>
 #include <malloc.h>
 
@@ -35,7 +36,7 @@
 // Used to verify the integrity of the mcpx rom
 
 // MCPX V1.0
-const uint8_t MCPX_V1_0_SHA1_HASH[SHA1_DIGEST_LEN] = {
+static const uint8_t MCPX_V1_0_SHA1_HASH[SHA1_DIGEST_LEN] = {
 	0x5d, 0x27, 0x06, 0x75,
 	0xb5, 0x4e, 0xb8, 0x07,
 	0x1b, 0x48, 0x0e, 0x42,
@@ -44,7 +45,7 @@ const uint8_t MCPX_V1_0_SHA1_HASH[SHA1_DIGEST_LEN] = {
 };
 
 // MCPX V1.1
-const uint8_t MCPX_V1_1_SHA1_HASH[SHA1_DIGEST_LEN] = {
+static const uint8_t MCPX_V1_1_SHA1_HASH[SHA1_DIGEST_LEN] = {
 	0x6c, 0x87, 0x5f, 0x17,
 	0xf7, 0x73, 0xaa, 0xec,
 	0x51, 0xeb, 0x43, 0x40,
@@ -52,17 +53,8 @@ const uint8_t MCPX_V1_1_SHA1_HASH[SHA1_DIGEST_LEN] = {
 	0x7c, 0x43, 0x43, 0xc0
 };
 
-// MOUSE rev 1 v0.9.0
-const uint8_t MOUSE_REV1_SHA1_HASH[SHA1_DIGEST_LEN] = {
-	0x15, 0x13, 0xab, 0xcb,
-	0x6b, 0x97, 0x9f, 0x79,
-	0x53, 0x6f, 0xcf, 0x0e,
-	0xd9, 0x67, 0xf3, 0x77,
-	0x55, 0xe0, 0x7f, 0x9b
-};
-
 // MOUSE rev 0 v0.9.0
-const uint8_t MOUSE_REV0_SHA1_HASH[SHA1_DIGEST_LEN] = {
+static const uint8_t MOUSE_REV0_SHA1_HASH[SHA1_DIGEST_LEN] = {
 	0xb9, 0xe8, 0x8e, 0x37,
 	0x50, 0x40, 0xbf, 0xaf,
 	0x90, 0x28, 0x15, 0xbe,
@@ -70,8 +62,18 @@ const uint8_t MOUSE_REV0_SHA1_HASH[SHA1_DIGEST_LEN] = {
 	0x05, 0x14, 0x71, 0x37
 };
 
+// MOUSE rev 1 v0.9.0
+static const uint8_t MOUSE_REV1_SHA1_HASH[SHA1_DIGEST_LEN] = {
+	0x15, 0x13, 0xab, 0xcb,
+	0x6b, 0x97, 0x9f, 0x79,
+	0x53, 0x6f, 0xcf, 0x0e,
+	0xd9, 0x67, 0xf3, 0x77,
+	0x55, 0xe0, 0x7f, 0x9b
+};
+
 void mcpx_init(MCPX* mcpx) {
 	mcpx->rev = MCPX_REV_UNK;
+	mcpx->flavor = MCPX_FLAVOR_UNK;
 	mcpx->data = NULL;
 	mcpx->sbkey = NULL;
 	memset(mcpx->hash, 0, SHA1_DIGEST_LEN);
@@ -83,6 +85,7 @@ void mcpx_free(MCPX* mcpx) {
 	}
 	mcpx->sbkey = NULL;
 	mcpx->rev = MCPX_REV_UNK;
+	mcpx->flavor = MCPX_FLAVOR_UNK;
 }
 
 int mcpx_load(MCPX* mcpx, uint8_t* data) {
@@ -100,28 +103,31 @@ int mcpx_load(MCPX* mcpx, uint8_t* data) {
 	if (memcmp(mcpx->hash, MCPX_V1_0_SHA1_HASH, SHA1_DIGEST_LEN) == 0) {
 		// mcpx v1.0 
 		mcpx->rev = MCPX_REV_0;
+		mcpx->flavor = MCPX_FLAVOR_AUTH;
 		mcpx->sbkey = (mcpx->data + 0x1A5);
+		mcpx->teahash = (mcpx->data); /* no tea hash */
 	}
 	else if (memcmp(mcpx->hash, MCPX_V1_1_SHA1_HASH, SHA1_DIGEST_LEN) == 0) {
 		// mcpx v1.1
 		mcpx->rev = MCPX_REV_1;
+		mcpx->flavor = MCPX_FLAVOR_AUTH;
 		mcpx->sbkey = (mcpx->data + 0x19C);
+		mcpx->teahash = (mcpx->data + 0x1A8);
 		return 0;
-	}
-	else if (memcmp(mcpx->hash, MOUSE_REV0_SHA1_HASH, SHA1_DIGEST_LEN) == 0) {
-		// mouse rev.0 v0.8.0
-		mcpx->rev = MCPX_REV_0;
-		mcpx->sbkey = (mcpx->data + 0x19C);
-	} 
-	else if (memcmp(mcpx->hash, MOUSE_REV1_SHA1_HASH, SHA1_DIGEST_LEN) == 0) {
-		// mouse rev.1 v0.8.0
-		mcpx->rev = MCPX_REV_1;
-		mcpx->sbkey = (mcpx->data + 0x19C);
 	}
 	else if (memcmp(mcpx->hash, MOUSE_REV0_SHA1_HASH, SHA1_DIGEST_LEN) == 0) {
 		// mouse rev.0 v0.9.0
 		mcpx->rev = MCPX_REV_0;
+		mcpx->flavor = MCPX_FLAVOR_MOUSE;
 		mcpx->sbkey = (mcpx->data + 0x19C);
+		mcpx->teahash = (mcpx->data); /* no tea hash */
+	}
+	else if (memcmp(mcpx->hash, MOUSE_REV1_SHA1_HASH, SHA1_DIGEST_LEN) == 0) {
+		// mouse rev.1 v0.9.0
+		mcpx->rev = MCPX_REV_1;
+		mcpx->flavor = MCPX_FLAVOR_MOUSE;
+		mcpx->sbkey = (mcpx->data + 0x19C);
+		mcpx->teahash = (mcpx->data + 0x14D);
 	}
 	else {
 		// mcpx hash doesnt match; unknown mcpx dump;
