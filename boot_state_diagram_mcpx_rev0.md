@@ -17,4 +17,3 @@ click 2BL_ENTRY "https://github.com/tommojphillips/XboxBiosTool/blob/master/boot
 ```
 
 - [MCPX V1.1](boot_state_diagram_mcpx_rev1.md)
-- [FBL](boot_state_diagram_fbl.md)
