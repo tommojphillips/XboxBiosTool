@@ -1,5 +1,6 @@
+## 2BL
 ```mermaid
-flowchart
+flowchart TB
 
 MCPX_REV0[MCPX X3 1.0]-->2BL_ENTRY
 FBL[FBL]-->2BL_ENTRY
