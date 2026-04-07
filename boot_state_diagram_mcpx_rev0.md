@@ -16,4 +16,4 @@ SB_SHUTDOWN[SB Shutdown]
 click 2BL_ENTRY "https://github.com/tommojphillips/XboxBiosTool/blob/master/boot_state_diagram_2bl.md"
 ```
 
-- [MCPX V1.1](boot_state_diagram_mcpx_rev1.md)
+- [MCPX X3 1.1](boot_state_diagram_mcpx_rev1.md)
