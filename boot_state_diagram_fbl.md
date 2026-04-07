@@ -1,5 +1,5 @@
 ```mermaid
-graph TD;
+flowchart TB
 
 FBL_ENTRY[FBL Entry]-->DECRYPT_PK
 DECRYPT_PK[RC4 Decrypt Public Key]-->HASH_XBOX_ROM
@@ -15,6 +15,8 @@ DECRYPT_2BL[RC4 Decrypt 2BL]-->2BL_ENTRY
 
 SHUTDOWN[FBL Shutdown]
 2BL_ENTRY[Jump to 2BL Entry]
+
+click 2BL_ENTRY "https://github.com/tommojphillips/XboxBiosTool/blob/master/boot_state_diagram_2bl.md"
 
 ```
 
