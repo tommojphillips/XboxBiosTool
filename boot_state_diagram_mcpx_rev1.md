@@ -1,5 +1,5 @@
 ```mermaid
-graph TD;
+flowchart TB
 
 PWR_ON[Power On]-->SB_XCODE_INTERP
 SB_XCODE_INTERP[Run Xcode Interpreter]-->SB_HASH_FBL
@@ -12,8 +12,7 @@ SB_DOES_HASH_MATCH-->|No|SB_SHUTDOWN
 SB_SHUTDOWN[SB Shutdown]
 FBL_ENTRY[Jump to FBL Entry]
 
+click FBL_ENTRY "https://github.com/tommojphillips/XboxBiosTool/blob/master/boot_state_diagram_fbl.md"
 ```
 
 - [MCPX V1.0](boot_state_diagram_mcpx_rev0.md)
-- [FBL](boot_state_diagram_fbl.md)
-- [2BL](boot_state_diagram_2bl.md)
