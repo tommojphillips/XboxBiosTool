@@ -1,6 +1,9 @@
 ```mermaid
 flowchart
 
+MCPX_REV0[MCPX X3 1.0]->2BL_ENTRY
+FBL[FBL]->2BL_ENTRY
+
 2BL_ENTRY[2BL Entry]-->2BL_DISABLE_SB
 2BL_DISABLE_SB[Disable SB ROM]-->2BL_HASH_ROM
 
@@ -19,8 +22,6 @@ flowchart
 2BL_SHUTDOWN[2BL Shutdown]
 KERNEL_ENTRY[Jump to Kernel Entry]
 
+click MCPX_REV0 "https://github.com/tommojphillips/XboxBiosTool/blob/master/boot_state_diagram_mcpx_rev0.md"
+click FBL "https://github.com/tommojphillips/XboxBiosTool/blob/master/boot_state_diagram_fbl.md"
 ```
-
-- [MCPX V1.0](boot_state_diagram_mcpx_rev0.md)
-- [MCPX V1.1](boot_state_diagram_mcpx_rev1.md)
-- [FBL](boot_state_diagram_fbl.md)
