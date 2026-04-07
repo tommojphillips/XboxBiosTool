@@ -23,5 +23,3 @@ click 2BL_ENTRY "https://github.com/tommojphillips/XboxBiosTool/blob/master/boot
 click MCPX_REV1 "https://github.com/tommojphillips/XboxBiosTool/blob/master/boot_state_diagram_mcpx_rev1.md"
 
 ```
-
-- [MCPX X3 V1.0](boot_state_diagram_mcpx_rev0.md)
