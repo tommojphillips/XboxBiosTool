@@ -1,5 +1,6 @@
+## MCPX X3 1.0
 ```mermaid
-graph TD;
+flowchart TB
 
 PWR_ON[Power On]-->SB_XCODE_INTERP
 SB_XCODE_INTERP[Run Xcode Interpreter]-->SB_DECRYPT_2BL
@@ -11,8 +12,9 @@ SB_IS_2BL_VALID-->|No|SB_SHUTDOWN
 
 2BL_ENTRY[Jump to 2BL Entry]
 SB_SHUTDOWN[SB Shutdown]
+
+click 2BL_ENTRY "https://github.com/tommojphillips/XboxBiosTool/blob/master/boot_state_diagram_2bl.md"
 ```
 
 - [MCPX V1.1](boot_state_diagram_mcpx_rev1.md)
 - [FBL](boot_state_diagram_fbl.md)
-- [2BL](boot_state_diagram_2bl.md)
