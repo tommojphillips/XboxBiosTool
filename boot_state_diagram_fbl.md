@@ -1,5 +1,8 @@
+## FBL
 ```mermaid
 flowchart TB
+
+MCPX_REV1[MCPX X3 1.1]-->FBL_ENTRY
 
 FBL_ENTRY[FBL Entry]-->DECRYPT_PK
 DECRYPT_PK[RC4 Decrypt Public Key]-->HASH_XBOX_ROM
@@ -17,9 +20,8 @@ SHUTDOWN[FBL Shutdown]
 2BL_ENTRY[Jump to 2BL Entry]
 
 click 2BL_ENTRY "https://github.com/tommojphillips/XboxBiosTool/blob/master/boot_state_diagram_2bl.md"
+click MCPX_REV1 "https://github.com/tommojphillips/XboxBiosTool/blob/master/boot_state_diagram_mcpx_rev1.md"
 
 ```
 
-- [MCPX V1.0](boot_state_diagram_mcpx_rev0.md)
-- [MCPX V1.1](boot_state_diagram_mcpx_rev1.md)
-- [2BL](boot_state_diagram_2bl.md)
+- [MCPX X3 V1.0](boot_state_diagram_mcpx_rev0.md)
