@@ -11,7 +11,10 @@ SB_IS_2BL_VALID-->|Yes|2BL_ENTRY
 SB_IS_2BL_VALID-->|No|SB_SHUTDOWN
 
 2BL_ENTRY[Jump to 2BL Entry]
-SB_SHUTDOWN[SB Shutdown]
+SB_SHUTDOWN[Shutdown]-->SB_DISABLE
+
+SB_DISABLE[Disable MCPX ROM]-->ATTEMPT_TRIPLE_FAULT
+ATTEMPT_TRIPLE_FAULT[Attempt Triple Fault]
 
 click 2BL_ENTRY "https://github.com/tommojphillips/XboxBiosTool/blob/master/boot_state_diagram_2bl.md"
 ```
